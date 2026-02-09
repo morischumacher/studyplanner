@@ -20,6 +20,7 @@ import "reactflow/dist/style.css";
 
 import { fetchCatalog } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
+import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
 import {
     CANVAS_HEIGHT,
     CARD_WIDTH,
@@ -144,6 +145,7 @@ const normalizeCatalog = (raw) => {
  ****************/
 export default function App() {
     const { programCode, setCoursesFromNodes, coursesBySemester } = currentProgram();
+    const [viewMode, setViewMode] = useState("table");
 
     // Catalog state
     const [catalog, setCatalog] = useState([]);
@@ -537,6 +539,16 @@ export default function App() {
         return nodes;
     }
 
+    if (viewMode === "graph") {
+        return (
+            <CurriculumGraphView
+                catalog={catalog}
+                subjectColors={subjectColors}
+                onSwitchToTable={() => setViewMode("table")}
+            />
+        );
+    }
+
     /***********
      * Render  *
      ***********/
@@ -553,6 +565,23 @@ export default function App() {
             />
 
             <div style={{ flex: 1, position: "relative" }}>
+                <button
+                    onClick={() => setViewMode("graph")}
+                    style={{
+                        position: "absolute",
+                        top: 12,
+                        left: 12,
+                        zIndex: 5,
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    Graph View
+                </button>
                 <div className="rf-wrapper" ref={wrapperRef} onDrop={onDrop} onDragOver={onDragOver} style={{ position: "absolute", inset: 0 }}>
                     <ReactFlow
                         onInit={(inst) => (rfRef.current = inst)}
