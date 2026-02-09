@@ -5,7 +5,18 @@ import {
 } from "../utils/examSubjectColors.js";
 
 /** Sidebar — catalog + drag sources */
-export default function Sidebar({ catalog, loading, error, expandedSet, togglePf, onDragStart, subjectColors }) {
+export default function Sidebar({
+    catalog,
+    loading,
+    error,
+    expandedSet,
+    togglePf,
+    onDragStart,
+    subjectColors,
+    programCode,
+    setProgramCode,
+    programOptions,
+}) {
     return (
         <aside
             style={{
@@ -17,6 +28,26 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
             }}
         >
             <div style={{ fontSize: 18, fontWeight: 600 }}>Course Catalog</div>
+            <div style={{ display: "grid", gap: 6, margin: "10px 0 12px" }}>
+                <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Study Program</label>
+                <select
+                    value={programCode}
+                    onChange={(e) => setProgramCode?.(e.target.value)}
+                    style={{
+                        border: "1px solid #d1d5db",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        background: "#fff",
+                        fontSize: 14,
+                    }}
+                >
+                    {(programOptions || []).map((opt) => (
+                        <option key={opt.code} value={opt.code}>
+                            {opt.label} ({opt.code})
+                        </option>
+                    ))}
+                </select>
+            </div>
             <p style={{ fontSize: 14, color: "#6b7280" }}>
                 Drag a course or a multi-course module into any semester lane.
             </p>

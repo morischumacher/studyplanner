@@ -70,7 +70,7 @@ function buildCoursesOnlyFromNodes(nodes) {
 
 export function ProgramProvider({ children }) {
     // Your existing field:
-    const [programCode, setProgramCode] = useState("066 937");   // :contentReference[oaicite:2]{index=2}
+    const [programCode, setProgramCode] = useState("066 937");
 
     // New: "courses-only" plan
     const [coursesBySemester, setCoursesBySemester] = useState(() => emptyCoursesOnlyPlan());

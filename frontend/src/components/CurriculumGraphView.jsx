@@ -1,13 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, useNodesState } from "reactflow";
 import "reactflow/dist/style.css";
-import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../utils/examSubjectColors.js";
 import { CARD_WIDTH, NODE_HEIGHT } from "../utils/constants.js";
+import {
+    GraphCourseNode,
+    GraphModuleNode,
+    GraphRootNode,
+    GraphSubjectNode,
+} from "./graphNodes/index.js";
 
 const X_BY_LEVEL = {
     root: 40,
     subject: 340,
     module: 660,
+    courseDirect: 660,
     course: 980,
 };
 
@@ -16,89 +22,60 @@ const GRAPH_NODE_HEIGHT = NODE_HEIGHT;
 const LEAF_VERTICAL_SPACING = 92;
 const NODE_COLLISION_GAP = 12;
 
-function styleForNode(level, baseColor) {
-    const subjectColor = baseColor || "#4b5563";
-    const baseCard = {
-        width: GRAPH_NODE_WIDTH,
-        height: GRAPH_NODE_HEIGHT,
-        borderRadius: 10,
-        boxSizing: "border-box",
-        display: "-webkit-box",
-        padding: "8px 12px",
-        overflow: "hidden",
-        overflowWrap: "anywhere",
-        lineHeight: 1.25,
-        WebkitBoxOrient: "vertical",
-        WebkitLineClamp: 2,
-        textOverflow: "ellipsis",
-        whiteSpace: "normal",
-    };
+const NODE_TYPES = {
+    graphRoot: GraphRootNode,
+    graphSubject: GraphSubjectNode,
+    graphModule: GraphModuleNode,
+    graphCourse: GraphCourseNode,
+};
 
-    switch (level) {
-        case "root":
-            return {
-                ...baseCard,
-                background: "#111827",
-                color: "#ffffff",
-                border: "2px solid #111827",
-                fontWeight: 700,
-                fontSize: 14,
-            };
-        case "subject":
-            return {
-                ...baseCard,
-                background: subjectColor,
-                color: "#ffffff",
-                border: `2px solid ${subjectColor}`,
-                fontWeight: 700,
-                fontSize: 13,
-            };
-        case "module":
-            return {
-                ...baseCard,
-                background: hexToRgba(subjectColor, MODULE_GROUP_COLOR_ALPHA),
-                color: "#111827",
-                border: `2px solid ${subjectColor}`,
-                fontWeight: 600,
-                fontSize: 12,
-            };
-        case "course":
-        default:
-            return {
-                ...baseCard,
-                background: "#ffffff",
-                color: "#111827",
-                border: `1px solid ${subjectColor}`,
-                borderLeft: `6px solid ${subjectColor}`,
-                boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
-                fontWeight: 600,
-                fontSize: 12,
-            };
-    }
+function nodeTypeForLevel(level) {
+    if (level === "root") return "graphRoot";
+    if (level === "subject") return "graphSubject";
+    if (level === "module") return "graphModule";
+    return "graphCourse";
 }
 
 function buildTree(catalog, subjectColors) {
     const subjects = (catalog || []).map((pf, pfIdx) => {
         const subjectName = pf?.pruefungsfach ?? `Pruefungsfach ${pfIdx + 1}`;
         const subjectColor = subjectColors?.[subjectName] ?? "#4b5563";
-        return {
-            id: `subject-${pfIdx}-${subjectName}`,
-            label: subjectName,
-            level: "subject",
-            color: subjectColor,
-            children: (pf?.modules || []).map((mod, modIdx) => ({
+        const modules = (pf?.modules || []).flatMap((mod, modIdx) => {
+            const courses = mod?.courses || [];
+
+            // Match table behavior: module wrapper only if module has multiple courses.
+            if (courses.length === 1) {
+                const course = courses[0];
+                return [{
+                    id: `course-${pfIdx}-${modIdx}-single-${course?.code || mod?.code || "course"}`,
+                    label: `${course?.code ? `${course.code} · ` : ""}${course?.name || mod?.name || "Course"}`,
+                    level: "courseDirect",
+                    color: subjectColor,
+                    children: [],
+                }];
+            }
+
+            return [{
                 id: `module-${pfIdx}-${modIdx}-${mod?.code || mod?.name || "module"}`,
                 label: `${mod?.code ? `${mod.code} · ` : ""}${mod?.name || "Module"}`,
                 level: "module",
                 color: subjectColor,
-                children: (mod?.courses || []).map((course, courseIdx) => ({
+                children: courses.map((course, courseIdx) => ({
                     id: `course-${pfIdx}-${modIdx}-${courseIdx}-${course?.code || "course"}`,
                     label: `${course?.code ? `${course.code} · ` : ""}${course?.name || "Course"}`,
                     level: "course",
                     color: subjectColor,
                     children: [],
                 })),
-            })),
+            }];
+        });
+
+        return {
+            id: `subject-${pfIdx}-${subjectName}`,
+            label: subjectName,
+            level: "subject",
+            color: subjectColor,
+            children: modules,
         };
     });
 
@@ -142,6 +119,7 @@ function layoutTree(root, collapsedIds) {
         const x = X_BY_LEVEL[node.level] ?? depth * 320;
         nodes.push({
             id: node.id,
+            type: nodeTypeForLevel(node.level),
             position: { x, y },
             data: {
                 label: `${prefix}${node.label}`,
@@ -152,7 +130,6 @@ function layoutTree(root, collapsedIds) {
             },
             sourcePosition: "right",
             targetPosition: "left",
-            style: styleForNode(node.level, node.color),
         });
 
         if (parentId) {
@@ -287,7 +264,14 @@ function enforceHierarchicalOrder(nodes, subjectOrder, movedNodeIds) {
     return Array.from(byId.values());
 }
 
-export default function CurriculumGraphView({ catalog, subjectColors, onSwitchToTable }) {
+export default function CurriculumGraphView({
+    catalog,
+    subjectColors,
+    onSwitchToTable,
+    programCode,
+    setProgramCode,
+    programOptions,
+}) {
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
     const [collapsedIds, setCollapsedIds] = useState(() => collectCollapsibleIds(root));
 
@@ -386,9 +370,32 @@ export default function CurriculumGraphView({ catalog, subjectColors, onSwitchTo
             >
                 Reorder
             </button>
+            <select
+                value={programCode}
+                onChange={(e) => setProgramCode?.(e.target.value)}
+                style={{
+                    position: "absolute",
+                    top: 12,
+                    left: 214,
+                    zIndex: 5,
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontWeight: 600,
+                    minWidth: 290,
+                }}
+            >
+                {(programOptions || []).map((opt) => (
+                    <option key={opt.code} value={opt.code}>
+                        {opt.label} ({opt.code})
+                    </option>
+                ))}
+            </select>
             <ReactFlow
                 nodes={displayNodes}
                 edges={edges}
+                nodeTypes={NODE_TYPES}
                 onNodeClick={onNodeClick}
                 onNodesChange={onNodesChange}
                 onNodeDragStart={onNodeDragStart}

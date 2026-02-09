@@ -45,6 +45,11 @@ const NODE_TYPES = {
     moduleBg: ModuleGroupBackground,
 };
 
+const PROGRAM_OPTIONS = [
+    { code: "066 937", label: "Master Software Engineering" },
+    { code: "033 521", label: "Bachelor Informatics" },
+];
+
 /** Return lane index for a node (based on its X). */
 function laneIdx(node) {
     return laneIndexFromX(node.position.x);
@@ -144,7 +149,7 @@ const normalizeCatalog = (raw) => {
  * Main component
  ****************/
 export default function App() {
-    const { programCode, setCoursesFromNodes, coursesBySemester } = currentProgram();
+    const { programCode, setProgramCode, setCoursesFromNodes, coursesBySemester } = currentProgram();
     const [viewMode, setViewMode] = useState("table");
 
     // Catalog state
@@ -207,6 +212,14 @@ export default function App() {
 
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
+
+    // Changing the study program invalidates placed nodes from the previous catalog.
+    // Keep only empty lane backgrounds and clear persisted semester storage.
+    useEffect(() => {
+        setNodes([...laneNodes]);
+        setCoursesFromNodes([]);
+        setNeedsPersist(false);
+    }, [programCode, laneNodes, setNodes, setCoursesFromNodes]);
 
     /***********************
      * Sidebar drag & drop *
@@ -545,6 +558,9 @@ export default function App() {
                 catalog={catalog}
                 subjectColors={subjectColors}
                 onSwitchToTable={() => setViewMode("table")}
+                programCode={programCode}
+                setProgramCode={setProgramCode}
+                programOptions={PROGRAM_OPTIONS}
             />
         );
     }
@@ -562,6 +578,9 @@ export default function App() {
                 togglePf={togglePf}
                 onDragStart={handleDragStart}
                 subjectColors={subjectColors}
+                programCode={programCode}
+                setProgramCode={setProgramCode}
+                programOptions={PROGRAM_OPTIONS}
             />
 
             <div style={{ flex: 1, position: "relative" }}>
