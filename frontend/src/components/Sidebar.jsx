@@ -1,50 +1,11 @@
 import React from "react";
-import { TYPE_COLORS } from "../utils/constants.js";
-
-// normalize the module type for styling
-const typeFromModule = (m) =>
-    m?.is_mandatory ? "mandatory" : (m?.category ?? "unknown");
-
-function Legend() {
-    const item = (label, key) => (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <span
-          aria-hidden
-          style={{
-              width: 12,
-              height: 12,
-              borderRadius: 3,
-              background: TYPE_COLORS[key].bg,
-              border: `1px solid ${TYPE_COLORS[key].border}`,
-              display: "inline-block",
-          }}
-      />
-            <span style={{ fontSize: 12 }}>{label}</span>
-        </div>
-    );
-    return (
-        <div
-            style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-                padding: "8px 10px 12px",
-                background: "#fafafa",
-                border: "1px solid #e5e7eb",
-                borderRadius: 10,
-                marginTop: 8,
-                marginBottom: 12,
-            }}
-        >
-            {item("Mandatory", "mandatory")}
-            {item("Core", "core")}
-            {item("Elective", "elective")}
-        </div>
-    );
-}
+import {
+    hexToRgba,
+    MODULE_GROUP_COLOR_ALPHA,
+} from "../utils/examSubjectColors.js";
 
 /** Sidebar — catalog + drag sources */
-export default function Sidebar({ catalog, loading, error, expandedSet, togglePf, onDragStart }) {
+export default function Sidebar({ catalog, loading, error, expandedSet, togglePf, onDragStart, subjectColors }) {
     return (
         <aside
             style={{
@@ -60,8 +21,6 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                 Drag a course or a multi-course module into any semester lane.
             </p>
 
-            <Legend />
-
             {!(Array.isArray(catalog) && catalog.length > 0) && (
                 <div style={{ fontSize: 14, color: "#6b7280", margin: "8px 0 12px" }}>
                     {loading ? "Lade Katalog ..." : (error ? `Fehler beim Laden: ${error}` : "Kein Katalog gefunden.")}
@@ -73,9 +32,12 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                     const pfName = pf.pruefungsfach ?? `Prüfungsfach ${pfIdx + 1}`;
                     const modules = Array.isArray(pf.modules) ? pf.modules : [];
                     const isOpen = expandedSet.has(pfName);
+                    const subjectColor = subjectColors?.[pfName] ?? "#2563eb";
+                    const subjectSoft = hexToRgba(subjectColor, 0.22);
+                    const moduleColor = hexToRgba(subjectColor, MODULE_GROUP_COLOR_ALPHA);
 
                     return (
-                        <div key={`pf-${pfIdx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}>
+                        <div key={`pf-${pfIdx}`} style={{ border: `2px solid ${subjectColor}`, borderRadius: 12, background: "#fff" }}>
                             {/* Header */}
                             <button
                                 onClick={() => togglePf(pfName)}
@@ -83,9 +45,9 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                                     width: "100%",
                                     textAlign: "left",
                                     padding: "10px 12px",
-                                    background: "transparent",
+                                    background: subjectColor,
                                     border: "none",
-                                    borderBottom: "1px solid #e5e7eb",
+                                    borderBottom: `1px solid ${subjectColor}`,
                                     display: "flex",
                                     alignItems: "center",
                                     gap: 8,
@@ -99,14 +61,14 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                         display: "inline-block",
                         transform: `rotate(${isOpen ? 90 : 0}deg)`,
                         transition: "transform 0.15s ease",
-                        color: "#6b7280",
+                        color: "#ffffff",
                         fontWeight: 700,
                     }}
                 >
                   ▶
                 </span>
-                                <span style={{ fontWeight: 700 }}>{pfName}</span>
-                                <span style={{ marginLeft: "auto", color: "#6b7280", fontSize: 12 }}>
+                                <span style={{ fontWeight: 700, color: "#ffffff" }}>{pfName}</span>
+                                <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.9)", fontSize: 12 }}>
                   {modules.length} Module
                 </span>
                             </button>
@@ -116,7 +78,6 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                                 <div style={{ padding: "8px 10px 12px 10px", display: "grid", gap: 8 }}>
                                     {modules.map((mod, modIdx) => {
                                         const courses = Array.isArray(mod.courses) ? mod.courses : [];
-                                        const cat = typeFromModule(mod);
 
                                         // Case B: single course → drag that one (use the course's code!)
                                         if (courses.length === 1) {
@@ -130,13 +91,14 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                                                             kind: "course",
                                                             code: course.code ?? mod.code,
                                                             name: course.name ?? mod.name,
-                                                            category: cat,
+                                                            category: mod?.category ?? null,
+                                                            subjectColor,
                                                         })
                                                     }
                                                     title="Drag into the graph"
                                                     style={{
                                                         textAlign: "left",
-                                                        border: "1px solid #e5e7eb",
+                                                        border: `1px solid ${subjectColor}`,
                                                         borderRadius: 12,
                                                         background: "#fff",
                                                         padding: "10px 12px",
@@ -154,14 +116,15 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                                             kind: "module",
                                             code: mod.code,
                                             name: mod.name,
-                                            category: cat,
+                                            category: mod?.category ?? null,
+                                            subjectColor,
                                             courses: courses.map((c) => ({ code: c.code, name: c.name })),
                                         };
 
                                         return (
                                             <div
                                                 key={`pf${pfIdx}-${mod.code || modIdx}`}
-                                                style={{ border: "1px solid #e5e7eb", borderRadius: 12, background: "#fff" }}
+                                                style={{ border: `1px solid ${subjectSoft}`, borderRadius: 12, background: "#fff" }}
                                             >
                                                 <button
                                                     draggable
@@ -171,8 +134,8 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                                                         width: "100%",
                                                         textAlign: "left",
                                                         border: "none",
-                                                        borderBottom: "1px solid #e5e7eb",
-                                                        background: "#f3f4f6",
+                                                        borderBottom: `1px solid ${subjectSoft}`,
+                                                        background: moduleColor,
                                                         padding: 12,
                                                         display: "grid",
                                                         gap: 8,
@@ -197,13 +160,14 @@ export default function Sidebar({ catalog, loading, error, expandedSet, togglePf
                                                                     kind: "course",
                                                                     code: course?.code ?? mod.code, // prefer the real course code
                                                                     name: course?.name ?? mod.name,
-                                                                    category: cat,
+                                                                    category: mod?.category ?? null,
+                                                                    subjectColor,
                                                                 })
                                                             }
                                                             title="Drag only this course into the graph"
                                                             style={{
                                                                 textAlign: "left",
-                                                                border: "1px solid #e5e7eb",
+                                                                border: `1px solid ${subjectColor}`,
                                                                 borderRadius: 10,
                                                                 background: "#fff",
                                                                 padding: "8px 10px",

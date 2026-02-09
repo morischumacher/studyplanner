@@ -26,6 +26,7 @@ function buildCoursesOnlyFromNodes(nodes) {
                 title: n?.data?.title ?? n?.data?.label ?? "Module",
                 examSubject: n?.data?.examSubject ?? null,
                 category: n?.data?.category ?? "unknown",
+                subjectColor: n?.data?.subjectColor ?? null,
             });
         }
     }
@@ -51,6 +52,7 @@ function buildCoursesOnlyFromNodes(nodes) {
             // keep visual info around if you need ordering later:
             position: { x: n?.position?.x ?? 0, y: n?.position?.y ?? 0 },
             laneIndex: laneIdx,
+            subjectColor: n?.data?.subjectColor ?? null,
             // embed module reference (no separate module store):
             module: n?.data?.groupId ? { ...modMeta } : null,
         };

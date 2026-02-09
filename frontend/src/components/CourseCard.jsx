@@ -1,16 +1,17 @@
 import React from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, } from "../utils/constants.js";
-import { colorForType } from "../utils/constants.js";
+import { CARD_WIDTH, colorForType } from "../utils/constants.js";
+import { hexToRgba } from "../utils/examSubjectColors.js";
 
 /** CourseCard — React Flow node renderer */
-export default function CourseCard({ id, data }) {
+export default function CourseCard({ data }) {
     const handleRemove = (e) => {
         e.stopPropagation();
         data?.onRemove?.(data.nodeId);
     };
 
-    const tcol = colorForType(data?.category);
+    const fallback = colorForType(data?.category);
+    const subjectColor = data?.subjectColor ?? fallback.border;
 
     return (
         <div
@@ -18,8 +19,8 @@ export default function CourseCard({ id, data }) {
             style={{
                 width: CARD_WIDTH,
                 position: "relative",
-                background: tcol.faint,
-                border: `1px solid ${tcol.border}`,
+                background: "#fff",
+                border: `1px solid ${subjectColor}`,
                 borderLeftWidth: 6,
                 borderRadius: 10,
                 padding: 12,
@@ -48,14 +49,14 @@ export default function CourseCard({ id, data }) {
             )}
 
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                <div className="title" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2, color: tcol.text }}>
+                <div className="title" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2, color: "#111827" }}>
                     {data.label}
                 </div>
             </div>
 
-            <div className="muted" style={{ fontSize: 12, color: tcol.text, opacity: 0.8 }}>{data.code}</div>
+            <div className="muted" style={{ fontSize: 12, color: "#374151", opacity: 0.9 }}>{data.code}</div>
             {data.ects ? (
-                <div className="muted" style={{ fontSize: 12, color: tcol.text, opacity: 0.75 }}>{data.ects} ECTS</div>
+                <div className="muted" style={{ fontSize: 12, color: "#374151", opacity: 0.8 }}>{data.ects} ECTS</div>
             ) : null}
 
             {data.onRemove && (
@@ -67,9 +68,9 @@ export default function CourseCard({ id, data }) {
                         position: "absolute",
                         top: 6,
                         right: 6,
-                        border: `1px solid ${tcol.border}`,
-                        background: "#fff",
-                        color: tcol.text,
+                        border: `1px solid ${subjectColor}`,
+                        background: hexToRgba(subjectColor, 0.08),
+                        color: "#111827",
                         borderRadius: 6,
                         fontSize: 12,
                         padding: "2px 6px",

@@ -14,7 +14,6 @@ import ReactFlow, {
     Background,
     Controls,
     MiniMap,
-    useEdgesState,
     useNodesState,
 } from "reactflow";
 import "reactflow/dist/style.css";
@@ -25,7 +24,6 @@ import {
     CANVAS_HEIGHT,
     CARD_WIDTH,
     COLLISION_GAP,
-    DEFAULT_EDGE_OPTIONS,
     GRID_SIZE,
     GROUP_EXTRA_RIGHT,
     GROUP_PADDING_X,
@@ -35,6 +33,7 @@ import {
     SEMESTERS,
 } from "./utils/constants.js";
 import { centerX, laneIndexFromX, projectToLaneAndSnap } from "./utils/geometry.js";
+import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
 
 /*********************************
  * React Flow node type registry *
@@ -45,46 +44,12 @@ const NODE_TYPES = {
     moduleBg: ModuleGroupBackground,
 };
 
-/***********************
- * Edge-building utils *
- ***********************/
-const VERTICAL_X_TOLERANCE = 24; // how far off in X two nodes can be and still count as "vertical"
-const MIN_VERTICAL_GAP = 20; // minimum y-distance to be considered stacked
-const SAME_LANE_REQUIRED = true; // only use vertical edges within the same lane
-
 /** Return lane index for a node (based on its X). */
 function laneIdx(node) {
     return laneIndexFromX(node.position.x);
 }
 
-/** True if two nodes are in (roughly) the same X position. */
-function isRoughlySameX(a, b) {
-    return Math.abs(a.position.x - b.position.x) <= VERTICAL_X_TOLERANCE;
-}
-
-/** True if b is placed below a by at least MIN_VERTICAL_GAP. */
-function stackedVertically(a, b) {
-    return b.position.y - a.position.y >= MIN_VERTICAL_GAP;
-}
-
-/**
- * Decide which handles to use when creating an edge from a → b.
- * Prefer vertical straight edges when stacked in the same lane; otherwise use horizontal smoothstep.
- */
-function chooseHandles(a, b) {
-    const sameLane = laneIdx(a) === laneIdx(b);
-    if ((!SAME_LANE_REQUIRED || sameLane) && stackedVertically(a, b) && isRoughlySameX(a, b)) {
-        return { sourceHandle: "bottom", targetHandle: "top", edgeType: "straight" };
-    }
-    const toRight = b.position.x >= a.position.x;
-    return {
-        sourceHandle: toRight ? "right" : "left",
-        targetHandle: toRight ? "left" : "right",
-        edgeType: "smoothstep",
-    };
-}
-
-/***********************************************
+/***********************
  * Module group background (size/position) calc *
  ***********************************************/
 /**
@@ -143,60 +108,6 @@ function getExamSubjectForCode(catalog, code) {
     return null;
 }
 
-/**
- * Build edges so that all nodes with the same exam subject form a chain ordered by
- * lane (left→right) and vertical position (top→bottom).
- *
- * Chain includes:
- *  - module group nodes that carry an examSubject
- *  - ungrouped course nodes that carry an examSubject
- */
-function buildSubjectEdges(nodes) {
-    const subjectNodes = [];
-
-    for (const n of nodes) {
-        if (n.type === "moduleBg" && n?.data?.examSubject) {
-            subjectNodes.push({ id: n.id, subject: n.data.examSubject, node: n });
-        } else if (n.type === "course" && !n?.data?.groupId && n?.data?.examSubject) {
-            subjectNodes.push({ id: n.id, subject: n.data.examSubject, node: n });
-        }
-    }
-    if (subjectNodes.length <= 1) return [];
-
-    // Group nodes by subject
-    const bySubject = {};
-    for (const s of subjectNodes) (bySubject[s.subject] ||= []).push(s.node);
-
-    const edges = [];
-    for (const [subj, list] of Object.entries(bySubject)) {
-        const sorted = list
-            .slice()
-            .sort((a, b) => {
-                const la = laneIdx(a);
-                const lb = laneIdx(b);
-                if (la !== lb) return la - lb; // left → right
-                if (a.position.y !== b.position.y) return a.position.y - b.position.y; // top → bottom
-                return String(a.id).localeCompare(String(b.id));
-            });
-
-        for (let i = 0; i < sorted.length - 1; i++) {
-            const from = sorted[i];
-            const to = sorted[i + 1];
-            const { sourceHandle, targetHandle, edgeType } = chooseHandles(from, to);
-            edges.push({
-                id: `es:${subj}:${from.id}->${to.id}`,
-                source: from.id,
-                target: to.id,
-                sourceHandle,
-                targetHandle,
-                type: edgeType,
-                animated: false,
-            });
-        }
-    }
-    return edges;
-}
-
 /***********************************
  * Normalize backend payload → UI  *
  ***********************************/
@@ -238,6 +149,10 @@ export default function App() {
     const [catalog, setCatalog] = useState([]);
     const [loadingCatalog, setLoadingCatalog] = useState(false);
     const [catalogError, setCatalogError] = useState("");
+    const subjectColors = useMemo(
+        () => createExamSubjectColorMap((catalog || []).map((pf) => pf?.pruefungsfach).filter(Boolean)),
+        [catalog]
+    );
 
     // React Flow refs
     const wrapperRef = useRef(null);
@@ -287,7 +202,6 @@ export default function App() {
     // React Flow state
     const initialNodes = useMemo(() => [...laneNodes], [laneNodes]);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
@@ -432,6 +346,14 @@ export default function App() {
             // A) Module with >= 2 courses → create group + children
             if (payload?.kind === "module" && Array.isArray(payload.courses) && payload.courses.length >= 2) {
                 const groupId = `mod-${now}`;
+                const groupExamSubject =
+                    getExamSubjectForCode(catalog, payload.code) ||
+                    getExamSubjectForCode(catalog, payload.courses?.[0]?.code) ||
+                    null;
+                const resolvedSubjectColor =
+                    payload.subjectColor ||
+                    (groupExamSubject ? subjectColors?.[groupExamSubject] : null) ||
+                    "#2563eb";
 
                 const groupNode = {
                     id: groupId,
@@ -442,11 +364,9 @@ export default function App() {
                         groupId,
                         onRemoveGroup: removeModuleGroup,
                         onRemove: () => removeModuleGroup(groupId),
-                        examSubject:
-                            getExamSubjectForCode(catalog, payload.code) ||
-                            getExamSubjectForCode(catalog, payload.courses?.[0]?.code) ||
-                            null,
+                        examSubject: groupExamSubject,
                         category: payload.category ?? "unknown",
+                        subjectColor: resolvedSubjectColor,
                     },
                     position: { x, y }, // preliminary; will be resized by recomputeGroupFromChildren
                     draggable: true,
@@ -472,6 +392,7 @@ export default function App() {
                             nodeId: childId,
                             examSubject,
                             category: payload.category ?? "unknown",
+                            subjectColor: resolvedSubjectColor,
                         },
                         position: { x, y: baseY },
                         sourcePosition: "right",
@@ -492,6 +413,10 @@ export default function App() {
             // B) Single course card (or module with a single course treated as course)
             const id = `${payload.code}-${now}`;
             const examSubject = getExamSubjectForCode(catalog, payload.code);
+            const resolvedSubjectColor =
+                payload.subjectColor ||
+                (examSubject ? subjectColors?.[examSubject] : null) ||
+                "#2563eb";
             setNodes((prev) => {
                 const next = prev.concat({
                     id,
@@ -503,6 +428,7 @@ export default function App() {
                         nodeId: id,
                         examSubject,
                         category: payload.category ?? "unknown",
+                        subjectColor: resolvedSubjectColor,
                     },
                     position: { x, y },
                     sourcePosition: "right",
@@ -513,7 +439,7 @@ export default function App() {
             });
             schedulePersist();
         },
-        [catalog, removeCourseNode, removeModuleGroup]
+        [catalog, removeCourseNode, removeModuleGroup, subjectColors]
     );
 
     /***************************************
@@ -611,13 +537,6 @@ export default function App() {
         return nodes;
     }
 
-    /**********************************************
-     * Auto-build edges by examSubject when nodes change
-     **********************************************/
-    useEffect(() => {
-        setEdges(buildSubjectEdges(nodes));
-    }, [nodes, setEdges]);
-
     /***********
      * Render  *
      ***********/
@@ -630,6 +549,7 @@ export default function App() {
                 expandedSet={expandedPf}
                 togglePf={togglePf}
                 onDragStart={handleDragStart}
+                subjectColors={subjectColors}
             />
 
             <div style={{ flex: 1, position: "relative" }}>
@@ -637,9 +557,7 @@ export default function App() {
                     <ReactFlow
                         onInit={(inst) => (rfRef.current = inst)}
                         nodes={nodes}
-                        edges={edges}
                         onNodesChange={onNodesChange}
-                        onEdgesChange={onEdgesChange}
                         onNodeDragStart={onNodeDragStart}
                         onNodeDrag={onNodeDrag}
                         onNodeDragStop={onNodeDragStopMerged}
@@ -648,7 +566,6 @@ export default function App() {
                         fitView
                         snapToGrid
                         snapGrid={[GRID_SIZE, GRID_SIZE]}
-                        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
                         proOptions={{ hideAttribution: true }}
                     >
                         <MiniMap pannable zoomable />

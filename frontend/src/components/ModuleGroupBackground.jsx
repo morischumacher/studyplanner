@@ -5,11 +5,14 @@ import {
     MODULE_HEADER_HEIGHT,
 } from "../utils/constants.js";
 import { colorForType } from "../utils/constants.js";
+import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../utils/examSubjectColors.js";
 
 /** ModuleGroupBackground — soft panel wrapping a set of course nodes. */
 export default function ModuleGroupBackground({ data }) {
-    const { title, width, height, onRemove, category } = data || {};
-    const tcol = colorForType(category);
+    const { title, width, height, onRemove, category, subjectColor } = data || {};
+    const fallback = colorForType(category);
+    const baseColor = subjectColor ?? fallback.border;
+    const moduleColor = hexToRgba(baseColor, MODULE_GROUP_COLOR_ALPHA);
 
     return (
         <div
@@ -18,8 +21,8 @@ export default function ModuleGroupBackground({ data }) {
                 width,
                 height,
                 overflow: "visible",
-                background: tcol.faint,
-                border: `1px solid ${tcol.border}`,
+                background: moduleColor,
+                border: `1px solid ${baseColor}`,
                 borderRadius: 12,
                 position: "relative",
                 padding: GROUP_PADDING_Y,
@@ -54,10 +57,10 @@ export default function ModuleGroupBackground({ data }) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    color: tcol.text,
+                    color: "#111827",
                     fontWeight: 700,
                     fontSize: 13,
-                    background: tcol.bg,
+                    background: moduleColor,
                     borderRadius: 8,
                     padding: "0 10px",
                 }}
@@ -74,9 +77,9 @@ export default function ModuleGroupBackground({ data }) {
                         }}
                         title="Remove module"
                         style={{
-                            border: `1px solid ${tcol.border}`,
+                            border: `1px solid ${baseColor}`,
                             background: "#fff",
-                            color: tcol.text,
+                            color: "#111827",
                             borderRadius: 6,
                             fontSize: 12,
                             padding: "2px 6px",
