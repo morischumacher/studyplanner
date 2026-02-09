@@ -1,0 +1,23 @@
+# ---- Python ----
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ---- Node / Vite / React ----
+frontend/node_modules/
+node_modules/
+dist/
+build/
+.vite/
+*.log
+
+# ---- Env / secrets ----
+.env
+**/.env
+
+# ---- IDE / OS ----
+.idea/
+.vscode/
+.DS_Store

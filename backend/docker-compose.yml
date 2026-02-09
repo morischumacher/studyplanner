@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: uni
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d uni" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # New FastAPI backend
+  fastapi:
+    build:
+      context: ./
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    env_file:
+      - ./.env
+    environment:
+      # Fallbacks if .env not provided
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/uni
+      CORS_ORIGIN: http://localhost:5173
+      USE_CATALOG_MAT: "0"
+    volumes:
+      - ./app:/app/app
+      - ./sql:/app/sql
+      - ./.env:/app/.env:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # Use Python in the image for a lightweight healthcheck
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
