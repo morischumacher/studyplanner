@@ -9,9 +9,15 @@ export default function CourseCard({ data }) {
         e.stopPropagation();
         data?.onRemove?.(data.nodeId);
     };
+    const handleToggleDone = (e) => {
+        e.stopPropagation();
+        const nextDone = !(data?.status === "done");
+        data?.onToggleDone?.(data?.code, nextDone, data?.nodeId);
+    };
 
     const fallback = colorForType(data?.category);
     const subjectColor = data?.subjectColor ?? fallback.border;
+    const isDone = data?.status === "done";
 
     return (
         <div
@@ -19,12 +25,13 @@ export default function CourseCard({ data }) {
             style={{
                 width: CARD_WIDTH,
                 position: "relative",
-                background: "#fff",
-                border: `1px solid ${subjectColor}`,
+                background: isDone ? "#f3f4f6" : "#fff",
+                border: `1px solid ${isDone ? "#9ca3af" : subjectColor}`,
                 borderLeftWidth: 6,
                 borderRadius: 10,
                 padding: 12,
                 boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
+                opacity: isDone ? 0.8 : 1,
             }}
         >
             {/* four handles with IDs so edges can target specific sides */}
@@ -49,15 +56,38 @@ export default function CourseCard({ data }) {
             )}
 
             <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                <div className="title" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2, color: "#111827" }}>
+                <div className="title" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2, color: isDone ? "#6b7280" : "#111827" }}>
                     {data.label}
                 </div>
             </div>
 
-            <div className="muted" style={{ fontSize: 12, color: "#374151", opacity: 0.9 }}>{data.code}</div>
+            <div className="muted" style={{ fontSize: 12, color: isDone ? "#6b7280" : "#374151", opacity: 0.9 }}>{data.code}</div>
             {data.ects ? (
-                <div className="muted" style={{ fontSize: 12, color: "#374151", opacity: 0.8 }}>{data.ects} ECTS</div>
+                <div className="muted" style={{ fontSize: 12, color: isDone ? "#6b7280" : "#374151", opacity: 0.8 }}>{data.ects} ECTS</div>
             ) : null}
+
+            {data.onToggleDone && (
+                <button
+                    onClick={handleToggleDone}
+                    aria-label={isDone ? "Mark as in plan" : "Mark as done"}
+                    title={isDone ? "Mark as in plan" : "Mark as done"}
+                    style={{
+                        position: "absolute",
+                        top: 6,
+                        right: 6,
+                        border: `1px solid ${isDone ? "#9ca3af" : subjectColor}`,
+                        background: isDone ? "#10b981" : hexToRgba(subjectColor, 0.08),
+                        color: isDone ? "#ffffff" : "#111827",
+                        borderRadius: 6,
+                        fontSize: 12,
+                        padding: "2px 6px",
+                        cursor: "pointer",
+                        lineHeight: 1.2,
+                    }}
+                >
+                    ✓
+                </button>
+            )}
 
             {data.onRemove && (
                 <button
@@ -67,7 +97,7 @@ export default function CourseCard({ data }) {
                     style={{
                         position: "absolute",
                         top: 6,
-                        right: 6,
+                        left: 6,
                         border: `1px solid ${subjectColor}`,
                         background: hexToRgba(subjectColor, 0.08),
                         color: "#111827",

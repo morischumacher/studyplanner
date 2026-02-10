@@ -18,7 +18,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { fetchCatalog } from "./lib/api";
+import { fetchCatalog, sendRuleCheckUpdate } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
 import {
@@ -149,7 +149,16 @@ const normalizeCatalog = (raw) => {
  * Main component
  ****************/
 export default function App() {
-    const { programCode, setProgramCode, setCoursesFromNodes, coursesBySemester } = currentProgram();
+    const {
+        programCode,
+        setProgramCode,
+        setCoursesFromNodes,
+        coursesBySemester,
+        doneCourseCodes,
+        setCourseDone,
+        getCourseStatus,
+        lastPlanChange,
+    } = currentProgram();
     const [viewMode, setViewMode] = useState("table");
 
     // Catalog state
@@ -245,11 +254,21 @@ export default function App() {
             if (groupId) next = recomputeGroupFromChildren(next, groupId);
             return next;
         });
+        setNeedsPersist(true);
     }, [setNodes]);
 
     const removeModuleGroup = useCallback((groupId) => {
         setNodes((prev) => prev.filter((n) => n.id !== groupId && n.data?.groupId !== groupId));
+        setNeedsPersist(true);
     }, [setNodes]);
+
+    const toggleCourseDone = useCallback((courseCode, nextDone, nodeId) => {
+        setCourseDone(courseCode, nextDone);
+        setNodes((prev) => prev.map((n) => {
+            if (n.id !== nodeId) return n;
+            return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
+        }));
+    }, [setCourseDone, setNodes]);
 
     /************************
      * Group drag mechanics *
@@ -289,6 +308,35 @@ export default function App() {
         setCoursesFromNodes(latestNodes);
         setNeedsPersist(false);
     }, [needsPersist, nodes, setCoursesFromNodes]);
+
+    // Keep node status visuals in sync with persisted done-state.
+    useEffect(() => {
+        const doneSet = new Set(doneCourseCodes || []);
+        setNodes((prev) => prev.map((n) => {
+            if (n.type !== "course") return n;
+            const status = doneSet.has(n?.data?.code) ? "done" : "in_plan";
+            if (n?.data?.status === status) return n;
+            return { ...n, data: { ...n.data, status } };
+        }));
+    }, [doneCourseCodes, setNodes]);
+
+    // Notify backend rule-check endpoint on each plan/status change.
+    useEffect(() => {
+        if (!lastPlanChange) return;
+        const doneSet = new Set(doneCourseCodes || []);
+        const allCourses = Object.values(coursesBySemester || {}).flat();
+        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
+        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
+
+        sendRuleCheckUpdate({
+            programCode,
+            plannedCourses,
+            doneCourses,
+            change: lastPlanChange,
+        }).catch((err) => {
+            console.error("Failed to send rulecheck update", err);
+        });
+    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode]);
 
     /***************************
      * Snap & collision resolve *
@@ -404,10 +452,12 @@ export default function App() {
                             groupId,
                             baseY,
                             onRemove: removeCourseNode,
+                            onToggleDone: toggleCourseDone,
                             nodeId: childId,
                             examSubject,
                             category: payload.category ?? "unknown",
                             subjectColor: resolvedSubjectColor,
+                            status: getCourseStatus(course.code),
                         },
                         position: { x, y: baseY },
                         sourcePosition: "right",
@@ -440,10 +490,12 @@ export default function App() {
                         label: payload.name,
                         code: payload.code,
                         onRemove: removeCourseNode,
+                        onToggleDone: toggleCourseDone,
                         nodeId: id,
                         examSubject,
                         category: payload.category ?? "unknown",
                         subjectColor: resolvedSubjectColor,
+                        status: getCourseStatus(payload.code),
                     },
                     position: { x, y },
                     sourcePosition: "right",
@@ -454,7 +506,7 @@ export default function App() {
             });
             schedulePersist();
         },
-        [catalog, removeCourseNode, removeModuleGroup, subjectColors]
+        [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone]
     );
 
     /***************************************
@@ -581,6 +633,7 @@ export default function App() {
                 programCode={programCode}
                 setProgramCode={setProgramCode}
                 programOptions={PROGRAM_OPTIONS}
+                getCourseStatus={getCourseStatus}
             />
 
             <div style={{ flex: 1, position: "relative" }}>

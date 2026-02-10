@@ -16,7 +16,28 @@ export default function Sidebar({
     programCode,
     setProgramCode,
     programOptions,
+    getCourseStatus,
 }) {
+    const statusLabel = (status) => {
+        if (status === "done") return "done";
+        if (status === "in_plan") return "in plan";
+        return "todo";
+    };
+
+    const statusStyle = (status) => {
+        if (status === "done") return { bg: "#dcfce7", color: "#166534", border: "#86efac" };
+        if (status === "in_plan") return { bg: "#dbeafe", color: "#1d4ed8", border: "#93c5fd" };
+        return { bg: "#f3f4f6", color: "#4b5563", border: "#d1d5db" };
+    };
+
+    const moduleStatus = (codes) => {
+        if (!codes.length) return "todo";
+        const statuses = codes.map((code) => getCourseStatus?.(code) ?? "todo");
+        if (statuses.every((s) => s === "done")) return "done";
+        if (statuses.some((s) => s === "in_plan" || s === "done")) return "in_plan";
+        return "todo";
+    };
+
     return (
         <aside
             style={{
@@ -113,6 +134,8 @@ export default function Sidebar({
                                         // Case B: single course → drag that one (use the course's code!)
                                         if (courses.length === 1) {
                                             const course = courses[0] ?? {};
+                                            const courseStatus = getCourseStatus?.(course.code ?? mod.code) ?? "todo";
+                                            const style = statusStyle(courseStatus);
                                             return (
                                                 <button
                                                     key={`pf${pfIdx}-${mod.code || course.code || modIdx}`}
@@ -138,6 +161,21 @@ export default function Sidebar({
                                                 >
                                                     <div style={{ color: "#6b7280", fontSize: 12 }}>{course.code ?? mod.code}</div>
                                                     <div style={{ fontWeight: 600 }}>{course.name ?? mod.name}</div>
+                                                    <div
+                                                        style={{
+                                                            marginTop: 6,
+                                                            display: "inline-flex",
+                                                            borderRadius: 999,
+                                                            border: `1px solid ${style.border}`,
+                                                            background: style.bg,
+                                                            color: style.color,
+                                                            padding: "2px 8px",
+                                                            fontSize: 11,
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        {statusLabel(courseStatus)}
+                                                    </div>
                                                 </button>
                                             );
                                         }
@@ -151,6 +189,8 @@ export default function Sidebar({
                                             subjectColor,
                                             courses: courses.map((c) => ({ code: c.code, name: c.name })),
                                         };
+                                        const groupStatus = moduleStatus(courses.map((c) => c?.code).filter(Boolean));
+                                        const groupStyle = statusStyle(groupStatus);
 
                                         return (
                                             <div
@@ -179,39 +219,73 @@ export default function Sidebar({
                                                     <div style={{ color: "#6b7280", fontSize: 12 }}>
                                                         {courses.length} Kurse
                                                     </div>
+                                                    <div
+                                                        style={{
+                                                            display: "inline-flex",
+                                                            width: "fit-content",
+                                                            borderRadius: 999,
+                                                            border: `1px solid ${groupStyle.border}`,
+                                                            background: groupStyle.bg,
+                                                            color: groupStyle.color,
+                                                            padding: "2px 8px",
+                                                            fontSize: 11,
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        {statusLabel(groupStatus)}
+                                                    </div>
                                                 </button>
 
                                                 <div style={{ padding: 8, display: "grid", gap: 8 }}>
-                                                    {courses.map((course, idx) => (
-                                                        <button
-                                                            key={`pf${pfIdx}-${mod.code}-${idx}`}
-                                                            draggable
-                                                            onDragStart={(e) =>
-                                                                onDragStart(e, {
-                                                                    kind: "course",
-                                                                    code: course?.code ?? mod.code, // prefer the real course code
-                                                                    name: course?.name ?? mod.name,
-                                                                    category: mod?.category ?? null,
-                                                                    subjectColor,
-                                                                })
-                                                            }
-                                                            title="Drag only this course into the graph"
-                                                            style={{
-                                                                textAlign: "left",
-                                                                border: `1px solid ${subjectColor}`,
-                                                                borderRadius: 10,
-                                                                background: "#fff",
-                                                                padding: "8px 10px",
-                                                                cursor: "grab",
-                                                            }}
-                                                        >
-                                                            <div style={{ color: "#6b7280", fontSize: 12 }}>{course?.code ?? mod.code}</div>
-                                                            <div style={{ fontWeight: 600 }}>{course?.name ?? mod.name}</div>
-                                                            <div style={{ color: "#6b7280", fontSize: 12 }}>
-                                                                {typeof course?.ects === "number" ? `${course?.ects} ECTS` : course?.ects}
-                                                            </div>
-                                                        </button>
-                                                    ))}
+                                                    {courses.map((course, idx) => {
+                                                        const courseStatus = getCourseStatus?.(course?.code ?? mod.code) ?? "todo";
+                                                        const courseStyle = statusStyle(courseStatus);
+                                                        return (
+                                                            <button
+                                                                key={`pf${pfIdx}-${mod.code}-${idx}`}
+                                                                draggable
+                                                                onDragStart={(e) =>
+                                                                    onDragStart(e, {
+                                                                        kind: "course",
+                                                                        code: course?.code ?? mod.code, // prefer the real course code
+                                                                        name: course?.name ?? mod.name,
+                                                                        category: mod?.category ?? null,
+                                                                        subjectColor,
+                                                                    })
+                                                                }
+                                                                title="Drag only this course into the graph"
+                                                                style={{
+                                                                    textAlign: "left",
+                                                                    border: `1px solid ${subjectColor}`,
+                                                                    borderRadius: 10,
+                                                                    background: "#fff",
+                                                                    padding: "8px 10px",
+                                                                    cursor: "grab",
+                                                                }}
+                                                            >
+                                                                <div style={{ color: "#6b7280", fontSize: 12 }}>{course?.code ?? mod.code}</div>
+                                                                <div style={{ fontWeight: 600 }}>{course?.name ?? mod.name}</div>
+                                                                <div style={{ color: "#6b7280", fontSize: 12 }}>
+                                                                    {typeof course?.ects === "number" ? `${course?.ects} ECTS` : course?.ects}
+                                                                </div>
+                                                                <div
+                                                                    style={{
+                                                                        marginTop: 6,
+                                                                        display: "inline-flex",
+                                                                        borderRadius: 999,
+                                                                        border: `1px solid ${courseStyle.border}`,
+                                                                        background: courseStyle.bg,
+                                                                        color: courseStyle.color,
+                                                                        padding: "2px 8px",
+                                                                        fontSize: 11,
+                                                                        fontWeight: 700,
+                                                                    }}
+                                                                >
+                                                                    {statusLabel(courseStatus)}
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         );

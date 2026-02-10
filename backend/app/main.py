@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from .settings import settings
 from .db import migrate_on_boot, get_pool
 from .routes.catalog import router as catalog_router
+from .routes.rulecheck import router as rulecheck_router
 
 app = FastAPI(
     title="My Service",
@@ -19,6 +21,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def log_http_requests(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    print(
+        f"[HTTP] {request.method} {request.url.path}"
+        f" -> {response.status_code} ({elapsed_ms:.1f} ms)"
+    )
+    return response
 
 @app.get("/health", tags=["health"])
 def health():
@@ -37,3 +51,4 @@ async def health():
     return {"ok": True}
 
 app.include_router(catalog_router)
+app.include_router(rulecheck_router)

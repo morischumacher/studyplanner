@@ -21,3 +21,23 @@ export async function fetchCatalog(programCode) {
     }
     return res.json(); // backend sends real JSON
 }
+
+export async function sendRuleCheckUpdate(payload) {
+    const url = new URL("/rulecheck", BASE);
+    const res = await fetch(url.toString(), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify(payload ?? {}),
+    });
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`Rulecheck update failed: ${res.status} ${res.statusText} ${text}`);
+    }
+
+    return res.json().catch(() => ({}));
+}
