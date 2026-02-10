@@ -4,6 +4,7 @@ import { laneIndexFromX } from "./utils/geometry.js";          // :contentRefere
 
 const ProgramContext = createContext();
 const DONE_STORAGE_KEY = "study_planner_done_courses_v1";
+const BACHELOR_PROGRAM_CODE = "033 521";
 
 function emptyCoursesOnlyPlan() {
     const bySem = {};
@@ -114,31 +115,67 @@ function diffPlannedCourses(prevBySemester, nextBySemester) {
     const added = [];
     const removed = [];
     const moved = [];
+    const updated = [];
 
     for (const [id, course] of nextById.entries()) {
         const before = prevById.get(id);
         if (!before) {
-            added.push({ id, code: course.code ?? null, toSemester: course.semesterId });
+            const toLaneIndex = Number.isFinite(course?.laneIndex) ? course.laneIndex : null;
+            added.push({
+                id,
+                code: course.code ?? null,
+                toSemester: course.semesterId,
+                toLaneIndex,
+                toSemesterNumber: toLaneIndex != null ? toLaneIndex + 1 : null,
+            });
             continue;
         }
         if (before.semesterId !== course.semesterId) {
+            const fromLaneIndex = Number.isFinite(before?.laneIndex) ? before.laneIndex : null;
+            const toLaneIndex = Number.isFinite(course?.laneIndex) ? course.laneIndex : null;
             moved.push({
                 id,
                 code: course.code ?? null,
                 fromSemester: before.semesterId,
                 toSemester: course.semesterId,
+                fromLaneIndex,
+                toLaneIndex,
+                fromSemesterNumber: fromLaneIndex != null ? fromLaneIndex + 1 : null,
+                toSemesterNumber: toLaneIndex != null ? toLaneIndex + 1 : null,
+            });
+            continue;
+        }
+        const beforeEcts = Number(before?.ects ?? 0);
+        const nextEcts = Number(course?.ects ?? 0);
+        if (Number.isFinite(beforeEcts) && Number.isFinite(nextEcts) && beforeEcts !== nextEcts) {
+            const laneIndex = Number.isFinite(course?.laneIndex) ? course.laneIndex : null;
+            updated.push({
+                id,
+                code: course.code ?? null,
+                fromEcts: beforeEcts,
+                toEcts: nextEcts,
+                laneIndex,
+                semesterId: course.semesterId,
+                semesterNumber: laneIndex != null ? laneIndex + 1 : null,
             });
         }
     }
 
     for (const [id, course] of prevById.entries()) {
         if (!nextById.has(id)) {
-            removed.push({ id, code: course.code ?? null, fromSemester: course.semesterId });
+            const fromLaneIndex = Number.isFinite(course?.laneIndex) ? course.laneIndex : null;
+            removed.push({
+                id,
+                code: course.code ?? null,
+                fromSemester: course.semesterId,
+                fromLaneIndex,
+                fromSemesterNumber: fromLaneIndex != null ? fromLaneIndex + 1 : null,
+            });
         }
     }
 
-    if (!added.length && !removed.length && !moved.length) return null;
-    return { type: "plan_updated", added, removed, moved };
+    if (!added.length && !removed.length && !moved.length && !updated.length) return null;
+    return { type: "plan_updated", added, removed, moved, updated };
 }
 
 export function ProgramProvider({ children }) {
@@ -149,8 +186,10 @@ export function ProgramProvider({ children }) {
     const [coursesBySemester, setCoursesBySemester] = useState(() => emptyCoursesOnlyPlan());
     const [doneByProgram, setDoneByProgram] = useState(() => loadDoneByProgram());
     const [lastPlanChange, setLastPlanChange] = useState(null);
+    const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
 
     const doneCourseCodes = doneByProgram?.[programCode] ?? [];
+    const selectedFocus = selectedFocusByProgram?.[programCode] ?? "";
 
     // Call this whenever the React Flow node list changes (e.g., after drag/drop/snap)
     const setCoursesFromNodes = useCallback((nodes) => {
@@ -206,6 +245,16 @@ export function ProgramProvider({ children }) {
 
     const setCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
+        let currentLaneIndex = null;
+        let currentSemesterId = null;
+        for (const s of SEMESTERS) {
+            const match = (coursesBySemester?.[s.id] ?? []).find((c) => c?.code === courseCode);
+            if (match) {
+                currentLaneIndex = Number.isFinite(match?.laneIndex) ? match.laneIndex : null;
+                currentSemesterId = s.id;
+                break;
+            }
+        }
         setDoneByProgram((prev) => {
             const current = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
             const exists = current.includes(courseCode);
@@ -221,6 +270,25 @@ export function ProgramProvider({ children }) {
             type: "course_status_toggled",
             courseCode,
             toStatus: nextDone ? "done" : "in_plan",
+            laneIndex: currentLaneIndex,
+            semesterId: currentSemesterId,
+            semesterNumber: currentLaneIndex != null ? currentLaneIndex + 1 : null,
+        });
+    }, [coursesBySemester, programCode]);
+
+    const setSelectedFocus = useCallback((focusName) => {
+        const nextValue = typeof focusName === "string" ? focusName : "";
+        setSelectedFocusByProgram((prev) => {
+            const current = prev?.[programCode] ?? "";
+            if (current === nextValue) return prev;
+            return { ...prev, [programCode]: nextValue };
+        });
+
+        if (programCode !== BACHELOR_PROGRAM_CODE) return;
+        setLastPlanChange({
+            id: Date.now(),
+            type: "focus_updated",
+            selectedFocus: nextValue || null,
         });
     }, [programCode]);
 
@@ -230,6 +298,8 @@ export function ProgramProvider({ children }) {
         coursesBySemester,     // storage = courses only
         setCoursesFromNodes,   // updater you’ll call from App.jsx
         doneCourseCodes,
+        selectedFocus,
+        setSelectedFocus,
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
@@ -242,6 +312,8 @@ export function ProgramProvider({ children }) {
         coursesBySemester,
         setCoursesFromNodes,
         doneCourseCodes,
+        selectedFocus,
+        setSelectedFocus,
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
@@ -260,6 +332,10 @@ export function ProgramProvider({ children }) {
     useEffect(() => {
         console.log("[ProgramContext] doneCourseCodes changed:", doneCourseCodes);
     }, [doneCourseCodes]);
+
+    useEffect(() => {
+        console.log("[ProgramContext] selectedFocus changed:", selectedFocus);
+    }, [selectedFocus]);
 
     useEffect(() => {
         if (!lastPlanChange) return;

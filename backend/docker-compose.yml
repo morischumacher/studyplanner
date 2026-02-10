@@ -27,7 +27,7 @@ services:
     environment:
       # Fallbacks if .env not provided
       DATABASE_URL: postgresql://postgres:postgres@db:5432/uni
-      CORS_ORIGIN: http://localhost:5173
+      CORS_ORIGIN: http://localhost:5173,http://127.0.0.1:5173
       USE_CATALOG_MAT: "0"
     volumes:
       - ./app:/app/app

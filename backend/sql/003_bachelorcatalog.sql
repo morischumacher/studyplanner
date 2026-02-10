@@ -56,21 +56,21 @@ WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Algorithmen und Datenstrukturen',8,'mandatory' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-    ('AD-VU','Algorithmen und Datenstrukturen','VU',8,'de') ON CONFLICT DO NOTHING;
+    ('Algorithmen und Datenstrukturen','Algorithmen und Datenstrukturen','VU',8,'de') ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Einführung in die Programmierung',9.5,'mandatory' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-('EIDI1-VU','Einführung in die Programmierung 1','VU',5.5,'de')
-                                                        ,('EIDI2-VU','Einführung in die Programmierung 2','VU',4.0,'de')
+('Einführung in die Programmierung 1','Einführung in die Programmierung 1','VU',5.5,'de')
+                                                        ,('Einführung in die Programmierung 2','Einführung in die Programmierung 2','VU',4.0,'de')
     ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Programmierparadigmen',6,'mandatory' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-    ('PP-VU','Programmierparadigmen','VU',6,'de') ON CONFLICT DO NOTHING;
+    ('Programmierparadigmen','Programmierparadigmen','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- starred electives in AP
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -88,16 +88,16 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('LPC-VU','Logikprogra
 -- CS
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Grundzüge digitaler Systeme',6,'mandatory' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('GDS-VU','Grundzüge digitaler Systeme','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Grundzüge digitaler Systeme','Grundzüge digitaler Systeme','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- core (+)
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Betriebssysteme',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('OS-VU','Betriebssysteme','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Betriebssysteme','Betriebssysteme','VU',6,'de') ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Computersysteme',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('CSYS-VU','Computersysteme','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Computersysteme','Computersysteme','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives (*)
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -121,7 +121,7 @@ INSERT INTO course (code,title,type,ects,language) VALUES
 -- CGVC (one core + many electives)
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Einführung in Visual Computing',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('EVC-VU','Einführung in Visual Computing','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Einführung in Visual Computing','Einführung in Visual Computing','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -160,13 +160,13 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('PTVC-PR','Programmie
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Denkweisen der Informatik',6.5,'mandatory' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('DWI-VU','Denkweisen der Informatik','VU',5.5,'de'),
-                                                       ('ORI-VU','Orientierung Informatik und Wirtschaftsinformatik','VU',1.0,'de') ON CONFLICT DO NOTHING;
+                                                       ('Denkweisen der Informatik','Denkweisen der Informatik','VU',5.5,'de'),
+                                                       ('Orientierung Informatik und Wirtschaftsinformatik','Orientierung Informatik und Wirtschaftsinformatik','VU',1.0,'de') ON CONFLICT DO NOTHING;
 
 -- core
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Interface und Interaction Design',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('IID-VU','Interface und Interaction Design','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Interface und Interaction Design','Interface und Interaction Design','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -192,7 +192,7 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('UEMI-VU','Usability 
 -- IE
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Datenbanksysteme',6,'mandatory' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('DBS-VU','Datenbanksysteme','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Datenbanksysteme','Datenbanksysteme','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -214,11 +214,11 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('WEBE-VU','Web Engine
 -- LOG (two core + electives, plus split VO/UE module)
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Einführung in Artificial Intelligence',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('EAI-VU','Einführung in Artificial Intelligence','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Einführung in Artificial Intelligence','Einführung in Artificial Intelligence','VU',6,'de') ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Logic and Reasoning in Computer Science',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('LRCS-VU','Logic and Reasoning in Computer Science','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Logic and Reasoning in Computer Science','Logic and Reasoning in Computer Science','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives in LOG
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -264,12 +264,12 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('MDGAM-VU','Methods f
 -- SEC
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Einführung in Security',6,'mandatory' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('ESEC-VU','Einführung in Security','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Einführung in Security','Einführung in Security','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- core
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category) SELECT sp.id,'Daten- und Informatikrecht',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('DIR-VU','Daten- und Informatikrecht','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Daten- und Informatikrecht','Daten- und Informatikrecht','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -287,24 +287,24 @@ WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Algebra und Diskrete Mathematik',9,'mandatory' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('ADM-VO','Algebra und Diskrete Mathematik (VO)','VO',4.0,'de'),
-                                                       ('ADM-UE','Algebra und Diskrete Mathematik (UE)','UE',5.0,'de'),
-                                                       ('ADM-VU','Algebra und Diskrete Mathematik (VU)','VU',9.0,'de')
+                                                       ('Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik','Algebra und Diskrete Mathematik (VO)','VO',4.0,'de'),
+                                                       ('Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (UE)','Algebra und Diskrete Mathematik (UE)','UE',5.0,'de'),
+                                                       ('Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (VU)','Algebra und Diskrete Mathematik (VU)','VU',9.0,'de')
     ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Analysis',6,'mandatory' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('ANL-VO','Analysis (VO)','VO',2.0,'de'),
-                                                       ('ANL-UE','Analysis (UE)','UE',4.0,'de'),
-                                                       ('ANL-VU','Analysis (VU)','VU',6.0,'de')
+                                                       ('Analysis für Informatik und Wirtschaftsinformatik','Analysis (VO)','VO',2.0,'de'),
+                                                       ('Analysis für Informatik und Wirtschaftsinformatik (UE)','Analysis (UE)','UE',4.0,'de'),
+                                                       ('Analysis für Informatik und Wirtschaftsinformatik (VU)','Analysis (VU)','VU',6.0,'de')
     ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Mathematisches Arbeiten',2,'mandatory' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('MA-VU','Mathematisches Arbeiten','VU',2.0,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Mathematisches Arbeiten','Mathematisches Arbeiten','VU',2.0,'de') ON CONFLICT DO NOTHING;
 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
@@ -312,7 +312,7 @@ SELECT sp.id,'Statistik und Wahrscheinlichkeitstheorie',6,'mandatory' FROM sp ON
 INSERT INTO course (code,title,type,ects,language) VALUES
                                                        ('SWT-VO','Statistik und Wahrscheinlichkeitstheorie (VO)','VO',3.0,'de'),
                                                        ('SWT-UE','Statistik und Wahrscheinlichkeitstheorie (UE)','UE',3.0,'de'),
-                                                       ('SWT-VU','Statistik und Wahrscheinlichkeitstheorie (VU)','VU',6.0,'de')
+                                                       ('Statistik und Wahrscheinlichkeitstheorie','Statistik und Wahrscheinlichkeitstheorie (VU)','VU',6.0,'de')
     ON CONFLICT DO NOTHING;
 
 -- electives in STW
@@ -355,15 +355,15 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('NUMC-VU','Numerical 
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Software Engineering',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('SE-VU','Software Engineering','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Software Engineering','Software Engineering','VU',6,'de') ON CONFLICT DO NOTHING;
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Software Engineering Projekt',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('SEP-PR','Software Engineering Projekt','PR',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Software Engineering Projekt','Software Engineering Projekt','PR',6,'de') ON CONFLICT DO NOTHING;
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Verteilte Systeme',6,'core' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('VS-VU','Verteilte Systeme','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Verteilte Systeme','Verteilte Systeme','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -379,7 +379,7 @@ INSERT INTO course (code,title,type,ects,language) VALUES ('SQS-VU','Software-Qu
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Theoretische Informatik',6,'mandatory' FROM sp ON CONFLICT DO NOTHING;
-INSERT INTO course (code,title,type,ects,language) VALUES ('TI-VU','Theoretische Informatik','VU',6,'de') ON CONFLICT DO NOTHING;
+INSERT INTO course (code,title,type,ects,language) VALUES ('Theoretische Informatik','Theoretische Informatik','VU',6,'de') ON CONFLICT DO NOTHING;
 
 -- electives
 WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
@@ -401,8 +401,8 @@ WITH sp AS (SELECT id FROM study_program WHERE code='033 521')
 INSERT INTO module (program_id,name,ects,category)
 SELECT sp.id,'Bachelorarbeit',13,'elective' FROM sp ON CONFLICT DO NOTHING;
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('BA-PR','Bachelorarbeit für Informatik und Wirtschaftsinformatik','PR',10,'de'),
-                                                       ('WISS-SE','Wissenschaftliches Arbeiten','SE',3,'de') ON CONFLICT DO NOTHING;
+                                                       ('Bachelorarbeit','Bachelorarbeit für Informatik und Wirtschaftsinformatik','PR',10,'de'),
+                                                       ('Wissenschaftliches Arbeiten','Wissenschaftliches Arbeiten','SE',3,'de') ON CONFLICT DO NOTHING;
 
 COMMIT;
 
@@ -411,15 +411,15 @@ COMMIT;
 
 -- AP
 INSERT INTO module_course (module_id,course_id)
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AD-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='Algorithmen und Datenstrukturen'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Algorithmen und Datenstrukturen' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course (module_id,course_id)
-SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('EIDI1-VU','EIDI2-VU')
+SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Einführung in die Programmierung 1','Einführung in die Programmierung 2')
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Einführung in die Programmierung' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course (module_id,course_id)
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='PP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='Programmierparadigmen'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Programmierparadigmen' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='EA-VU'
@@ -430,11 +430,11 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Logikprogrammierung und Constraints' ON CONFLICT DO NOTHING;
 
 -- CS
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='GDS-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Grundzüge digitaler Systeme'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Grundzüge digitaler Systeme' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='OS-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Betriebssysteme'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Betriebssysteme' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='CSYS-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Computersysteme'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Computersysteme' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='AM-VU'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Abstrakte Maschinen' ON CONFLICT DO NOTHING;
@@ -446,7 +446,7 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Zuverlässige Echtzeitsysteme' ON CONFLICT DO NOTHING;
 
 -- CGVC
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='EVC-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Einführung in Visual Computing'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Einführung in Visual Computing' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='AVP-VU'
@@ -467,9 +467,9 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Programmiertechniken für Visual Computing' ON CONFLICT DO NOTHING;
 
 -- HCC
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('DWI-VU','ORI-VU')
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Denkweisen der Informatik','Orientierung Informatik und Wirtschaftsinformatik')
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Denkweisen der Informatik' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='IID-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Interface und Interaction Design'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Interface und Interaction Design' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='ACC-VU'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Access Computing' ON CONFLICT DO NOTHING;
@@ -483,7 +483,7 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Usability Engineering and Mobile Interaction' ON CONFLICT DO NOTHING;
 
 -- IE
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='DBS-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Datenbanksysteme'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Datenbanksysteme' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='EWS-VU'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Einführung in wissensbasierte Systeme' ON CONFLICT DO NOTHING;
@@ -495,9 +495,9 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Web Engineering' ON CONFLICT DO NOTHING;
 
 -- LOG
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='EAI-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Einführung in Artificial Intelligence'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Einführung in Artificial Intelligence' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='LRCS-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Logic and Reasoning in Computer Science'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Logic and Reasoning in Computer Science' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='AUB-VU'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Argumentieren und Beweisen' ON CONFLICT DO NOTHING;
@@ -523,9 +523,9 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Methods for Data Generation and Analytics in Medicine and Life Sciences' ON CONFLICT DO NOTHING;
 
 -- SEC
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='ESEC-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Einführung in Security'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Einführung in Security' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='DIR-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Daten- und Informatikrecht'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Daten- und Informatikrecht' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='ADCS-UE'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Attacks and Defenses in Computer Security' ON CONFLICT DO NOTHING;
@@ -535,13 +535,13 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Privacy-Enhancing Technologies' ON CONFLICT DO NOTHING;
 
 -- STW
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('ADM-VO','ADM-UE','ADM-VU')
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik','Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (UE)','Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (VU)')
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Algebra und Diskrete Mathematik' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('ANL-VO','ANL-UE','ANL-VU')
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Analysis für Informatik und Wirtschaftsinformatik','Analysis für Informatik und Wirtschaftsinformatik (UE)','Analysis für Informatik und Wirtschaftsinformatik (VU)')
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Analysis' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='MA-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Mathematisches Arbeiten'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Mathematisches Arbeiten' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('SWT-VO','SWT-UE','SWT-VU')
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('SWT-VO','SWT-UE','Statistik und Wahrscheinlichkeitstheorie')
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Statistik und Wahrscheinlichkeitstheorie' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('CSTAT-VU','SCOMP-VU','SIM-VU')
@@ -556,11 +556,11 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Numerical Computation' ON CONFLICT DO NOTHING;
 
 -- SE
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='SE-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Software Engineering'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Software Engineering' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='SEP-PR'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Software Engineering Projekt'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Software Engineering Projekt' ON CONFLICT DO NOTHING;
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='VS-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Verteilte Systeme'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Verteilte Systeme' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='PSV-VU'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Programm- und Systemverifikation' ON CONFLICT DO NOTHING;
@@ -568,7 +568,7 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Software-Qualitätssicherung' ON CONFLICT DO NOTHING;
 
 -- TI
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='TI-VU'
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='Theoretische Informatik'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Theoretische Informatik' ON CONFLICT DO NOTHING;
 INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code='ITC-VU'
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Introduction to Cryptography' ON CONFLICT DO NOTHING;
@@ -577,7 +577,7 @@ INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code
 
 -- FWTS / THESIS
 -- FWTS has no specific courses defined (choose from university-wide catalog), so we skip course linking.
-INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('BA-PR','WISS-SE')
+INSERT INTO module_course SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Bachelorarbeit','Wissenschaftliches Arbeiten')
                                                          JOIN study_program sp ON sp.id=m.program_id AND sp.code='033 521' WHERE m.name='Bachelorarbeit' ON CONFLICT DO NOTHING;
 
 COMMIT;

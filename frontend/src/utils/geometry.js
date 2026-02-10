@@ -28,17 +28,26 @@ export const laneIndexFromX = (flowX) => {
 
 /**
  * Convert a DOM drop event to snapped React Flow coords, honoring zoom/pan.
- * Uses screenToFlowPosition (no manual bounds math needed).
- *
- * NOTE: wrapperEl is unused now; kept in the signature for backward compatibility.
+ * We derive flow-space coordinates from wrapper bounds + viewport transform,
+ * which is stable across browsers and React Flow versions.
  */
-export const projectToLaneAndSnap = ({ evt, wrapperEl: _unused, rfInstance }) => {
-    // Fall back gracefully if instance is missing (e.g. very early in mount)
-    const hasProjector = typeof rfInstance?.screenToFlowPosition === "function";
+export const projectToLaneAndSnap = ({ evt, wrapperEl, rfInstance }) => {
+    const bounds = wrapperEl?.getBoundingClientRect?.();
+    const viewport = typeof rfInstance?.getViewport === "function"
+        ? rfInstance.getViewport()
+        : { x: 0, y: 0, zoom: 1 };
 
-    const { x: flowX, y: flowY } = hasProjector
-        ? rfInstance.screenToFlowPosition({ x: evt.clientX, y: evt.clientY })
-        : { x: evt.clientX, y: evt.clientY };
+    const zoom = Number.isFinite(viewport?.zoom) && viewport.zoom > 0 ? viewport.zoom : 1;
+    const vx = Number.isFinite(viewport?.x) ? viewport.x : 0;
+    const vy = Number.isFinite(viewport?.y) ? viewport.y : 0;
+
+    const clientX = Number.isFinite(evt?.clientX) ? evt.clientX : 0;
+    const clientY = Number.isFinite(evt?.clientY) ? evt.clientY : 0;
+    const left = Number.isFinite(bounds?.left) ? bounds.left : 0;
+    const top = Number.isFinite(bounds?.top) ? bounds.top : 0;
+
+    const flowX = (clientX - left - vx) / zoom;
+    const flowY = (clientY - top - vy) / zoom;
 
     const laneIndex = laneIndexFromX(flowX);
     const x = Math.max(0, centerX(laneIndex));

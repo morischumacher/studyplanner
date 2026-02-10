@@ -13,12 +13,14 @@ async def _setup_codecs(conn: asyncpg.Connection):
 
 async def get_pool() -> asyncpg.pool.Pool:
     global _pool
+    if _pool is not None:
+        return _pool
     _pool = await asyncpg.create_pool(
-                    dsn=settings.DATABASE_URL,
-                min_size=1,
-                max_size=10,
-                init=_setup_codecs,   # <-- add this
-            )
+        dsn=settings.DATABASE_URL,
+        min_size=1,
+        max_size=10,
+        init=_setup_codecs,
+    )
     return _pool
 
 async def run_sql_file(conn: asyncpg.Connection, path: str):
@@ -30,10 +32,9 @@ async def run_sql_file(conn: asyncpg.Connection, path: str):
 async def migrate_on_boot():
     pool = await get_pool()
     async with pool.acquire() as conn:
-        # mirror Node boot: run schema then seed
         base = settings.MIGRATIONS_DIR
-        files = [os.path.join(base, "001_schema.sql")]
-        #files = [os.path.join(base, "001_schema.sql"), os.path.join(base, "002_mastercatalog.sql")]
+        # Run all SQL migrations in lexical order: 001..., 002..., 003..., 004...
+        files = sorted(glob.glob(os.path.join(base, "*.sql")))
         for f in files:
             if os.path.exists(f):
                 try:
@@ -44,4 +45,3 @@ async def migrate_on_boot():
                     print(f"❌ {os.path.basename(f)}: {e}")
         # quick “attach versions” / health step equivalent
         await conn.execute("DO $$ BEGIN PERFORM 1; END $$;")
-

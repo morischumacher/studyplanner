@@ -16,6 +16,10 @@ export default function Sidebar({
     programCode,
     setProgramCode,
     programOptions,
+    selectedFocus,
+    setSelectedFocus,
+    bachelorProgramCode,
+    bachelorFocusOptions,
     getCourseStatus,
 }) {
     const statusLabel = (status) => {
@@ -37,6 +41,8 @@ export default function Sidebar({
         if (statuses.some((s) => s === "in_plan" || s === "done")) return "in_plan";
         return "todo";
     };
+
+    const isBlockedStatus = (status) => status === "done" || status === "in_plan";
 
     return (
         <aside
@@ -69,6 +75,32 @@ export default function Sidebar({
                     ))}
                 </select>
             </div>
+            {programCode === bachelorProgramCode && (
+                <div style={{ display: "grid", gap: 6, margin: "0 0 12px" }}>
+                    <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Focus Area (Bachelor)</label>
+                    <select
+                        value={selectedFocus || ""}
+                        onChange={(e) => setSelectedFocus?.(e.target.value)}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            background: "#fff",
+                            fontSize: 13,
+                            width: "100%",
+                            maxWidth: "100%",
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        <option value="">Select focus area</option>
+                        {(bachelorFocusOptions || []).map((focus) => (
+                            <option key={focus} value={focus}>
+                                {focus}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
             <p style={{ fontSize: 14, color: "#6b7280" }}>
                 Drag a course or a multi-course module into any semester lane.
             </p>
@@ -136,31 +168,36 @@ export default function Sidebar({
                                             const course = courses[0] ?? {};
                                             const courseStatus = getCourseStatus?.(course.code ?? mod.code) ?? "todo";
                                             const style = statusStyle(courseStatus);
+                                            const blocked = isBlockedStatus(courseStatus);
                                             return (
                                                 <button
                                                     key={`pf${pfIdx}-${mod.code || course.code || modIdx}`}
-                                                    draggable
-                                                    onDragStart={(e) =>
+                                                    draggable={!blocked}
+                                                    onDragStart={(e) => {
+                                                        if (blocked) return;
                                                         onDragStart(e, {
                                                             kind: "course",
                                                             code: course.code ?? mod.code,
                                                             name: course.name ?? mod.name,
+                                                            ects: course.ects ?? mod.ects ?? null,
                                                             category: mod?.category ?? null,
                                                             subjectColor,
-                                                        })
-                                                    }
+                                                        });
+                                                    }}
+                                                    disabled={blocked}
                                                     title="Drag into the graph"
                                                     style={{
                                                         textAlign: "left",
-                                                        border: `1px solid ${subjectColor}`,
+                                                        border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`,
                                                         borderRadius: 12,
-                                                        background: "#fff",
+                                                        background: courseStatus === "done" ? "#f3f4f6" : (courseStatus === "in_plan" ? "#eff6ff" : "#fff"),
                                                         padding: "10px 12px",
-                                                        cursor: "grab",
+                                                        cursor: blocked ? "not-allowed" : "grab",
+                                                        opacity: blocked ? 0.85 : 1,
                                                     }}
                                                 >
-                                                    <div style={{ color: "#6b7280", fontSize: 12 }}>{course.code ?? mod.code}</div>
-                                                    <div style={{ fontWeight: 600 }}>{course.name ?? mod.name}</div>
+                                                    <div style={{ color: courseStatus === "done" ? "#6b7280" : "#6b7280", fontSize: 12 }}>{course.code ?? mod.code}</div>
+                                                    <div style={{ fontWeight: 600, color: courseStatus === "done" ? "#6b7280" : "#111827" }}>{course.name ?? mod.name}</div>
                                                     <div
                                                         style={{
                                                             marginTop: 6,
@@ -187,10 +224,13 @@ export default function Sidebar({
                                             name: mod.name,
                                             category: mod?.category ?? null,
                                             subjectColor,
-                                            courses: courses.map((c) => ({ code: c.code, name: c.name })),
+                                            courses: courses.map((c) => ({ code: c.code, name: c.name, ects: c.ects ?? null })),
                                         };
                                         const groupStatus = moduleStatus(courses.map((c) => c?.code).filter(Boolean));
                                         const groupStyle = statusStyle(groupStatus);
+                                        const moduleBlocked = courses
+                                            .map((c) => getCourseStatus?.(c?.code) ?? "todo")
+                                            .some((s) => isBlockedStatus(s));
 
                                         return (
                                             <div
@@ -198,19 +238,24 @@ export default function Sidebar({
                                                 style={{ border: `1px solid ${subjectSoft}`, borderRadius: 12, background: "#fff" }}
                                             >
                                                 <button
-                                                    draggable
-                                                    onDragStart={(e) => onDragStart(e, modulePayload)}
+                                                    draggable={!moduleBlocked}
+                                                    onDragStart={(e) => {
+                                                        if (moduleBlocked) return;
+                                                        onDragStart(e, modulePayload);
+                                                    }}
+                                                    disabled={moduleBlocked}
                                                     title="Drag the whole module"
                                                     style={{
                                                         width: "100%",
                                                         textAlign: "left",
                                                         border: "none",
                                                         borderBottom: `1px solid ${subjectSoft}`,
-                                                        background: moduleColor,
+                                                        background: groupStatus === "done" ? "#f3f4f6" : moduleColor,
                                                         padding: 12,
                                                         display: "grid",
                                                         gap: 8,
-                                                        cursor: "grab",
+                                                        cursor: moduleBlocked ? "not-allowed" : "grab",
+                                                        opacity: moduleBlocked ? 0.85 : 1,
                                                     }}
                                                 >
                                                     <div style={{ fontWeight: 700, fontSize: 14 }}>
@@ -240,31 +285,28 @@ export default function Sidebar({
                                                     {courses.map((course, idx) => {
                                                         const courseStatus = getCourseStatus?.(course?.code ?? mod.code) ?? "todo";
                                                         const courseStyle = statusStyle(courseStatus);
+                                                        const blocked = true; // per requirement: child courses in module groups are never draggable
                                                         return (
                                                             <button
                                                                 key={`pf${pfIdx}-${mod.code}-${idx}`}
-                                                                draggable
-                                                                onDragStart={(e) =>
-                                                                    onDragStart(e, {
-                                                                        kind: "course",
-                                                                        code: course?.code ?? mod.code, // prefer the real course code
-                                                                        name: course?.name ?? mod.name,
-                                                                        category: mod?.category ?? null,
-                                                                        subjectColor,
-                                                                    })
-                                                                }
-                                                                title="Drag only this course into the graph"
+                                                                draggable={false}
+                                                                onDragStart={(e) => {
+                                                                    e.preventDefault();
+                                                                }}
+                                                                disabled
+                                                                title="Only the whole module can be dragged"
                                                                 style={{
                                                                     textAlign: "left",
-                                                                    border: `1px solid ${subjectColor}`,
+                                                                    border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`,
                                                                     borderRadius: 10,
-                                                                    background: "#fff",
+                                                                    background: courseStatus === "done" ? "#f3f4f6" : (courseStatus === "in_plan" ? "#eff6ff" : "#fff"),
                                                                     padding: "8px 10px",
-                                                                    cursor: "grab",
+                                                                    cursor: "not-allowed",
+                                                                    opacity: 0.85,
                                                                 }}
                                                             >
                                                                 <div style={{ color: "#6b7280", fontSize: 12 }}>{course?.code ?? mod.code}</div>
-                                                                <div style={{ fontWeight: 600 }}>{course?.name ?? mod.name}</div>
+                                                                <div style={{ fontWeight: 600, color: courseStatus === "done" ? "#6b7280" : "#111827" }}>{course?.name ?? mod.name}</div>
                                                                 <div style={{ color: "#6b7280", fontSize: 12 }}>
                                                                     {typeof course?.ects === "number" ? `${course?.ects} ECTS` : course?.ects}
                                                                 </div>

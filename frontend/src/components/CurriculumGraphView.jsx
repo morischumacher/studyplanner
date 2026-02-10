@@ -271,6 +271,10 @@ export default function CurriculumGraphView({
     programCode,
     setProgramCode,
     programOptions,
+    selectedFocus,
+    setSelectedFocus,
+    bachelorProgramCode,
+    bachelorFocusOptions,
 }) {
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
     const [collapsedIds, setCollapsedIds] = useState(() => collectCollapsibleIds(root));
@@ -392,6 +396,31 @@ export default function CurriculumGraphView({
                     </option>
                 ))}
             </select>
+            {programCode === bachelorProgramCode && (
+                <select
+                    value={selectedFocus || ""}
+                    onChange={(e) => setSelectedFocus?.(e.target.value)}
+                    style={{
+                        position: "absolute",
+                        top: 12,
+                        left: 512,
+                        zIndex: 5,
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        fontWeight: 600,
+                        minWidth: 320,
+                    }}
+                >
+                    <option value="">Select focus area</option>
+                    {(bachelorFocusOptions || []).map((focus) => (
+                        <option key={focus} value={focus}>
+                            {focus}
+                        </option>
+                    ))}
+                </select>
+            )}
             <ReactFlow
                 nodes={displayNodes}
                 edges={edges}
