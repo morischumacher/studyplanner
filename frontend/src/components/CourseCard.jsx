@@ -1,10 +1,29 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, colorForType } from "../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT, colorForType } from "../utils/constants.js";
 import { hexToRgba } from "../utils/examSubjectColors.js";
+import {
+    combinedCardShadow,
+    layeredTypeShadow,
+    mapTypeForProgram,
+    stateVisualByStatus,
+} from "../utils/courseVisuals.js";
 
 /** CourseCard — React Flow node renderer */
 export default function CourseCard({ data }) {
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [menuView, setMenuView] = useState("root");
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        if (!isMenuOpen) return;
+        const handlePointerDown = (event) => {
+            if (!menuRef.current?.contains(event.target)) setIsMenuOpen(false);
+        };
+        document.addEventListener("mousedown", handlePointerDown);
+        return () => document.removeEventListener("mousedown", handlePointerDown);
+    }, [isMenuOpen]);
+
     const handleRemove = (e) => {
         e.stopPropagation();
         data?.onRemove?.(data.nodeId);
@@ -22,6 +41,15 @@ export default function CourseCard({ data }) {
     const fallback = colorForType(data?.category);
     const subjectColor = data?.subjectColor ?? fallback.border;
     const isDone = data?.status === "done";
+    const statusTextColor =
+        data?.status === "done"
+            ? "#166534"
+            : (data?.status === "in_plan" ? "#1d4ed8" : "#4b5563");
+    const visualStatus = data?.status;
+    const stateMeta = stateVisualByStatus(visualStatus);
+    const cardBackground = stateMeta.background;
+    const typeMeta = mapTypeForProgram(data?.category, data?.programCode);
+    const typeShadow = layeredTypeShadow(subjectColor, typeMeta.layers, stateMeta.background || "transparent");
     const codeKey = String(data?.code ?? "").trim().toLowerCase();
     const labelKey = String(data?.label ?? "").trim().toLowerCase();
     const isTransferableSkills =
@@ -41,13 +69,16 @@ export default function CourseCard({ data }) {
             style={{
                 width: CARD_WIDTH,
                 position: "relative",
-                background: isDone ? "#f3f4f6" : "#fff",
-                border: `1px solid ${isDone ? "#9ca3af" : subjectColor}`,
-                borderLeftWidth: 6,
+                minHeight: NODE_HEIGHT,
+                background: cardBackground,
+                border: `1px solid ${stateMeta.borderColor || subjectColor}`,
                 borderRadius: 10,
-                padding: 12,
-                boxShadow: "0 1px 1px rgba(0,0,0,0.03)",
-                opacity: isDone ? 0.8 : 1,
+                padding: 16,
+                boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
+                opacity: stateMeta.opacity,
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
             }}
         >
             {/* four handles with IDs so edges can target specific sides */}
@@ -71,16 +102,156 @@ export default function CourseCard({ data }) {
                 </>
             )}
 
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
-                <div className="title" style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.2, color: isDone ? "#6b7280" : "#111827" }}>
-                    {data.label}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                    {data.code}
+                </div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {data.onToggleDone && (data.status === "in_plan" || data.status === "done") && (
+                        <button
+                            onClick={handleToggleDone}
+                            aria-label={isDone ? "Mark as in plan" : "Mark as done"}
+                            title={isDone ? "Mark as in plan" : "Mark as done"}
+                            style={{
+                                border: `1px solid ${isDone ? "#9ca3af" : subjectColor}`,
+                                background: isDone ? "#10b981" : hexToRgba(subjectColor, 0.08),
+                                color: isDone ? "#ffffff" : "#111827",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                padding: "2px 6px",
+                                cursor: "pointer",
+                                lineHeight: 1.2,
+                            }}
+                        >
+                            ✓
+                        </button>
+                    )}
+                    <div style={{ position: "relative" }}>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsMenuOpen((v) => {
+                                    const next = !v;
+                                    if (next) setMenuView("root");
+                                    return next;
+                                });
+                            }}
+                            aria-label="Options"
+                            title="Options"
+                            style={{
+                                border: `1px solid ${isDone ? "#9ca3af" : subjectColor}`,
+                                background: "#ffffff",
+                                color: "#111827",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                padding: "2px 6px",
+                                cursor: "pointer",
+                                lineHeight: 1.2,
+                            }}
+                        >
+                            ...
+                        </button>
+                        {isMenuOpen && (
+                            <div
+                                ref={menuRef}
+                                style={{
+                                    position: "absolute",
+                                    top: 24,
+                                    right: 0,
+                                    width: 180,
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 8,
+                                    background: "#ffffff",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                                    padding: 6,
+                                    display: "grid",
+                                    gap: 4,
+                                    zIndex: 10,
+                                }}
+                            >
+                                {menuView === "root" && data.status === "todo" && data?.onAddToPlan && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setMenuView("semesters");
+                                        }}
+                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                    >
+                                        Add to plan
+                                    </button>
+                                )}
+                                {menuView === "root" && (data.status === "in_plan" || data.status === "done") && data?.onRemove && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (data?.groupId && data?.onRemoveModuleGroup) {
+                                                data.onRemoveModuleGroup(data.groupId);
+                                            } else {
+                                                data?.onRemove?.(data.nodeId);
+                                            }
+                                            setIsMenuOpen(false);
+                                        }}
+                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                    >
+                                        Remove from plan
+                                    </button>
+                                )}
+                                {menuView === "semesters" && (
+                                    <>
+                                        {(Array.isArray(data?.semesters) ? data.semesters : []).map((semester) => (
+                                            <button
+                                                key={semester.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    data?.onAddToPlan?.({
+                                                        code: data?.code,
+                                                        name: data?.label,
+                                                        ects: data?.ects ?? null,
+                                                        category: data?.category ?? null,
+                                                        examSubject: data?.examSubject ?? null,
+                                                        subjectColor,
+                                                    }, (Number(semester.id) || 1) - 1);
+                                                    setIsMenuOpen(false);
+                                                    setMenuView("root");
+                                                }}
+                                                style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                            >
+                                                {semester.title}
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setMenuView("root");
+                                            }}
+                                            style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                        >
+                                            Back
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            <div className="muted" style={{ fontSize: 12, color: isDone ? "#6b7280" : "#374151", opacity: 0.9 }}>{data.code}</div>
-            {data.ects ? (
-                <div className="muted" style={{ fontSize: 12, color: isDone ? "#6b7280" : "#374151", opacity: 0.8 }}>{data.ects} ECTS</div>
-            ) : null}
+            <div
+                className="title"
+                style={{
+                    fontSize: 16,
+                    fontWeight: 700,
+                    lineHeight: 1.25,
+                    color: isDone ? "#6b7280" : "#111827",
+                    display: "-webkit-box",
+                    WebkitBoxOrient: "vertical",
+                    WebkitLineClamp: 3,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                }}
+            >
+                {data.label}
+            </div>
             {isTransferableSkills && data?.onUpdateEcts && (
                 <div style={{ marginTop: 6 }}>
                     <label style={{ fontSize: 11, color: "#6b7280", marginRight: 6 }}>ECTS</label>
@@ -128,51 +299,13 @@ export default function CourseCard({ data }) {
                 </div>
             )}
 
-            {data.onToggleDone && (
-                <button
-                    onClick={handleToggleDone}
-                    aria-label={isDone ? "Mark as in plan" : "Mark as done"}
-                    title={isDone ? "Mark as in plan" : "Mark as done"}
-                    style={{
-                        position: "absolute",
-                        top: 6,
-                        right: 6,
-                        border: `1px solid ${isDone ? "#9ca3af" : subjectColor}`,
-                        background: isDone ? "#10b981" : hexToRgba(subjectColor, 0.08),
-                        color: isDone ? "#ffffff" : "#111827",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        padding: "2px 6px",
-                        cursor: "pointer",
-                        lineHeight: 1.2,
-                    }}
-                >
-                    ✓
-                </button>
-            )}
-
-            {data.onRemove && (
-                <button
-                    onClick={handleRemove}
-                    aria-label="Remove course"
-                    title="Remove course"
-                    style={{
-                        position: "absolute",
-                        top: 6,
-                        left: 6,
-                        border: `1px solid ${subjectColor}`,
-                        background: hexToRgba(subjectColor, 0.08),
-                        color: "#111827",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        padding: "2px 6px",
-                        cursor: "pointer",
-                        lineHeight: 1.2,
-                    }}
-                >
-                    ✕
-                </button>
-            )}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: "auto" }}>
+                <div style={{ fontSize: 11, color: "#6b7280" }}>{data.ects ? `${data.ects} ECTS` : "-"}</div>
+                <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>{typeMeta.label}</div>
+                <div style={{ fontSize: 11, color: statusTextColor, textTransform: "lowercase", fontWeight: 700 }}>
+                    {data.status === "done" ? "done" : (data.status === "in_plan" ? "planned" : "not planned")}
+                </div>
+            </div>
         </div>
     );
 }

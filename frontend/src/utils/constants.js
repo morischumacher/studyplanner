@@ -51,9 +51,10 @@ export const SEMESTERS = [
 
 export const COLLISION_GAP = 8; // minimal breathing room between blocks
 
-export const LANE_WIDTH = 320;           // width per semester column (flow units)
+export const LANE_WIDTH = 360;           // width per semester column (flow units)
 export const LANE_GAP = 20;              // gap between lanes (flow units)
-export const NODE_HEIGHT = 56;           // fixed course-card height
+export const NODE_HEIGHT = 124;          // course-card baseline height
+export const COURSE_LAYOUT_HEIGHT = 156; // vertical spacing/bbox used for table layout
 export const GRID_SIZE = 16;             // snap grid
 export const CANVAS_HEIGHT = 2000;       // tall background per lane
 export const CARD_WIDTH = 270;           // fixed card width â†’ easy centering
@@ -61,11 +62,11 @@ export const CARD_WIDTH = 270;           // fixed card width â†’ easy cente
 // Group panel padding
 export const GROUP_PADDING_X = 6;
 export const GROUP_PADDING_Y = 20;
-export const GROUP_EXTRA_RIGHT = 25;
+export const GROUP_EXTRA_RIGHT = 60;
 export const COURSE_VERTICAL_GAP = 8;    // distance between stacked courses
 
 // Module group panel tuning
-export const MODULE_HEADER_HEIGHT = 36;
+export const MODULE_HEADER_HEIGHT = 68;
 export const MODULE_TOP_PADDING = 4;     // small top padding under header
 export const MODULE_BOTTOM_PADDING = 30; // extra breathing room at bottom
 

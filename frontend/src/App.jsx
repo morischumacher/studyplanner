@@ -20,20 +20,24 @@ import "reactflow/dist/style.css";
 
 import { fetchCatalog, sendRuleCheckUpdate } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
+import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
 import {
     CANVAS_HEIGHT,
     CARD_WIDTH,
     COLLISION_GAP,
     GRID_SIZE,
+    LANE_WIDTH,
     GROUP_EXTRA_RIGHT,
     GROUP_PADDING_X,
     GROUP_PADDING_Y,
+    COURSE_VERTICAL_GAP,
+    COURSE_LAYOUT_HEIGHT,
+    MODULE_BOTTOM_PADDING,
     MODULE_HEADER_HEIGHT,
-    NODE_HEIGHT,
     SEMESTERS,
 } from "./utils/constants.js";
-import { centerX, laneIndexFromX, projectToLaneAndSnap } from "./utils/geometry.js";
+import { centerX, laneIndexFromX, laneX, projectToLaneAndSnap } from "./utils/geometry.js";
 import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
 
 /*********************************
@@ -109,23 +113,67 @@ function recomputeGroupFromChildren(nodes, groupId) {
     const minX = Math.min(...children.map((c) => c.position.x));
     const minY = Math.min(...children.map((c) => c.position.y));
     const maxX = Math.max(...children.map((c) => c.position.x + CARD_WIDTH));
-    const maxY = Math.max(...children.map((c) => c.position.y + NODE_HEIGHT));
+    const maxY = Math.max(...children.map((c) => c.position.y + COURSE_LAYOUT_HEIGHT));
 
+    // Keep module groups visually centered while still reserving slightly more room on the right.
+    const extraLeft = GROUP_EXTRA_RIGHT * 0.35;
     const width = maxX - minX + GROUP_PADDING_X * 2 + GROUP_EXTRA_RIGHT;
-    const height = maxY - minY + GROUP_PADDING_Y * 2 + MODULE_HEADER_HEIGHT;
+    const statuses = children.map((c) => c?.data?.status ?? "in_plan");
+    const groupStatus = statuses.every((s) => s === "done")
+        ? "done"
+        : (statuses.some((s) => s === "in_plan" || s === "done") ? "in_plan" : "todo");
+    const moduleEctsFromChildren = children.reduce((sum, c) => sum + Number(c?.data?.ects || 0), 0);
+    const moduleCourseCodes = children.map((c) => c?.data?.code).filter(Boolean);
+    const height = maxY - minY + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT + MODULE_BOTTOM_PADDING;
 
     return nodes.map((n) =>
         n.id === groupId
             ? {
                 ...n,
                 position: {
-                    x: minX - GROUP_PADDING_X,
+                    x: minX - GROUP_PADDING_X - extraLeft,
                     y: minY - GROUP_PADDING_Y - MODULE_HEADER_HEIGHT,
                 },
-                data: { ...n.data, width, height },
+                data: {
+                    ...n.data,
+                    width,
+                    height,
+                    moduleCourseCount: children.length,
+                    moduleEcts: Number(n?.data?.moduleEcts ?? 0) || moduleEctsFromChildren || null,
+                    moduleCourseCodes,
+                    status: groupStatus,
+                },
             }
             : n
     );
+}
+
+function resolveGroupCourseOverlaps(nodes, groupId) {
+    const children = nodes
+        .filter((n) => n.type === "course" && n.data?.groupId === groupId)
+        .sort((a, b) => a.position.y - b.position.y);
+    if (children.length <= 1) return nodes;
+
+    let next = nodes.slice();
+    const placed = [];
+    for (const child of children) {
+        const current = next.find((n) => n.id === child.id) || child;
+        let minY = current.position.y;
+        for (const prior of placed) {
+            const xOverlap =
+                current.position.x < prior.position.x + CARD_WIDTH + COLLISION_GAP &&
+                current.position.x + CARD_WIDTH + COLLISION_GAP > prior.position.x;
+            if (!xOverlap) continue;
+            minY = Math.max(minY, prior.position.y + COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
+        }
+        if (current.position.y < minY) {
+            next = next.map((n) => (
+                n.id === child.id ? { ...n, position: { x: n.position.x, y: minY } } : n
+            ));
+        }
+        placed.push(next.find((n) => n.id === child.id) || current);
+    }
+    return next;
 }
 
 /****************************************
@@ -211,6 +259,7 @@ export default function App() {
         lastUpdatedAt: null,
     });
     const [isRuleDashboardOpen, setIsRuleDashboardOpen] = useState(false);
+    const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isSteopInfoOpen, setIsSteopInfoOpen] = useState(false);
     const [isFocusInfoOpen, setIsFocusInfoOpen] = useState(false);
     const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0 });
@@ -225,6 +274,7 @@ export default function App() {
     const groupDragRef = useRef(new Map()); // Map<groupId, { lastX, lastY }>
     const latestRuleCheckChangeIdRef = useRef(null);
     const pendingInitialSyncProgramRef = useRef(programCode);
+    const pendingDragPayloadRef = useRef(null);
 
     // Fetch & normalize catalog whenever programCode changes
     useEffect(() => {
@@ -257,7 +307,7 @@ export default function App() {
                 id: `lane-${s.id}`,
                 type: "lane",
                 data: { title: s.title, even: i % 2 === 0 },
-                position: { x: i * 340 /* fallback for LANE_WIDTH+LANE_GAP */, y: 0 },
+                position: { x: laneX(i), y: 0 },
                 draggable: false,
                 selectable: false,
                 zIndex: 0,
@@ -286,13 +336,21 @@ export default function App() {
      * Sidebar drag & drop *
      ***********************/
     const handleDragStart = useCallback((e, payload) => {
-        e.dataTransfer.setData("application/x-course", JSON.stringify(payload));
-        e.dataTransfer.effectAllowed = "move";
+        pendingDragPayloadRef.current = payload ?? null;
+        const dt = e?.dataTransfer || e?.nativeEvent?.dataTransfer || null;
+        if (!dt) return;
+        try {
+            dt.setData("application/x-course", JSON.stringify(payload));
+            dt.effectAllowed = "move";
+        } catch {
+            // Some environments block setData for custom MIME types; fallback ref handles drop.
+        }
     }, []);
 
     const onDragOver = useCallback((event) => {
         event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
+        const dt = event?.dataTransfer || event?.nativeEvent?.dataTransfer || null;
+        if (dt) dt.dropEffect = "move";
     }, []);
 
     /***********************
@@ -369,6 +427,43 @@ export default function App() {
         setNeedsPersist(true);
     }, [setNodes]);
 
+    const toggleModuleDoneCodes = useCallback((courseCodes, nextDone, groupId) => {
+        let codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+        if (!codes.length && groupId) {
+            const source = (rfRef.current?.getNodes?.() || nodes);
+            codes = source
+                .filter((n) => n.type === "course" && n.data?.groupId === groupId)
+                .map((n) => n?.data?.code)
+                .filter(Boolean);
+        }
+        const uniqueCodes = [...new Set(codes)];
+        if (!uniqueCodes.length) return;
+        for (const code of uniqueCodes) {
+            setCourseDone(code, Boolean(nextDone));
+        }
+        setNodes((prev) => {
+            const patched = prev.map((n) => {
+                if (n.type !== "course" || !uniqueCodes.includes(n?.data?.code)) return n;
+                return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
+            });
+            if (groupId) {
+                return patched.map((n) => (
+                    n.type === "moduleBg" && n.id === groupId
+                        ? {
+                            ...n,
+                            data: {
+                                ...n.data,
+                                status: nextDone ? "done" : "in_plan",
+                                moduleCourseCodes: uniqueCodes,
+                            },
+                        }
+                        : n
+                ));
+            }
+            return patched;
+        });
+    }, [nodes, setCourseDone, setNodes]);
+
     const addGraphCourseToPlan = useCallback((course, requestedLaneIndex) => {
         const courseCode = course?.code;
         if (!courseCode || getCourseStatus(courseCode) !== "todo") return false;
@@ -392,7 +487,7 @@ export default function App() {
                 .filter((n) => n.type === "course" && laneIdx(n) === laneIndex)
                 .sort((a, b) => (a?.position?.y ?? 0) - (b?.position?.y ?? 0));
             const last = laneNodes[laneNodes.length - 1];
-            const y = last ? (last.position.y + NODE_HEIGHT + COLLISION_GAP) : 96;
+            const y = last ? (last.position.y + COURSE_LAYOUT_HEIGHT + COLLISION_GAP) : 96;
 
             const next = prev.concat({
                 id,
@@ -402,11 +497,13 @@ export default function App() {
                     code: courseCode,
                     ects: course?.ects ?? null,
                     onRemove: removeCourseNode,
+                    onRemoveModuleGroup: removeModuleGroup,
                     onToggleDone: toggleCourseDone,
                     onUpdateEcts: updateCourseEcts,
                     nodeId: id,
                     examSubject,
                     category: course?.category ?? "unknown",
+                    programCode,
                     subjectColor: resolvedSubjectColor,
                     status: "in_plan",
                 },
@@ -439,7 +536,7 @@ export default function App() {
 
         const laneIndex = Math.max(0, Math.min(Number(requestedLaneIndex) || 0, SEMESTERS.length - 1));
         const x = centerX(laneIndex);
-        const y = 96;
+        const y = 144;
         const now = Date.now();
         const groupId = `mod-${now}-graph`;
         const groupExamSubject =
@@ -458,11 +555,18 @@ export default function App() {
             data: {
                 title: `${modulePayload?.name || "Module"}`,
                 code: null,
+                moduleCode: modulePayload?.code ?? null,
+                moduleEcts: modulePayload?.ects ?? null,
+                moduleCourseCount: courses.length,
+                moduleCourseCodes: codes,
+                status: "in_plan",
                 groupId,
                 onRemoveGroup: removeModuleGroup,
                 onRemove: () => removeModuleGroup(groupId),
+                onToggleModuleDone: toggleModuleDoneCodes,
                 examSubject: groupExamSubject,
                 category: modulePayload?.category ?? "unknown",
+                programCode,
                 subjectColor: resolvedSubjectColor,
             },
             position: { x, y },
@@ -473,7 +577,7 @@ export default function App() {
 
         const childCourseNodes = courses.map((course, idx) => {
             const childId = `${course.code}-${now}-${idx}-graph`;
-            const baseY = y + idx * (56 + 8);
+            const baseY = y + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
             const examSubject =
                 getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, modulePayload?.code);
 
@@ -492,6 +596,7 @@ export default function App() {
                     nodeId: childId,
                     examSubject,
                     category: modulePayload?.category ?? "unknown",
+                    programCode,
                     subjectColor: resolvedSubjectColor,
                     status: "in_plan",
                 },
@@ -521,7 +626,7 @@ export default function App() {
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+    }, [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
 
     const toggleGraphCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
@@ -607,17 +712,31 @@ export default function App() {
     }, []);
 
     const onNodeDrag = useCallback((_, node) => {
-        if (node?.type !== "moduleBg") return;
-        const st = groupDragRef.current.get(node.id) || { lastX: node.position.x, lastY: node.position.y };
-        const dx = node.position.x - st.lastX;
-        const dy = node.position.y - st.lastY;
-        if (dx === 0 && dy === 0) return;
-        groupDragRef.current.set(node.id, { lastX: node.position.x, lastY: node.position.y });
-        setNodes((prev) =>
-            prev.map((n) => (n.type === "course" && n.data?.groupId === node.id
-                ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
-                : n))
-        );
+        // Dragging a module background: move all children by the same live delta.
+        if (node?.type === "moduleBg") {
+            const st = groupDragRef.current.get(node.id) || { lastX: node.position.x, lastY: node.position.y };
+            const dx = node.position.x - st.lastX;
+            const dy = node.position.y - st.lastY;
+            if (dx === 0 && dy === 0) return;
+            groupDragRef.current.set(node.id, { lastX: node.position.x, lastY: node.position.y });
+            setNodes((prev) =>
+                prev.map((n) => (n.type === "course" && n.data?.groupId === node.id
+                    ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+                    : n))
+            );
+            return;
+        }
+
+        // Dragging a child course inside a module: keep the module background synced live.
+        if (node?.type === "course" && node?.data?.groupId) {
+            const groupId = node.data.groupId;
+            setNodes((prev) => {
+                const withDraggedCourse = prev.map((n) => (
+                    n.id === node.id ? { ...n, position: { x: node.position.x, y: node.position.y } } : n
+                ));
+                return recomputeGroupFromChildren(withDraggedCourse, groupId);
+            });
+        }
     }, [setNodes]);
 
     /** Mark that we should persist after the next nodes commit. */
@@ -764,18 +883,21 @@ export default function App() {
      * Snap & collision resolve *
      ***************************/
     const onNodeDragStop = useCallback((_, node) => {
-        const li = laneIndexFromX(node.position.x);
-        const snappedX = centerX(li);
         const snappedY = Math.max(0, Math.round(node.position.y / GRID_SIZE) * GRID_SIZE);
 
         // If a whole module group was dragged: shift children by the snap delta, snap the group,
         // then recompute the group bbox, and resolve collisions.
         if (node?.type === "moduleBg") {
-            const dxSnap = snappedX - node.position.x;
-            const dySnap = snappedY - node.position.y;
             setNodes((prev) => {
+                const children = prev.filter((n) => n.type === "course" && n.data?.groupId === node.id);
+                const targetLane = laneIndexFromX(node.position.x);
+                const targetChildX = centerX(targetLane);
+                const avgChildX = children.length
+                    ? (children.reduce((sum, c) => sum + Number(c?.position?.x || 0), 0) / children.length)
+                    : targetChildX;
+                const dxSnap = targetChildX - avgChildX;
+                const dySnap = snappedY - node.position.y;
                 const moved = prev.map((n) => {
-                    if (n.id === node.id) return { ...n, position: { x: snappedX, y: snappedY } };
                     if (n.type === "course" && n.data?.groupId === node.id) {
                         return { ...n, position: { x: n.position.x + dxSnap, y: n.position.y + dySnap } };
                     }
@@ -792,13 +914,20 @@ export default function App() {
         if (node?.type === "course" && node?.data?.groupId) {
             const groupId = node.data.groupId;
             setNodes((prev) => {
-                const updated = prev.map((n) => (n.id === node.id ? { ...n, position: { x: snappedX, y: snappedY } } : n));
-                return resolveLaneCollisions(recomputeGroupFromChildren(updated, groupId));
+                const targetLane = laneIndexFromX(node.position.x);
+                const targetLaneX = centerX(targetLane);
+                const updated = prev.map((n) =>
+                    n.id === node.id ? { ...n, position: { x: targetLaneX, y: snappedY } } : n
+                );
+                const stacked = resolveGroupCourseOverlaps(updated, groupId);
+                return resolveLaneCollisions(recomputeGroupFromChildren(stacked, groupId));
             });
             return;
         }
 
         // All other nodes: normal snapping + collision resolution
+        const li = laneIndexFromX(node.position.x);
+        const snappedX = centerX(li);
         setNodes((prev) => {
             const next = prev.map((n) => (n.id === node.id ? { ...n, position: { x: snappedX, y: snappedY } } : n));
             return resolveLaneCollisions(next);
@@ -815,15 +944,21 @@ export default function App() {
     const onDrop = useCallback(
         (evt) => {
             evt.preventDefault();
-            const raw = evt.dataTransfer.getData("application/x-course");
-            if (!raw) return;
-
-            let payload;
-            try {
-                payload = JSON.parse(raw);
-            } catch {
-                return;
+            const dt = evt?.dataTransfer || evt?.nativeEvent?.dataTransfer || null;
+            let payload = null;
+            const raw = dt ? dt.getData("application/x-course") : "";
+            if (raw) {
+                try {
+                    payload = JSON.parse(raw);
+                } catch {
+                    payload = null;
+                }
             }
+            if (!payload && pendingDragPayloadRef.current) {
+                payload = pendingDragPayloadRef.current;
+            }
+            if (!payload) return;
+            pendingDragPayloadRef.current = null;
 
             const { x, y } = projectToLaneAndSnap({ evt, wrapperEl: wrapperRef.current, rfInstance: rfRef.current });
             const now = Date.now();
@@ -846,11 +981,18 @@ export default function App() {
                     data: {
                         title: `${payload.name}`,
                         code: null,
+                        moduleCode: payload?.code ?? null,
+                        moduleEcts: payload?.ects ?? null,
+                        moduleCourseCount: payload?.courses?.length ?? 0,
+                        moduleCourseCodes: payload?.courses?.map((c) => c?.code).filter(Boolean) ?? [],
+                        status: "in_plan",
                         groupId,
                         onRemoveGroup: removeModuleGroup,
                         onRemove: () => removeModuleGroup(groupId),
+                        onToggleModuleDone: toggleModuleDoneCodes,
                         examSubject: groupExamSubject,
                         category: payload.category ?? "unknown",
+                        programCode,
                         subjectColor: resolvedSubjectColor,
                     },
                     position: { x, y }, // preliminary; will be resized by recomputeGroupFromChildren
@@ -861,7 +1003,7 @@ export default function App() {
 
                 const childCourseNodes = payload.courses.map((course, idx) => {
                     const childId = `${course.code}-${now}-${idx}`;
-                    const baseY = y + idx * (56 /* NODE_HEIGHT */ + 8 /* COURSE_VERTICAL_GAP */);
+                    const baseY = y + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
                     const examSubject =
                         getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, payload.code);
 
@@ -875,13 +1017,15 @@ export default function App() {
                             groupId,
                             baseY,
                             onRemove: removeCourseNode,
+                            onRemoveModuleGroup: removeModuleGroup,
                             onToggleDone: toggleCourseDone,
                             onUpdateEcts: updateCourseEcts,
                             nodeId: childId,
                             examSubject,
                             category: payload.category ?? "unknown",
+                            programCode,
                             subjectColor: resolvedSubjectColor,
-                            status: getCourseStatus(course.code),
+                            status: "in_plan",
                         },
                         position: { x, y: baseY },
                         sourcePosition: "right",
@@ -920,8 +1064,9 @@ export default function App() {
                         nodeId: id,
                         examSubject,
                         category: payload.category ?? "unknown",
+                        programCode,
                         subjectColor: resolvedSubjectColor,
-                        status: getCourseStatus(payload.code),
+                        status: "in_plan",
                     },
                     position: { x, y },
                     sourcePosition: "right",
@@ -932,7 +1077,7 @@ export default function App() {
             });
             schedulePersist();
         },
-        [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, updateCourseEcts]
+        [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
     );
 
     /***************************************
@@ -957,13 +1102,13 @@ export default function App() {
                 x1: n.position.x,
                 y1: n.position.y,
                 x2: n.position.x + CARD_WIDTH,
-                y2: n.position.y + NODE_HEIGHT,
-                h: NODE_HEIGHT,
+                y2: n.position.y + COURSE_LAYOUT_HEIGHT,
+                h: COURSE_LAYOUT_HEIGHT,
             };
         }
         if (n.type === "moduleBg") {
             const w = Number(n?.data?.width) || CARD_WIDTH + 2 * GROUP_PADDING_X;
-            const h = Number(n?.data?.height) || NODE_HEIGHT + MODULE_HEADER_HEIGHT + 2 * GROUP_PADDING_Y;
+            const h = Number(n?.data?.height) || COURSE_LAYOUT_HEIGHT + MODULE_HEADER_HEIGHT + 2 * GROUP_PADDING_Y;
             return { x1: n.position.x, y1: n.position.y, x2: n.position.x + w, y2: n.position.y + h, h };
         }
         return { x1: n.position.x, y1: n.position.y, x2: n.position.x, y2: n.position.y, h: 0 };
@@ -1201,6 +1346,8 @@ export default function App() {
                         setGraphViewState={setGraphViewState}
                         isRuleDashboardOpen={isRuleDashboardOpen}
                         onToggleRuleDashboard={() => setIsRuleDashboardOpen((v) => !v)}
+                        isLegendOpen={isLegendOpen}
+                        onToggleLegend={() => setIsLegendOpen((v) => !v)}
                         ruleFeedback={{
                             text: feedbackText,
                             bg: feedbackBg,
@@ -1317,6 +1464,12 @@ export default function App() {
                 bachelorProgramCode={BACHELOR_PROGRAM_CODE}
                 bachelorFocusOptions={BACHELOR_FOCUS_OPTIONS}
                 getCourseStatus={getCourseStatus}
+                onAddCourseToPlan={addGraphCourseToPlan}
+                onAddModuleToPlan={addGraphModuleToPlan}
+                onToggleCourseDone={toggleGraphCourseDone}
+                onToggleModuleDone={toggleGraphModuleDone}
+                onRemoveCourseFromPlan={removeGraphCourseFromPlan}
+                onRemoveModuleFromPlan={removeGraphModuleFromPlan}
             />
 
             <div style={{ flex: 1, display: "flex", minWidth: 0 }}>
@@ -1355,6 +1508,23 @@ export default function App() {
                         }}
                     >
                         {isRuleDashboardOpen ? "Close Rule Dashboard" : "Open Rule Dashboard"}
+                    </button>
+                    <button
+                        onClick={() => setIsLegendOpen((v) => !v)}
+                        style={{
+                            position: "absolute",
+                            top: 12,
+                            left: 306,
+                            zIndex: 5,
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 12px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                        }}
+                    >
+                        {isLegendOpen ? "Hide Legend" : "Show Legend"}
                     </button>
 
                     <div
@@ -1396,6 +1566,11 @@ export default function App() {
                             <Background gap={GRID_SIZE} />
                         </ReactFlow>
                     </div>
+                    {isLegendOpen && (
+                        <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 6 }}>
+                            <VisualLegend programCode={programCode} />
+                        </div>
+                    )}
                 </div>
 
                 {isRuleDashboardOpen && (

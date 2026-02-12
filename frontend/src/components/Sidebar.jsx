@@ -1,8 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import {
     hexToRgba,
     MODULE_GROUP_COLOR_ALPHA,
 } from "../utils/examSubjectColors.js";
+import { SEMESTERS } from "../utils/constants.js";
+import {
+    combinedCardShadow,
+    layeredTypeShadow,
+    mapTypeForProgram,
+    stateVisualByStatus,
+} from "../utils/courseVisuals.js";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
@@ -21,11 +28,23 @@ export default function Sidebar({
     bachelorProgramCode,
     bachelorFocusOptions,
     getCourseStatus,
+    onAddCourseToPlan,
+    onAddModuleToPlan,
+    onToggleCourseDone,
+    onToggleModuleDone,
+    onRemoveCourseFromPlan,
+    onRemoveModuleFromPlan,
 }) {
+    const [menuState, setMenuState] = useState({ key: null, view: "root" });
+
+    const openMenu = (key) => setMenuState({ key, view: "root" });
+    const closeMenu = () => setMenuState({ key: null, view: "root" });
+    const gotoSemesters = (key) => setMenuState({ key, view: "semesters" });
+
     const statusLabel = (status) => {
         if (status === "done") return "done";
-        if (status === "in_plan") return "in plan";
-        return "todo";
+        if (status === "in_plan") return "planned";
+        return "not planned";
     };
 
     const statusStyle = (status) => {
@@ -121,7 +140,15 @@ export default function Sidebar({
                     const moduleColor = hexToRgba(subjectColor, MODULE_GROUP_COLOR_ALPHA);
 
                     return (
-                        <div key={`pf-${pfIdx}`} style={{ border: `2px solid ${subjectColor}`, borderRadius: 12, background: "#fff" }}>
+                        <div
+                            key={`pf-${pfIdx}`}
+                            style={{
+                                border: `2px solid ${subjectColor}`,
+                                borderRadius: 12,
+                                background: "#fff",
+                                overflow: "hidden",
+                            }}
+                        >
                             {/* Header */}
                             <button
                                 onClick={() => togglePf(pfName)}
@@ -169,12 +196,16 @@ export default function Sidebar({
                                             const courseStatus = getCourseStatus?.(course.code ?? mod.code) ?? "todo";
                                             const style = statusStyle(courseStatus);
                                             const blocked = isBlockedStatus(courseStatus);
+                                            const typeMeta = mapTypeForProgram(mod?.category, programCode);
+                                            const stateMeta = stateVisualByStatus(courseStatus);
+                                            const typeShadow = layeredTypeShadow(subjectColor, typeMeta.layers, stateMeta.background || "transparent");
+                                            const menuKey = `single-${pfIdx}-${mod.code || course.code || modIdx}`;
                                             return (
-                                                <button
-                                                    key={`pf${pfIdx}-${mod.code || course.code || modIdx}`}
-                                                    draggable={!blocked}
+                                                <div
+                                                    key={menuKey}
+                                                    draggable={courseStatus === "todo"}
                                                     onDragStart={(e) => {
-                                                        if (blocked) return;
+                                                        if (courseStatus !== "todo") return;
                                                         onDragStart(e, {
                                                             kind: "course",
                                                             code: course.code ?? mod.code,
@@ -184,36 +215,86 @@ export default function Sidebar({
                                                             subjectColor,
                                                         });
                                                     }}
-                                                    disabled={blocked}
                                                     title="Drag into the graph"
                                                     style={{
                                                         textAlign: "left",
-                                                        border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`,
+                                                        border: `1px solid ${stateMeta.borderColor || subjectColor}`,
                                                         borderRadius: 12,
-                                                        background: courseStatus === "done" ? "#f3f4f6" : (courseStatus === "in_plan" ? "#eff6ff" : "#fff"),
-                                                        padding: "10px 12px",
-                                                        cursor: blocked ? "not-allowed" : "grab",
-                                                        opacity: blocked ? 0.85 : 1,
+                                                        background: stateMeta.background,
+                                                        boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
+                                                        padding: "12px 12px",
+                                                        cursor: courseStatus === "todo" ? "grab" : "default",
+                                                        opacity: stateMeta.opacity,
+                                                        display: "grid",
+                                                        gap: 8,
+                                                        position: "relative",
+                                                        width: "100%",
+                                                        boxSizing: "border-box",
+                                                        minWidth: 0,
+                                                        overflow: "hidden",
                                                     }}
                                                 >
-                                                    <div style={{ color: courseStatus === "done" ? "#6b7280" : "#6b7280", fontSize: 12 }}>{course.code ?? mod.code}</div>
-                                                    <div style={{ fontWeight: 600, color: courseStatus === "done" ? "#6b7280" : "#111827" }}>{course.name ?? mod.name}</div>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                            {course.code ?? mod.code}
+                                                        </div>
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                            {(courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onToggleCourseDone?.(course.code ?? mod.code, courseStatus !== "done");
+                                                                    }}
+                                                                    style={{ border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`, background: courseStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: courseStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    ✓
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (menuState.key === menuKey) closeMenu();
+                                                                    else openMenu(menuKey);
+                                                                }}
+                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                            >
+                                                                ...
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {menuState.key === menuKey && (
+                                                        <div style={{ position: "absolute", top: 34, right: 10, width: 170, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 10 }}>
+                                                            {menuState.view === "root" && courseStatus === "todo" && (
+                                                                <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                            )}
+                                                            {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                <button onClick={(e) => { e.stopPropagation(); onRemoveCourseFromPlan?.(course.code ?? mod.code); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
+                                                            )}
+                                                            {menuState.view === "semesters" && (
+                                                                <>
+                                                                    {SEMESTERS.map((semester) => (
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semester.title}</button>
+                                                                    ))}
+                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{course.name ?? mod.name}</div>
                                                     <div
                                                         style={{
-                                                            marginTop: 6,
-                                                            display: "inline-flex",
-                                                            borderRadius: 999,
-                                                            border: `1px solid ${style.border}`,
-                                                            background: style.bg,
-                                                            color: style.color,
-                                                            padding: "2px 8px",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "space-between",
+                                                            gap: 8,
                                                             fontSize: 11,
-                                                            fontWeight: 700,
                                                         }}
                                                     >
-                                                        {statusLabel(courseStatus)}
+                                                        <span style={{ color: "#6b7280", whiteSpace: "nowrap" }}>{(course.ects ?? mod.ects) ? `${course.ects ?? mod.ects} ECTS` : "-"}</span>
+                                                        <span style={{ color: "#6b7280", fontWeight: 700, flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{typeMeta.label}</span>
+                                                        <span style={{ color: style.color, fontWeight: 700, whiteSpace: "nowrap" }}>{statusLabel(courseStatus)}</span>
                                                     </div>
-                                                </button>
+                                                </div>
                                             );
                                         }
 
@@ -227,7 +308,13 @@ export default function Sidebar({
                                             courses: courses.map((c) => ({ code: c.code, name: c.name, ects: c.ects ?? null })),
                                         };
                                         const groupStatus = moduleStatus(courses.map((c) => c?.code).filter(Boolean));
+                                        const groupVisualStatus = groupStatus === "done" ? "done" : "todo";
                                         const groupStyle = statusStyle(groupStatus);
+                                        const groupTypeMeta = mapTypeForProgram(mod?.category, programCode);
+                                        const groupStateMeta = stateVisualByStatus(groupVisualStatus);
+                                        const groupTypeShadow = layeredTypeShadow(subjectColor, groupTypeMeta.layers, groupStateMeta.background || "transparent");
+                                        const groupBorderColor = groupStateMeta.borderColor || subjectColor;
+                                        const isGroupDone = groupStatus === "done";
                                         const moduleBlocked = courses
                                             .map((c) => getCourseStatus?.(c?.code) ?? "todo")
                                             .some((s) => isBlockedStatus(s));
@@ -235,97 +322,185 @@ export default function Sidebar({
                                         return (
                                             <div
                                                 key={`pf${pfIdx}-${mod.code || modIdx}`}
-                                                style={{ border: `1px solid ${subjectSoft}`, borderRadius: 12, background: "#fff" }}
+                                                style={{
+                                                    border: `2px solid ${groupBorderColor}`,
+                                                    borderRadius: 12,
+                                                    background: "#fff",
+                                                    overflow: "hidden",
+                                                }}
                                             >
-                                                <button
-                                                    draggable={!moduleBlocked}
+                                                <div
+                                                    draggable={groupStatus === "todo" && !moduleBlocked}
                                                     onDragStart={(e) => {
-                                                        if (moduleBlocked) return;
+                                                        if (groupStatus !== "todo" || moduleBlocked) return;
                                                         onDragStart(e, modulePayload);
                                                     }}
-                                                    disabled={moduleBlocked}
                                                     title="Drag the whole module"
                                                     style={{
                                                         width: "100%",
                                                         textAlign: "left",
                                                         border: "none",
-                                                        borderBottom: `1px solid ${subjectSoft}`,
-                                                        background: groupStatus === "done" ? "#f3f4f6" : moduleColor,
+                                                        borderBottom: `2px solid ${groupBorderColor}`,
+                                                        background: groupVisualStatus === "todo" ? moduleColor : groupStateMeta.background,
+                                                        boxShadow: combinedCardShadow(groupTypeShadow, groupStateMeta.extraShadow),
                                                         padding: 12,
                                                         display: "grid",
                                                         gap: 8,
-                                                        cursor: moduleBlocked ? "not-allowed" : "grab",
-                                                        opacity: moduleBlocked ? 0.85 : 1,
+                                                        cursor: groupStatus === "todo" && !moduleBlocked ? "grab" : "default",
+                                                        opacity: moduleBlocked ? 0.85 : groupStateMeta.opacity,
+                                                        position: "relative",
+                                                        boxSizing: "border-box",
+                                                        minWidth: 0,
+                                                        overflow: "hidden",
                                                     }}
                                                 >
-                                                    <div style={{ fontWeight: 700, fontSize: 14 }}>
-                                                        <span style={{ color: "#6b7280" }}>{mod.code}</span> · {mod.name}
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                        <div style={{ fontSize: 11, color: isGroupDone ? "#9ca3af" : "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{mod.code}</div>
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                            {(groupStatus === "in_plan" || groupStatus === "done") && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onToggleModuleDone?.(courses.map((c) => c?.code).filter(Boolean), groupStatus !== "done");
+                                                                    }}
+                                                                    style={{ border: `1px solid ${groupStatus === "done" ? "#9ca3af" : subjectColor}`, background: groupStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: groupStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    ✓
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    const key = `module-${pfIdx}-${mod.code || modIdx}`;
+                                                                    if (menuState.key === key) closeMenu();
+                                                                    else openMenu(key);
+                                                                }}
+                                                                style={{ border: `1px solid ${isGroupDone ? "#9ca3af" : subjectColor}`, background: "#fff", color: isGroupDone ? "#6b7280" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                            >
+                                                                ...
+                                                            </button>
+                                                        </div>
                                                     </div>
-                                                    <div style={{ color: "#6b7280", fontSize: 12 }}>
+                                                    {menuState.key === `module-${pfIdx}-${mod.code || modIdx}` && (
+                                                        <div style={{ position: "absolute", top: 34, right: 10, width: 170, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 10 }}>
+                                                            {menuState.view === "root" && groupStatus === "todo" && (
+                                                                <button onClick={(e) => { e.stopPropagation(); gotoSemesters(`module-${pfIdx}-${mod.code || modIdx}`); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                            )}
+                                                            {menuState.view === "root" && (groupStatus === "in_plan" || groupStatus === "done") && (
+                                                                <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
+                                                            )}
+                                                            {menuState.view === "semesters" && (
+                                                                <>
+                                                                    {SEMESTERS.map((semester) => (
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semester.title}</button>
+                                                                    ))}
+                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(`module-${pfIdx}-${mod.code || modIdx}`); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: isGroupDone ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                                                        {mod.name}
+                                                    </div>
+                                                    <div style={{ color: isGroupDone ? "#9ca3af" : "#6b7280", fontSize: 12 }}>
                                                         {courses.length} Kurse
                                                     </div>
                                                     <div
                                                         style={{
-                                                            display: "inline-flex",
-                                                            width: "fit-content",
-                                                            borderRadius: 999,
-                                                            border: `1px solid ${groupStyle.border}`,
-                                                            background: groupStyle.bg,
-                                                            color: groupStyle.color,
-                                                            padding: "2px 8px",
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "space-between",
+                                                            gap: 8,
                                                             fontSize: 11,
-                                                            fontWeight: 700,
                                                         }}
                                                     >
-                                                        {statusLabel(groupStatus)}
+                                                        <span style={{ color: isGroupDone ? "#9ca3af" : "#6b7280", whiteSpace: "nowrap" }}>{mod.ects ? `${mod.ects} ECTS` : "-"}</span>
+                                                        <span style={{ color: isGroupDone ? "#9ca3af" : "#6b7280", fontWeight: 700, flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{groupTypeMeta.label}</span>
+                                                        <span style={{ color: groupStyle.color, fontWeight: 700, whiteSpace: "nowrap" }}>{statusLabel(groupStatus)}</span>
                                                     </div>
-                                                </button>
+                                                </div>
 
                                                 <div style={{ padding: 8, display: "grid", gap: 8 }}>
                                                     {courses.map((course, idx) => {
                                                         const courseStatus = getCourseStatus?.(course?.code ?? mod.code) ?? "todo";
                                                         const courseStyle = statusStyle(courseStatus);
-                                                        const blocked = true; // per requirement: child courses in module groups are never draggable
+                                                        const childTypeMeta = mapTypeForProgram(mod?.category, programCode);
+                                                        const childStateMeta = stateVisualByStatus(courseStatus);
+                                                        const childBackground = childStateMeta.background;
+                                                        const childTypeShadow = layeredTypeShadow(subjectColor, childTypeMeta.layers, childStateMeta.background || "transparent");
+                                                        const menuKey = `child-${pfIdx}-${mod.code}-${idx}`;
                                                         return (
-                                                            <button
+                                                            <div
                                                                 key={`pf${pfIdx}-${mod.code}-${idx}`}
-                                                                draggable={false}
-                                                                onDragStart={(e) => {
-                                                                    e.preventDefault();
-                                                                }}
-                                                                disabled
-                                                                title="Only the whole module can be dragged"
+                                                                title="Course in module"
                                                                 style={{
                                                                     textAlign: "left",
-                                                                    border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`,
+                                                                    border: `1px solid ${childStateMeta.borderColor || subjectColor}`,
                                                                     borderRadius: 10,
-                                                                    background: courseStatus === "done" ? "#f3f4f6" : (courseStatus === "in_plan" ? "#eff6ff" : "#fff"),
-                                                                    padding: "8px 10px",
-                                                                    cursor: "not-allowed",
-                                                                    opacity: 0.85,
+                                                                    background: childBackground,
+                                                                    boxShadow: combinedCardShadow(childTypeShadow, childStateMeta.extraShadow),
+                                                                    padding: "10px 10px",
+                                                                    opacity: childStateMeta.opacity,
+                                                                    display: "grid",
+                                                                    gap: 8,
+                                                                    position: "relative",
+                                                                    width: "100%",
+                                                                    boxSizing: "border-box",
+                                                                    minWidth: 0,
+                                                                    overflow: "hidden",
                                                                 }}
                                                             >
-                                                                <div style={{ color: "#6b7280", fontSize: 12 }}>{course?.code ?? mod.code}</div>
-                                                                <div style={{ fontWeight: 600, color: courseStatus === "done" ? "#6b7280" : "#111827" }}>{course?.name ?? mod.name}</div>
-                                                                <div style={{ color: "#6b7280", fontSize: 12 }}>
-                                                                    {typeof course?.ects === "number" ? `${course?.ects} ECTS` : course?.ects}
+                                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{course?.code ?? mod.code}</div>
+                                                                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                                        {(courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    onToggleModuleDone?.(courses.map((c) => c?.code).filter(Boolean), courseStatus !== "done");
+                                                                                }}
+                                                                                style={{ border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`, background: courseStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: courseStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                            >
+                                                                                ✓
+                                                                            </button>
+                                                                        )}
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                if (menuState.key === menuKey) closeMenu();
+                                                                                else openMenu(menuKey);
+                                                                            }}
+                                                                            style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                        >
+                                                                            ...
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
-                                                                <div
-                                                                    style={{
-                                                                        marginTop: 6,
-                                                                        display: "inline-flex",
-                                                                        borderRadius: 999,
-                                                                        border: `1px solid ${courseStyle.border}`,
-                                                                        background: courseStyle.bg,
-                                                                        color: courseStyle.color,
-                                                                        padding: "2px 8px",
-                                                                        fontSize: 11,
-                                                                        fontWeight: 700,
-                                                                    }}
-                                                                >
-                                                                    {statusLabel(courseStatus)}
+                                                                {menuState.key === menuKey && (
+                                                                    <div style={{ position: "absolute", top: 34, right: 10, width: 170, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 10 }}>
+                                                                        {menuState.view === "root" && courseStatus === "todo" && (
+                                                                            <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                                        )}
+                                                                        {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                            <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
+                                                                        )}
+                                                                        {menuState.view === "semesters" && (
+                                                                            <>
+                                                                                {SEMESTERS.map((semester) => (
+                                                                                    <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semester.title}</button>
+                                                                                ))}
+                                                                                <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{course?.name ?? mod.name}</div>
+                                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
+                                                                    <span style={{ color: "#6b7280", whiteSpace: "nowrap" }}>{typeof course?.ects === "number" ? `${course?.ects} ECTS` : (course?.ects || "-")}</span>
+                                                                    <span style={{ color: "#6b7280", fontWeight: 700, flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{childTypeMeta.label}</span>
+                                                                    <span style={{ color: courseStyle.color, fontWeight: 700, whiteSpace: "nowrap" }}>{statusLabel(courseStatus)}</span>
                                                                 </div>
-                                                            </button>
+                                                            </div>
                                                         );
                                                     })}
                                                 </div>

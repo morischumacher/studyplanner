@@ -8,6 +8,7 @@ import {
     GraphRootNode,
     GraphSubjectNode,
 } from "./graphNodes/index.js";
+import VisualLegend from "./VisualLegend.jsx";
 
 const X_BY_LEVEL = {
     root: 40,
@@ -19,7 +20,7 @@ const X_BY_LEVEL = {
 
 const GRAPH_NODE_WIDTH = CARD_WIDTH;
 const GRAPH_NODE_HEIGHT = NODE_HEIGHT;
-const LEAF_VERTICAL_SPACING = 92;
+const LEAF_VERTICAL_SPACING = NODE_HEIGHT + 36;
 const NODE_COLLISION_GAP = 12;
 
 const NODE_TYPES = {
@@ -40,7 +41,8 @@ function buildTree(catalog, subjectColors) {
     const subjects = (catalog || []).map((pf, pfIdx) => {
         const subjectName = pf?.pruefungsfach ?? `Pruefungsfach ${pfIdx + 1}`;
         const subjectColor = subjectColors?.[subjectName] ?? "#4b5563";
-        const modules = (pf?.modules || []).flatMap((mod, modIdx) => {
+        const sourceModules = pf?.modules || [];
+        const modules = sourceModules.flatMap((mod, modIdx) => {
             const courses = mod?.courses || [];
 
             // Match table behavior: module wrapper only if module has multiple courses.
@@ -48,7 +50,7 @@ function buildTree(catalog, subjectColors) {
                 const course = courses[0];
                 return [{
                     id: `course-${pfIdx}-${modIdx}-single-${course?.code || mod?.code || "course"}`,
-                    label: `${course?.code ? `${course.code} · ` : ""}${course?.name || mod?.name || "Course"}`,
+                    label: `${course?.name || mod?.name || "Course"}`,
                     level: "courseDirect",
                     color: subjectColor,
                     courseCode: course?.code ?? mod?.code ?? "",
@@ -75,14 +77,19 @@ function buildTree(catalog, subjectColors) {
 
             return [{
                 id: `module-${pfIdx}-${modIdx}-${mod?.code || mod?.name || "module"}`,
-                label: `${mod?.code ? `${mod.code} · ` : ""}${mod?.name || "Module"}`,
+                label: `${mod?.name || "Module"}`,
                 level: "module",
                 color: subjectColor,
+                moduleCode: mod?.code ?? "",
+                moduleEcts: mod?.ects ?? null,
+                moduleCourseCount: courses.length,
+                category: mod?.category ?? null,
+                examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                 modulePayload,
                 moduleCourseCodes: courses.map((course) => course?.code).filter(Boolean),
                 children: courses.map((course, courseIdx) => ({
                     id: `course-${pfIdx}-${modIdx}-${courseIdx}-${course?.code || "course"}`,
-                    label: `${course?.code ? `${course.code} · ` : ""}${course?.name || "Course"}`,
+                    label: `${course?.name || "Course"}`,
                     level: "course",
                     color: subjectColor,
                     courseCode: course?.code ?? "",
@@ -101,6 +108,7 @@ function buildTree(catalog, subjectColors) {
             label: subjectName,
             level: "subject",
             color: subjectColor,
+            moduleCount: sourceModules.length,
             children: modules,
         };
     });
@@ -129,6 +137,7 @@ function layoutTree(root, collapsedIds, options = {}) {
     const onToggleModuleDone = options?.onToggleModuleDone;
     const onRemoveFromPlan = options?.onRemoveFromPlan;
     const onRemoveModuleFromPlan = options?.onRemoveModuleFromPlan;
+    const programCode = options?.programCode ?? "";
     const nodes = [];
     const edges = [];
     let leafIndex = 0;
@@ -176,12 +185,17 @@ function layoutTree(root, collapsedIds, options = {}) {
                 ects: node?.ects ?? null,
                 category: node?.category ?? null,
                 examSubject: node?.examSubject ?? null,
+                programCode,
+                moduleCount: node?.moduleCount ?? null,
                 status,
                 onAddToPlan: (node.level === "course" || node.level === "courseDirect") ? onAddToPlan : null,
                 onToggleDone: (node.level === "course" || node.level === "courseDirect") ? onToggleDone : null,
                 semesters: (node.level === "course" || node.level === "courseDirect") ? SEMESTERS : null,
                 modulePayload: node?.modulePayload ?? null,
                 moduleCourseCodes: node?.moduleCourseCodes ?? null,
+                moduleCode: node?.moduleCode ?? null,
+                moduleEcts: node?.moduleEcts ?? null,
+                moduleCourseCount: node?.moduleCourseCount ?? null,
                 parentModulePayload: node?.parentModulePayload ?? null,
                 onAddModuleToPlan: (node.level === "module" || node.level === "course") ? onAddModuleToPlan : null,
                 onToggleModuleDone: node.level === "module" ? onToggleModuleDone : null,
@@ -354,6 +368,8 @@ export default function CurriculumGraphView({
     ruleFeedback,
     isRuleDashboardOpen,
     onToggleRuleDashboard,
+    isLegendOpen,
+    onToggleLegend,
 }) {
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
     const [collapsedIds, setCollapsedIds] = useState(() => {
@@ -389,6 +405,7 @@ export default function CurriculumGraphView({
             onToggleModuleDone,
             onRemoveFromPlan,
             onRemoveModuleFromPlan,
+            programCode,
         });
     }, [
         root,
@@ -400,6 +417,7 @@ export default function CurriculumGraphView({
         onToggleModuleDone,
         onRemoveFromPlan,
         onRemoveModuleFromPlan,
+        programCode,
     ]);
     const subjectOrder = useMemo(
         () => (root?.children || []).map((s) => s.id),
@@ -526,6 +544,23 @@ export default function CurriculumGraphView({
             >
                 {isRuleDashboardOpen ? "Close Rule Dashboard" : "Open Rule Dashboard"}
             </button>
+            <button
+                onClick={() => onToggleLegend?.()}
+                style={{
+                    position: "absolute",
+                    top: 52,
+                    left: 212,
+                    zIndex: 5,
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                }}
+            >
+                {isLegendOpen ? "Hide Legend" : "Show Legend"}
+            </button>
             <select
                 value={programCode}
                 onChange={(e) => setProgramCode?.(e.target.value)}
@@ -591,6 +626,11 @@ export default function CurriculumGraphView({
                     }}
                 >
                     {ruleFeedback.text}
+                </div>
+            )}
+            {isLegendOpen && (
+                <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 5 }}>
+                    <VisualLegend programCode={programCode} />
                 </div>
             )}
             <ReactFlow
