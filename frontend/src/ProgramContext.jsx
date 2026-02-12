@@ -187,6 +187,7 @@ export function ProgramProvider({ children }) {
     const [doneByProgram, setDoneByProgram] = useState(() => loadDoneByProgram());
     const [lastPlanChange, setLastPlanChange] = useState(null);
     const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
+    const [graphViewByProgram, setGraphViewByProgram] = useState({});
 
     const doneCourseCodes = doneByProgram?.[programCode] ?? [];
     const selectedFocus = selectedFocusByProgram?.[programCode] ?? "";
@@ -292,6 +293,57 @@ export function ProgramProvider({ children }) {
         });
     }, [programCode]);
 
+    const graphViewState = graphViewByProgram?.[programCode] ?? { collapsedIds: null, nodeXById: {} };
+
+    const setGraphViewState = useCallback((nextStateOrUpdater) => {
+        setGraphViewByProgram((prev) => {
+            const current = prev?.[programCode] ?? { collapsedIds: null, nodeXById: {} };
+            const patch =
+                typeof nextStateOrUpdater === "function"
+                    ? nextStateOrUpdater(current)
+                    : nextStateOrUpdater;
+            const safePatch = patch && typeof patch === "object" ? patch : {};
+            const nextCollapsedIds = Array.isArray(safePatch.collapsedIds)
+                ? safePatch.collapsedIds
+                : (current.collapsedIds ?? null);
+            const nextNodeXById = safePatch.nodeXById && typeof safePatch.nodeXById === "object"
+                ? safePatch.nodeXById
+                : (current.nodeXById ?? {});
+
+            const collapsedEqual = (() => {
+                const a = Array.isArray(current.collapsedIds) ? current.collapsedIds : null;
+                const b = Array.isArray(nextCollapsedIds) ? nextCollapsedIds : null;
+                if (a === b) return true;
+                if (a === null || b === null) return a === b;
+                if (a.length !== b.length) return false;
+                for (let i = 0; i < a.length; i += 1) {
+                    if (a[i] !== b[i]) return false;
+                }
+                return true;
+            })();
+            const nodeXEqual = (() => {
+                const a = current.nodeXById ?? {};
+                const b = nextNodeXById ?? {};
+                const aKeys = Object.keys(a);
+                const bKeys = Object.keys(b);
+                if (aKeys.length !== bKeys.length) return false;
+                for (const key of aKeys) {
+                    if (a[key] !== b[key]) return false;
+                }
+                return true;
+            })();
+            if (collapsedEqual && nodeXEqual) return prev;
+
+            return {
+                ...prev,
+                [programCode]: {
+                    collapsedIds: nextCollapsedIds,
+                    nodeXById: nextNodeXById,
+                },
+            };
+        });
+    }, [programCode]);
+
     const value = useMemo(() => ({
         programCode,
         setProgramCode,
@@ -303,6 +355,8 @@ export function ProgramProvider({ children }) {
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
+        graphViewState,
+        setGraphViewState,
 
         // optional derived helpers
         getCoursesForSemester,
@@ -317,6 +371,8 @@ export function ProgramProvider({ children }) {
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
+        graphViewState,
+        setGraphViewState,
         getCoursesForSemester,
         getModulesForSemester,
     ]);

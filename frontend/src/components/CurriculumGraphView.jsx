@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Background, Controls, MarkerType, MiniMap, useNodesState } from "reactflow";
 import "reactflow/dist/style.css";
-import { CARD_WIDTH, NODE_HEIGHT } from "../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT, SEMESTERS } from "../utils/constants.js";
 import {
     GraphCourseNode,
     GraphModuleNode,
@@ -51,20 +51,46 @@ function buildTree(catalog, subjectColors) {
                     label: `${course?.code ? `${course.code} · ` : ""}${course?.name || mod?.name || "Course"}`,
                     level: "courseDirect",
                     color: subjectColor,
+                    courseCode: course?.code ?? mod?.code ?? "",
+                    courseName: course?.name ?? mod?.name ?? "Course",
+                    ects: course?.ects ?? mod?.ects ?? null,
+                    category: mod?.category ?? null,
+                    examSubject: mod?.module_exam_subject ?? pfName ?? null,
                     children: [],
                 }];
             }
+
+            const modulePayload = {
+                code: mod?.code ?? "",
+                name: mod?.name ?? "Module",
+                category: mod?.category ?? null,
+                examSubject: mod?.module_exam_subject ?? subjectName ?? null,
+                subjectColor,
+                courses: courses.map((course) => ({
+                    code: course?.code ?? "",
+                    name: course?.name ?? "Course",
+                    ects: course?.ects ?? null,
+                })),
+            };
 
             return [{
                 id: `module-${pfIdx}-${modIdx}-${mod?.code || mod?.name || "module"}`,
                 label: `${mod?.code ? `${mod.code} · ` : ""}${mod?.name || "Module"}`,
                 level: "module",
                 color: subjectColor,
+                modulePayload,
+                moduleCourseCodes: courses.map((course) => course?.code).filter(Boolean),
                 children: courses.map((course, courseIdx) => ({
                     id: `course-${pfIdx}-${modIdx}-${courseIdx}-${course?.code || "course"}`,
                     label: `${course?.code ? `${course.code} · ` : ""}${course?.name || "Course"}`,
                     level: "course",
                     color: subjectColor,
+                    courseCode: course?.code ?? "",
+                    courseName: course?.name ?? "Course",
+                    ects: course?.ects ?? null,
+                    category: mod?.category ?? null,
+                    examSubject: mod?.module_exam_subject ?? pfName ?? null,
+                    parentModulePayload: modulePayload,
                     children: [],
                 })),
             }];
@@ -95,7 +121,14 @@ function collectCollapsibleIds(node, out = new Set()) {
     return out;
 }
 
-function layoutTree(root, collapsedIds) {
+function layoutTree(root, collapsedIds, options = {}) {
+    const getCourseStatus = options?.getCourseStatus;
+    const onAddToPlan = options?.onAddToPlan;
+    const onToggleDone = options?.onToggleDone;
+    const onAddModuleToPlan = options?.onAddModuleToPlan;
+    const onToggleModuleDone = options?.onToggleModuleDone;
+    const onRemoveFromPlan = options?.onRemoveFromPlan;
+    const onRemoveModuleFromPlan = options?.onRemoveModuleFromPlan;
     const nodes = [];
     const edges = [];
     let leafIndex = 0;
@@ -117,6 +150,17 @@ function layoutTree(root, collapsedIds) {
 
         const prefix = node.level !== "root" && canExpand ? (isCollapsed ? "▶ " : "▼ ") : "";
         const x = X_BY_LEVEL[node.level] ?? depth * 320;
+        let status = null;
+        if (node.level === "course" || node.level === "courseDirect") {
+            status = getCourseStatus?.(node?.courseCode) ?? "todo";
+        } else if (node.level === "module") {
+            const codes = Array.isArray(node?.moduleCourseCodes) ? node.moduleCourseCodes : [];
+            const statuses = codes.map((code) => getCourseStatus?.(code) ?? "todo");
+            if (statuses.length === 0) status = "todo";
+            else if (statuses.every((s) => s === "done")) status = "done";
+            else if (statuses.some((s) => s === "in_plan" || s === "done")) status = "in_plan";
+            else status = "todo";
+        }
         nodes.push({
             id: node.id,
             type: nodeTypeForLevel(node.level),
@@ -127,6 +171,23 @@ function layoutTree(root, collapsedIds) {
                 hasChildren: canExpand,
                 color: node.color,
                 subjectId,
+                courseCode: node?.courseCode ?? null,
+                courseName: node?.courseName ?? null,
+                ects: node?.ects ?? null,
+                category: node?.category ?? null,
+                examSubject: node?.examSubject ?? null,
+                status,
+                onAddToPlan: (node.level === "course" || node.level === "courseDirect") ? onAddToPlan : null,
+                onToggleDone: (node.level === "course" || node.level === "courseDirect") ? onToggleDone : null,
+                semesters: (node.level === "course" || node.level === "courseDirect") ? SEMESTERS : null,
+                modulePayload: node?.modulePayload ?? null,
+                moduleCourseCodes: node?.moduleCourseCodes ?? null,
+                parentModulePayload: node?.parentModulePayload ?? null,
+                onAddModuleToPlan: (node.level === "module" || node.level === "course") ? onAddModuleToPlan : null,
+                onToggleModuleDone: node.level === "module" ? onToggleModuleDone : null,
+                onRemoveFromPlan: (node.level === "course" || node.level === "courseDirect") ? onRemoveFromPlan : null,
+                onRemoveModuleFromPlan: (node.level === "module" || node.level === "course") ? onRemoveModuleFromPlan : null,
+                semestersForModule: node.level === "module" ? SEMESTERS : null,
             },
             sourcePosition: "right",
             targetPosition: "left",
@@ -150,16 +211,22 @@ function layoutTree(root, collapsedIds) {
     return { nodes, edges };
 }
 
-function mergeNodesWithPinnedPositions(nextNodes, prevNodes, edges) {
+function mergeNodesWithPinnedPositions(nextNodes, prevNodes, edges, persistedXById = {}) {
     const prevById = new Map((prevNodes || []).map((n) => [n.id, n]));
     const nextById = new Map((nextNodes || []).map((n) => [n.id, n]));
     const parentByChild = new Map((edges || []).map((e) => [e.target, e.source]));
+    const persisted = persistedXById && typeof persistedXById === "object" ? persistedXById : {};
 
     return (nextNodes || []).map((nextNode) => {
         const prevNode = prevById.get(nextNode.id);
         if (prevNode) {
             // Preserve only manual horizontal moves; vertical position should reflow.
             return { ...nextNode, position: { x: prevNode.position.x, y: nextNode.position.y } };
+        }
+
+        const persistedX = persisted?.[nextNode.id];
+        if (Number.isFinite(persistedX)) {
+            return { ...nextNode, position: { x: persistedX, y: nextNode.position.y } };
         }
 
         // New node (e.g. after expand): inherit parent's horizontal shift if parent moved.
@@ -275,17 +342,65 @@ export default function CurriculumGraphView({
     setSelectedFocus,
     bachelorProgramCode,
     bachelorFocusOptions,
+    getCourseStatus,
+    onAddToPlan,
+    onToggleDone,
+    onAddModuleToPlan,
+    onToggleModuleDone,
+    onRemoveFromPlan,
+    onRemoveModuleFromPlan,
+    graphViewState,
+    setGraphViewState,
+    ruleFeedback,
+    isRuleDashboardOpen,
+    onToggleRuleDashboard,
 }) {
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
-    const [collapsedIds, setCollapsedIds] = useState(() => collectCollapsibleIds(root));
+    const [collapsedIds, setCollapsedIds] = useState(() => {
+        const saved = graphViewState?.collapsedIds;
+        if (Array.isArray(saved)) return new Set(saved);
+        return collectCollapsibleIds(root);
+    });
 
     useEffect(() => {
-        setCollapsedIds(collectCollapsibleIds(root));
-    }, [root]);
+        setCollapsedIds((prev) => {
+            const allowed = collectCollapsibleIds(root);
+            const saved = Array.isArray(graphViewState?.collapsedIds) ? new Set(graphViewState.collapsedIds) : null;
+            if (saved) {
+                return new Set([...saved].filter((id) => allowed.has(id)));
+            }
+            return new Set([...prev].filter((id) => allowed.has(id)));
+        });
+    }, [root, graphViewState?.collapsedIds]);
+
+    useEffect(() => {
+        const next = Array.from(collapsedIds);
+        const current = Array.isArray(graphViewState?.collapsedIds) ? graphViewState.collapsedIds : [];
+        if (next.length === current.length && next.every((v, i) => v === current[i])) return;
+        setGraphViewState?.((prev) => ({ ...prev, collapsedIds: next }));
+    }, [collapsedIds, graphViewState?.collapsedIds, setGraphViewState]);
 
     const { nodes, edges: autoEdges } = useMemo(() => {
-        return layoutTree(root, collapsedIds);
-    }, [root, collapsedIds]);
+        return layoutTree(root, collapsedIds, {
+            getCourseStatus,
+            onAddToPlan,
+            onToggleDone,
+            onAddModuleToPlan,
+            onToggleModuleDone,
+            onRemoveFromPlan,
+            onRemoveModuleFromPlan,
+        });
+    }, [
+        root,
+        collapsedIds,
+        getCourseStatus,
+        onAddToPlan,
+        onToggleDone,
+        onAddModuleToPlan,
+        onToggleModuleDone,
+        onRemoveFromPlan,
+        onRemoveModuleFromPlan,
+    ]);
     const subjectOrder = useMemo(
         () => (root?.children || []).map((s) => s.id),
         [root]
@@ -295,11 +410,31 @@ export default function CurriculumGraphView({
 
     useEffect(() => {
         setDisplayNodes((prev) => {
-            const merged = mergeNodesWithPinnedPositions(nodes, prev, autoEdges);
+            const merged = mergeNodesWithPinnedPositions(nodes, prev, autoEdges, graphViewState?.nodeXById);
             const noOverlap = resolveNodeOverlaps(merged);
             return enforceHierarchicalOrder(noOverlap, subjectOrder, new Set());
         });
-    }, [nodes, autoEdges, subjectOrder, setDisplayNodes]);
+    }, [nodes, autoEdges, subjectOrder, setDisplayNodes, graphViewState?.nodeXById]);
+
+    useEffect(() => {
+        const nextNodeXById = {};
+        for (const node of displayNodes || []) {
+            if (!node?.id) continue;
+            const x = Number(node?.position?.x);
+            if (!Number.isFinite(x)) continue;
+            nextNodeXById[node.id] = x;
+        }
+        const currentNodeXById = graphViewState?.nodeXById ?? {};
+        const currentKeys = Object.keys(currentNodeXById);
+        const nextKeys = Object.keys(nextNodeXById);
+        if (currentKeys.length === nextKeys.length && currentKeys.every((k) => currentNodeXById[k] === nextNodeXById[k])) {
+            return;
+        }
+        setGraphViewState?.((prev) => ({
+            ...prev,
+            nodeXById: nextNodeXById,
+        }));
+    }, [displayNodes, graphViewState?.nodeXById, setGraphViewState]);
 
     const onNodeClick = useCallback((_, node) => {
         if (node?.data?.level === "root" || !node?.data?.hasChildren) return;
@@ -337,7 +472,7 @@ export default function CurriculumGraphView({
     }, []);
 
     return (
-        <div style={{ height: "100vh", width: "100vw", position: "relative", background: "#f9fafb" }}>
+        <div style={{ height: "100%", width: "100%", position: "relative", background: "#f9fafb" }}>
             <button
                 onClick={onSwitchToTable}
                 style={{
@@ -373,6 +508,23 @@ export default function CurriculumGraphView({
                 }}
             >
                 Reorder
+            </button>
+            <button
+                onClick={() => onToggleRuleDashboard?.()}
+                style={{
+                    position: "absolute",
+                    top: 52,
+                    left: 12,
+                    zIndex: 5,
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                }}
+            >
+                {isRuleDashboardOpen ? "Close Rule Dashboard" : "Open Rule Dashboard"}
             </button>
             <select
                 value={programCode}
@@ -420,6 +572,26 @@ export default function CurriculumGraphView({
                         </option>
                     ))}
                 </select>
+            )}
+            {ruleFeedback?.text && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: 12,
+                        right: 12,
+                        zIndex: 5,
+                        border: `1px solid ${ruleFeedback.border || "#d1d5db"}`,
+                        background: ruleFeedback.bg || "#f3f4f6",
+                        color: ruleFeedback.color || "#374151",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        maxWidth: 360,
+                    }}
+                >
+                    {ruleFeedback.text}
+                </div>
             )}
             <ReactFlow
                 nodes={displayNodes}

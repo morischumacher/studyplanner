@@ -195,6 +195,8 @@ export default function App() {
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
+        graphViewState,
+        setGraphViewState,
     } = currentProgram();
     const [viewMode, setViewMode] = useState("table");
 
@@ -366,6 +368,235 @@ export default function App() {
         }));
         setNeedsPersist(true);
     }, [setNodes]);
+
+    const addGraphCourseToPlan = useCallback((course, requestedLaneIndex) => {
+        const courseCode = course?.code;
+        if (!courseCode || getCourseStatus(courseCode) !== "todo") return false;
+
+        const laneIndex = Math.max(0, Math.min(Number(requestedLaneIndex) || 0, SEMESTERS.length - 1));
+        const x = centerX(laneIndex);
+        const now = Date.now();
+        const id = `${courseCode}-${now}-graph`;
+        const examSubject = course?.examSubject || getExamSubjectForCode(catalog, courseCode);
+        const resolvedSubjectColor =
+            course?.subjectColor ||
+            (examSubject ? subjectColors?.[examSubject] : null) ||
+            "#2563eb";
+
+        let persistedNodes = null;
+        let added = false;
+        setNodes((prev) => {
+            if (prev.some((n) => n.type === "course" && n?.data?.code === courseCode)) return prev;
+
+            const laneNodes = prev
+                .filter((n) => n.type === "course" && laneIdx(n) === laneIndex)
+                .sort((a, b) => (a?.position?.y ?? 0) - (b?.position?.y ?? 0));
+            const last = laneNodes[laneNodes.length - 1];
+            const y = last ? (last.position.y + NODE_HEIGHT + COLLISION_GAP) : 96;
+
+            const next = prev.concat({
+                id,
+                type: "course",
+                data: {
+                    label: course?.name || courseCode,
+                    code: courseCode,
+                    ects: course?.ects ?? null,
+                    onRemove: removeCourseNode,
+                    onToggleDone: toggleCourseDone,
+                    onUpdateEcts: updateCourseEcts,
+                    nodeId: id,
+                    examSubject,
+                    category: course?.category ?? "unknown",
+                    subjectColor: resolvedSubjectColor,
+                    status: "in_plan",
+                },
+                position: { x, y },
+                sourcePosition: "right",
+                targetPosition: "left",
+                zIndex: 1,
+            });
+            added = true;
+            const resolved = resolveLaneCollisions(next);
+            persistedNodes = resolved.filter((n) => n.type !== "lane");
+            return resolved;
+        });
+        if (!added) return false;
+        if (Array.isArray(persistedNodes)) {
+            setCoursesFromNodes(persistedNodes);
+            setNeedsPersist(false);
+        } else {
+            setNeedsPersist(true);
+        }
+        return true;
+    }, [catalog, getCourseStatus, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+
+    const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex) => {
+        const courses = Array.isArray(modulePayload?.courses) ? modulePayload.courses : [];
+        if (courses.length < 2) return false;
+        const codes = courses.map((c) => c?.code).filter(Boolean);
+        if (!codes.length) return false;
+        if (codes.some((code) => getCourseStatus(code) !== "todo")) return false;
+
+        const laneIndex = Math.max(0, Math.min(Number(requestedLaneIndex) || 0, SEMESTERS.length - 1));
+        const x = centerX(laneIndex);
+        const y = 96;
+        const now = Date.now();
+        const groupId = `mod-${now}-graph`;
+        const groupExamSubject =
+            modulePayload?.examSubject ||
+            getExamSubjectForCode(catalog, modulePayload?.code) ||
+            getExamSubjectForCode(catalog, courses?.[0]?.code) ||
+            null;
+        const resolvedSubjectColor =
+            modulePayload?.subjectColor ||
+            (groupExamSubject ? subjectColors?.[groupExamSubject] : null) ||
+            "#2563eb";
+
+        const groupNode = {
+            id: groupId,
+            type: "moduleBg",
+            data: {
+                title: `${modulePayload?.name || "Module"}`,
+                code: null,
+                groupId,
+                onRemoveGroup: removeModuleGroup,
+                onRemove: () => removeModuleGroup(groupId),
+                examSubject: groupExamSubject,
+                category: modulePayload?.category ?? "unknown",
+                subjectColor: resolvedSubjectColor,
+            },
+            position: { x, y },
+            draggable: true,
+            selectable: false,
+            zIndex: 0,
+        };
+
+        const childCourseNodes = courses.map((course, idx) => {
+            const childId = `${course.code}-${now}-${idx}-graph`;
+            const baseY = y + idx * (56 + 8);
+            const examSubject =
+                getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, modulePayload?.code);
+
+            return {
+                id: childId,
+                type: "course",
+                data: {
+                    label: course?.name || course?.code || "Course",
+                    code: course?.code,
+                    ects: course?.ects ?? null,
+                    groupId,
+                    baseY,
+                    onRemove: removeCourseNode,
+                    onToggleDone: toggleCourseDone,
+                    onUpdateEcts: updateCourseEcts,
+                    nodeId: childId,
+                    examSubject,
+                    category: modulePayload?.category ?? "unknown",
+                    subjectColor: resolvedSubjectColor,
+                    status: "in_plan",
+                },
+                position: { x, y: baseY },
+                sourcePosition: "right",
+                targetPosition: "left",
+                zIndex: 1,
+            };
+        });
+
+        let persistedNodes = null;
+        let added = false;
+        setNodes((prev) => {
+            if (codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code))) return prev;
+            const withAll = prev.concat(groupNode, ...childCourseNodes);
+            const sized = recomputeGroupFromChildren(withAll, groupId);
+            const resolved = resolveLaneCollisions(sized);
+            persistedNodes = resolved.filter((n) => n.type !== "lane");
+            added = true;
+            return resolved;
+        });
+        if (!added) return false;
+        if (Array.isArray(persistedNodes)) {
+            setCoursesFromNodes(persistedNodes);
+            setNeedsPersist(false);
+        } else {
+            setNeedsPersist(true);
+        }
+        return true;
+    }, [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+
+    const toggleGraphCourseDone = useCallback((courseCode, nextDone) => {
+        if (!courseCode) return;
+        const currentStatus = getCourseStatus(courseCode);
+        if (currentStatus !== "in_plan" && currentStatus !== "done") return;
+
+        setCourseDone(courseCode, Boolean(nextDone));
+        setNodes((prev) => prev.map((n) => {
+            if (n.type !== "course" || n?.data?.code !== courseCode) return n;
+            return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
+        }));
+    }, [getCourseStatus, setCourseDone, setNodes]);
+
+    const toggleGraphModuleDone = useCallback((courseCodes, nextDone) => {
+        const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+        if (!codes.length) return;
+        const allowed = codes.filter((code) => {
+            const status = getCourseStatus(code);
+            return status === "in_plan" || status === "done";
+        });
+        if (!allowed.length) return;
+        for (const code of allowed) {
+            setCourseDone(code, Boolean(nextDone));
+        }
+        setNodes((prev) => prev.map((n) => {
+            if (n.type !== "course" || !allowed.includes(n?.data?.code)) return n;
+            return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
+        }));
+    }, [getCourseStatus, setCourseDone, setNodes]);
+
+    const removeGraphCoursesFromPlan = useCallback((courseCodes) => {
+        const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+        if (!codes.length) return false;
+        const removeSet = new Set(codes);
+
+        let persistedNodes = null;
+        let changed = false;
+        setNodes((prev) => {
+            const affectedGroupIds = new Set(
+                prev
+                    .filter((n) => n.type === "course" && removeSet.has(n?.data?.code) && n?.data?.groupId)
+                    .map((n) => n.data.groupId)
+            );
+            let next = prev.filter((n) => !(n.type === "course" && removeSet.has(n?.data?.code)));
+            for (const groupId of affectedGroupIds) {
+                next = recomputeGroupFromChildren(next, groupId);
+            }
+            if (next.length === prev.length) return prev;
+            changed = true;
+            persistedNodes = next.filter((n) => n.type !== "lane");
+            return next;
+        });
+
+        if (!changed) return false;
+        if (Array.isArray(persistedNodes)) {
+            setCoursesFromNodes(persistedNodes);
+            setNeedsPersist(false);
+        } else {
+            setNeedsPersist(true);
+        }
+        return true;
+    }, [setCoursesFromNodes, setNodes]);
+
+    const removeGraphCourseFromPlan = useCallback((courseCode) => {
+        if (!courseCode) return false;
+        return removeGraphCoursesFromPlan([courseCode]);
+    }, [removeGraphCoursesFromPlan]);
+
+    const removeGraphModuleFromPlan = useCallback((modulePayload) => {
+        const codes = Array.isArray(modulePayload?.courses)
+            ? modulePayload.courses.map((c) => c?.code).filter(Boolean)
+            : [];
+        if (!codes.length) return false;
+        return removeGraphCoursesFromPlan(codes);
+    }, [removeGraphCoursesFromPlan]);
 
     /************************
      * Group drag mechanics *
@@ -799,23 +1030,6 @@ export default function App() {
         return nodes;
     }
 
-    if (viewMode === "graph") {
-        return (
-            <CurriculumGraphView
-                catalog={catalog}
-                subjectColors={subjectColors}
-                onSwitchToTable={() => setViewMode("table")}
-                programCode={programCode}
-                setProgramCode={setProgramCode}
-                programOptions={PROGRAM_OPTIONS}
-                selectedFocus={selectedFocus}
-                setSelectedFocus={setSelectedFocus}
-                bachelorProgramCode={BACHELOR_PROGRAM_CODE}
-                bachelorFocusOptions={BACHELOR_FOCUS_OPTIONS}
-            />
-        );
-    }
-
     /***********
      * Render  *
      ***********/
@@ -960,6 +1174,130 @@ export default function App() {
     const feedbackColor = stickyActive
         ? "#991b1b"
         : (ruleCheckState.sending ? "#1d4ed8" : (ruleCheckState.error ? "#991b1b" : (ruleOk ? "#166534" : "#374151")));
+
+    if (viewMode === "graph") {
+        return (
+            <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <CurriculumGraphView
+                        catalog={catalog}
+                        subjectColors={subjectColors}
+                        onSwitchToTable={() => setViewMode("table")}
+                        programCode={programCode}
+                        setProgramCode={setProgramCode}
+                        programOptions={PROGRAM_OPTIONS}
+                        selectedFocus={selectedFocus}
+                        setSelectedFocus={setSelectedFocus}
+                        bachelorProgramCode={BACHELOR_PROGRAM_CODE}
+                        bachelorFocusOptions={BACHELOR_FOCUS_OPTIONS}
+                        getCourseStatus={getCourseStatus}
+                        onAddToPlan={addGraphCourseToPlan}
+                        onToggleDone={toggleGraphCourseDone}
+                        onAddModuleToPlan={addGraphModuleToPlan}
+                        onToggleModuleDone={toggleGraphModuleDone}
+                        onRemoveFromPlan={removeGraphCourseFromPlan}
+                        onRemoveModuleFromPlan={removeGraphModuleFromPlan}
+                        graphViewState={graphViewState}
+                        setGraphViewState={setGraphViewState}
+                        isRuleDashboardOpen={isRuleDashboardOpen}
+                        onToggleRuleDashboard={() => setIsRuleDashboardOpen((v) => !v)}
+                        ruleFeedback={{
+                            text: feedbackText,
+                            bg: feedbackBg,
+                            border: feedbackBorder,
+                            color: feedbackColor,
+                        }}
+                    />
+                </div>
+                {isRuleDashboardOpen && (
+                    <aside
+                        style={{
+                            width: 420,
+                            borderLeft: "1px solid #e5e7eb",
+                            background: "#ffffff",
+                            padding: 12,
+                            overflow: "auto",
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
+                            <button
+                                onClick={() => setIsRuleDashboardOpen(false)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "6px 10px",
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>Program: {programCode}</div>
+                        {programCode === BACHELOR_PROGRAM_CODE && (
+                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>Focus: {selectedFocus || "-"}</div>
+                        )}
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                <div style={{ fontSize: 11, color: "#6b7280" }}>Done ECTS</div>
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>{doneEctsKpi.toFixed(1)}</div>
+                            </div>
+                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                <div style={{ fontSize: 11, color: "#6b7280" }}>Planned ECTS</div>
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>{plannedEctsKpi.toFixed(1)}</div>
+                            </div>
+                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                <div style={{ fontSize: 11, color: "#6b7280" }}>Total ECTS</div>
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>{totalEctsKpi.toFixed(1)}</div>
+                            </div>
+                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                <div style={{ fontSize: 11, color: "#6b7280" }}>Target ECTS</div>
+                                <div style={{ fontSize: 18, fontWeight: 700 }}>{targetEctsKpi.toFixed(1)}</div>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Missing Requirements</div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                                {missingItems.length === 0 && <div style={{ fontSize: 12, color: "#166534" }}>No missing requirements reported.</div>}
+                                {missingItems.map((m, idx) => (
+                                    <div key={`${m}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>{m}</div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Warnings</div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                                {warnings.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No warnings.</div>}
+                                {warnings.map((w, idx) => (
+                                    <div key={`${w}-${idx}`} style={{ fontSize: 12, color: "#92400e" }}>{w}</div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Violations</div>
+                            <div style={{ display: "grid", gap: 6 }}>
+                                {violations.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No violations.</div>}
+                                {violations.map((v, idx) => (
+                                    <div key={`${v}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>{v}</div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ fontSize: 12, color: "#6b7280" }}>
+                            Last update: {ruleCheckState.lastUpdatedAt ? new Date(ruleCheckState.lastUpdatedAt).toLocaleTimeString() : "-"}
+                        </div>
+                    </aside>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
