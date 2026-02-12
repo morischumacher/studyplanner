@@ -62,6 +62,22 @@ export default function Sidebar({
     };
 
     const isBlockedStatus = (status) => status === "done" || status === "in_plan";
+    const modulePriority = (mod) => {
+        const raw = String(mod?.category ?? "").trim().toLowerCase();
+        const isMandatory =
+            Boolean(mod?.is_mandatory) ||
+            raw === "mandatory" ||
+            raw === "pflicht" ||
+            raw === "required";
+        if (isMandatory) return 0;
+        const isCore =
+            raw === "core" ||
+            raw === "narrow_elective" ||
+            raw === "narrow" ||
+            raw === "enge wahl";
+        if (isCore) return 1;
+        return 2;
+    };
 
     return (
         <aside
@@ -133,7 +149,16 @@ export default function Sidebar({
             <div style={{ display: "grid", gap: 10 }}>
                 {(Array.isArray(catalog) ? catalog : []).map((pf, pfIdx) => {
                     const pfName = pf.pruefungsfach ?? `Prüfungsfach ${pfIdx + 1}`;
-                    const modules = Array.isArray(pf.modules) ? pf.modules : [];
+                    const modules = (Array.isArray(pf.modules) ? pf.modules : [])
+                        .slice()
+                        .sort((a, b) => {
+                            const pa = modulePriority(a);
+                            const pb = modulePriority(b);
+                            if (pa !== pb) return pa - pb;
+                            const an = String(a?.name ?? "").toLowerCase();
+                            const bn = String(b?.name ?? "").toLowerCase();
+                            return an.localeCompare(bn);
+                        });
                     const isOpen = expandedSet.has(pfName);
                     const subjectColor = subjectColors?.[pfName] ?? "#2563eb";
                     const subjectSoft = hexToRgba(subjectColor, 0.22);

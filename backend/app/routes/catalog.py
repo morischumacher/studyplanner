@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional
 from ..db import get_pool
-from ..deps import get_current_user
+from ..deps import require_current_user
 
 router = APIRouter()
 
 @router.get("/catalog")
 async def list_catalog(
         program_code: Optional[str] = Query(None),
-        _user=Depends(get_current_user),
+        _user=Depends(require_current_user),
 ):
     pool = await get_pool()
     view = "public.v_catalog_json_mat"

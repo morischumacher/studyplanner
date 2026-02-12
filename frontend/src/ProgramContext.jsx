@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useMemo, useState, useCallback, useEffect } from "react";
-import { SEMESTERS } from "./utils/constants.js";              // :contentReference[oaicite:0]{index=0}
-import { laneIndexFromX } from "./utils/geometry.js";          // :contentReference[oaicite:1]{index=1}
+import React, { createContext, useContext, useMemo, useState, useCallback } from "react";
+import { SEMESTERS } from "./utils/constants.js";
+import { laneIndexFromX } from "./utils/geometry.js";
 
 const ProgramContext = createContext();
-const DONE_STORAGE_KEY = "study_planner_done_courses_v1";
 const BACHELOR_PROGRAM_CODE = "033 521";
+const EMPTY_COURSES_PLAN = emptyCoursesOnlyPlan();
+const EMPTY_DONE_CODES = [];
+const EMPTY_GRAPH_VIEW_STATE = { collapsedIds: null, nodePosById: {} };
 
 function emptyCoursesOnlyPlan() {
     const bySem = {};
@@ -12,14 +14,19 @@ function emptyCoursesOnlyPlan() {
     return bySem;
 }
 
-/**
- * Build "courses-only" storage from React Flow nodes.
- * We only keep course items; each course embeds its module reference (if any).
- */
+function normalizeBySemesterMap(value) {
+    const next = emptyCoursesOnlyPlan();
+    if (!value || typeof value !== "object") return next;
+    for (const s of SEMESTERS) {
+        const arr = Array.isArray(value?.[s.id]) ? value[s.id] : [];
+        next[s.id] = arr;
+    }
+    return next;
+}
+
 function buildCoursesOnlyFromNodes(nodes) {
     if (!Array.isArray(nodes)) return emptyCoursesOnlyPlan();
 
-    // collect module (group) metadata just to embed into the courses
     const modules = new Map();
     for (const n of nodes) {
         if (n?.type === "moduleBg") {
@@ -29,64 +36,39 @@ function buildCoursesOnlyFromNodes(nodes) {
                 examSubject: n?.data?.examSubject ?? null,
                 category: n?.data?.category ?? "unknown",
                 subjectColor: n?.data?.subjectColor ?? null,
+                code: n?.data?.moduleCode ?? null,
+                ects: n?.data?.moduleEcts ?? null,
             });
         }
     }
 
     const bySem = emptyCoursesOnlyPlan();
-    const yById = Object.fromEntries(nodes.map(n => [n.id, n?.position?.y ?? 0]));
+    const yById = Object.fromEntries(nodes.map((n) => [n.id, n?.position?.y ?? 0]));
 
     for (const n of nodes) {
         if (n?.type !== "course") continue;
-
         const laneIdx = Math.max(0, Math.min(laneIndexFromX(n.position?.x ?? 0), SEMESTERS.length - 1));
         const semesterId = SEMESTERS[laneIdx].id;
-
         const modMeta = n?.data?.groupId ? (modules.get(n.data.groupId) || { id: n.data.groupId }) : null;
 
-        const course = {
+        bySem[semesterId].push({
             id: n.id,
             code: n?.data?.code ?? null,
             name: n?.data?.name ?? n?.data?.label ?? null,
             ects: n?.data?.ects ?? null,
             category: n?.data?.category ?? "unknown",
             examSubject: n?.data?.examSubject ?? null,
-            // keep visual info around if you need ordering later:
             position: { x: n?.position?.x ?? 0, y: n?.position?.y ?? 0 },
             laneIndex: laneIdx,
             subjectColor: n?.data?.subjectColor ?? null,
-            // embed module reference (no separate module store):
             module: n?.data?.groupId ? { ...modMeta } : null,
-        };
-
-        bySem[semesterId].push(course);
+        });
     }
 
-    // optional: sort by vertical position within each semester
     for (const s of SEMESTERS) {
         bySem[s.id].sort((a, b) => (yById[a.id] ?? 0) - (yById[b.id] ?? 0));
     }
-
     return bySem;
-}
-
-function loadDoneByProgram() {
-    if (typeof window === "undefined") return {};
-    try {
-        const parsed = JSON.parse(window.localStorage.getItem(DONE_STORAGE_KEY) ?? "{}");
-        return parsed && typeof parsed === "object" ? parsed : {};
-    } catch {
-        return {};
-    }
-}
-
-function persistDoneByProgram(value) {
-    if (typeof window === "undefined") return;
-    try {
-        window.localStorage.setItem(DONE_STORAGE_KEY, JSON.stringify(value));
-    } catch {
-        // ignore local storage write failures
-    }
 }
 
 function flattenBySemester(bySemester) {
@@ -111,7 +93,6 @@ function diffPlannedCourses(prevBySemester, nextBySemester) {
     const nextFlat = flattenBySemester(nextBySemester);
     const prevById = mapByCourseId(prevFlat);
     const nextById = mapByCourseId(nextFlat);
-
     const added = [];
     const removed = [];
     const moved = [];
@@ -179,27 +160,26 @@ function diffPlannedCourses(prevBySemester, nextBySemester) {
 }
 
 export function ProgramProvider({ children }) {
-    // Your existing field:
     const [programCode, setProgramCode] = useState("066 937");
-
-    // New: "courses-only" plan
-    const [coursesBySemester, setCoursesBySemester] = useState(() => emptyCoursesOnlyPlan());
-    const [doneByProgram, setDoneByProgram] = useState(() => loadDoneByProgram());
+    const [coursesByProgram, setCoursesByProgram] = useState({});
+    const [doneByProgram, setDoneByProgram] = useState({});
     const [lastPlanChange, setLastPlanChange] = useState(null);
     const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
     const [graphViewByProgram, setGraphViewByProgram] = useState({});
 
-    const doneCourseCodes = doneByProgram?.[programCode] ?? [];
+    const coursesBySemester = coursesByProgram?.[programCode] ?? EMPTY_COURSES_PLAN;
+    const doneCourseCodes = doneByProgram?.[programCode] ?? EMPTY_DONE_CODES;
     const selectedFocus = selectedFocusByProgram?.[programCode] ?? "";
+    const graphViewState = graphViewByProgram?.[programCode] ?? EMPTY_GRAPH_VIEW_STATE;
 
-    // Call this whenever the React Flow node list changes (e.g., after drag/drop/snap)
     const setCoursesFromNodes = useCallback((nodes) => {
         const nextPlan = buildCoursesOnlyFromNodes(nodes);
 
-        setCoursesBySemester((prevPlan) => {
+        setCoursesByProgram((prev) => {
+            const prevPlan = prev?.[programCode] ?? emptyCoursesOnlyPlan();
             const diff = diffPlannedCourses(prevPlan, nextPlan);
             if (diff) setLastPlanChange({ id: Date.now(), ...diff });
-            return nextPlan;
+            return { ...prev, [programCode]: nextPlan };
         });
 
         const plannedCodes = new Set(flattenBySemester(nextPlan).map((c) => c?.code).filter(Boolean));
@@ -207,26 +187,21 @@ export function ProgramProvider({ children }) {
             const currentDone = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
             const pruned = currentDone.filter((code) => plannedCodes.has(code));
             if (pruned.length === currentDone.length) return prev;
-            const next = { ...prev, [programCode]: pruned };
-            persistDoneByProgram(next);
-            return next;
+            return { ...prev, [programCode]: pruned };
         });
     }, [programCode]);
 
-    // ----- Optional: tiny derived helpers (they DO NOT store modules) -----
     const getCoursesForSemester = useCallback((semesterId) => {
         return coursesBySemester[semesterId] ?? [];
     }, [coursesBySemester]);
 
-    // Derive modules present in a semester from the courses (no storage)
     const getModulesForSemester = useCallback((semesterId) => {
         const list = coursesBySemester[semesterId] ?? [];
         const byId = new Map();
         for (const c of list) {
             if (c.module?.id) {
-                const key = c.module.id;
-                if (!byId.has(key)) byId.set(key, { module: c.module, courses: [] });
-                byId.get(key).courses.push(c);
+                if (!byId.has(c.module.id)) byId.set(c.module.id, { module: c.module, courses: [] });
+                byId.get(c.module.id).courses.push(c);
             }
         }
         return Array.from(byId.values());
@@ -235,11 +210,8 @@ export function ProgramProvider({ children }) {
     const getCourseStatus = useCallback((courseCode) => {
         if (!courseCode) return "todo";
         if ((doneByProgram?.[programCode] ?? []).includes(courseCode)) return "done";
-
         for (const s of SEMESTERS) {
-            if ((coursesBySemester?.[s.id] ?? []).some((c) => c?.code === courseCode)) {
-                return "in_plan";
-            }
+            if ((coursesBySemester?.[s.id] ?? []).some((c) => c?.code === courseCode)) return "in_plan";
         }
         return "todo";
     }, [coursesBySemester, doneByProgram, programCode]);
@@ -262,9 +234,7 @@ export function ProgramProvider({ children }) {
             const target = Boolean(nextDone);
             if ((target && exists) || (!target && !exists)) return prev;
             const updated = target ? [...current, courseCode] : current.filter((code) => code !== courseCode);
-            const next = { ...prev, [programCode]: updated };
-            persistDoneByProgram(next);
-            return next;
+            return { ...prev, [programCode]: updated };
         });
         setLastPlanChange({
             id: Date.now(),
@@ -284,71 +254,101 @@ export function ProgramProvider({ children }) {
             if (current === nextValue) return prev;
             return { ...prev, [programCode]: nextValue };
         });
-
         if (programCode !== BACHELOR_PROGRAM_CODE) return;
-        setLastPlanChange({
-            id: Date.now(),
-            type: "focus_updated",
-            selectedFocus: nextValue || null,
-        });
+        setLastPlanChange({ id: Date.now(), type: "focus_updated", selectedFocus: nextValue || null });
     }, [programCode]);
-
-    const graphViewState = graphViewByProgram?.[programCode] ?? { collapsedIds: null, nodeXById: {} };
 
     const setGraphViewState = useCallback((nextStateOrUpdater) => {
         setGraphViewByProgram((prev) => {
-            const current = prev?.[programCode] ?? { collapsedIds: null, nodeXById: {} };
-            const patch =
-                typeof nextStateOrUpdater === "function"
-                    ? nextStateOrUpdater(current)
-                    : nextStateOrUpdater;
+            const current = prev?.[programCode] ?? EMPTY_GRAPH_VIEW_STATE;
+            const patch = typeof nextStateOrUpdater === "function" ? nextStateOrUpdater(current) : nextStateOrUpdater;
             const safePatch = patch && typeof patch === "object" ? patch : {};
-            const nextCollapsedIds = Array.isArray(safePatch.collapsedIds)
-                ? safePatch.collapsedIds
-                : (current.collapsedIds ?? null);
-            const nextNodeXById = safePatch.nodeXById && typeof safePatch.nodeXById === "object"
+            const nextCollapsedIds = Array.isArray(safePatch.collapsedIds) ? safePatch.collapsedIds : (current.collapsedIds ?? null);
+            const legacyNodeXById = safePatch.nodeXById && typeof safePatch.nodeXById === "object"
                 ? safePatch.nodeXById
                 : (current.nodeXById ?? {});
+            const nextNodePosById = safePatch.nodePosById && typeof safePatch.nodePosById === "object"
+                ? safePatch.nodePosById
+                : (current.nodePosById ?? {});
 
-            const collapsedEqual = (() => {
-                const a = Array.isArray(current.collapsedIds) ? current.collapsedIds : null;
-                const b = Array.isArray(nextCollapsedIds) ? nextCollapsedIds : null;
-                if (a === b) return true;
-                if (a === null || b === null) return a === b;
-                if (a.length !== b.length) return false;
-                for (let i = 0; i < a.length; i += 1) {
-                    if (a[i] !== b[i]) return false;
-                }
-                return true;
-            })();
-            const nodeXEqual = (() => {
-                const a = current.nodeXById ?? {};
-                const b = nextNodeXById ?? {};
-                const aKeys = Object.keys(a);
-                const bKeys = Object.keys(b);
-                if (aKeys.length !== bKeys.length) return false;
-                for (const key of aKeys) {
-                    if (a[key] !== b[key]) return false;
-                }
-                return true;
-            })();
-            if (collapsedEqual && nodeXEqual) return prev;
+            // Backward compatibility: if only nodeXById exists, convert to nodePosById.
+            const nodePosCandidate =
+                Object.keys(nextNodePosById).length > 0
+                    ? nextNodePosById
+                    : Object.fromEntries(
+                        Object.entries(legacyNodeXById || {})
+                            .filter(([, x]) => Number.isFinite(x))
+                            .map(([id, x]) => [id, { x, y: 0 }])
+                    );
 
-            return {
-                ...prev,
-                [programCode]: {
-                    collapsedIds: nextCollapsedIds,
-                    nodeXById: nextNodeXById,
-                },
-            };
+            return { ...prev, [programCode]: { collapsedIds: nextCollapsedIds, nodePosById: nodePosCandidate } };
         });
     }, [programCode]);
+
+    const exportPlannerStateSnapshot = useCallback(() => ({
+        version: 1,
+        programCode,
+        coursesByProgram,
+        doneByProgram,
+        selectedFocusByProgram,
+        graphViewByProgram,
+    }), [programCode, coursesByProgram, doneByProgram, selectedFocusByProgram, graphViewByProgram]);
+
+    const importPlannerStateSnapshot = useCallback((snapshot) => {
+        if (!snapshot || typeof snapshot !== "object") return;
+        const nextCoursesByProgram = snapshot?.coursesByProgram && typeof snapshot.coursesByProgram === "object"
+            ? snapshot.coursesByProgram
+            : {};
+        const normalizedCoursesByProgram = {};
+        for (const [prog, bySem] of Object.entries(nextCoursesByProgram)) {
+            normalizedCoursesByProgram[prog] = normalizeBySemesterMap(bySem);
+        }
+        setCoursesByProgram(normalizedCoursesByProgram);
+        setDoneByProgram(snapshot?.doneByProgram && typeof snapshot.doneByProgram === "object" ? snapshot.doneByProgram : {});
+        setSelectedFocusByProgram(snapshot?.selectedFocusByProgram && typeof snapshot.selectedFocusByProgram === "object" ? snapshot.selectedFocusByProgram : {});
+        const rawGraphViewByProgram =
+            snapshot?.graphViewByProgram && typeof snapshot.graphViewByProgram === "object"
+                ? snapshot.graphViewByProgram
+                : {};
+        const normalizedGraphViewByProgram = {};
+        for (const [prog, state] of Object.entries(rawGraphViewByProgram)) {
+            const collapsedIds = Array.isArray(state?.collapsedIds) ? state.collapsedIds : null;
+            const nodePosById = state?.nodePosById && typeof state.nodePosById === "object"
+                ? state.nodePosById
+                : {};
+            const legacyNodeXById = state?.nodeXById && typeof state.nodeXById === "object"
+                ? state.nodeXById
+                : {};
+            const mergedNodePosById = {
+                ...Object.fromEntries(
+                    Object.entries(legacyNodeXById)
+                        .filter(([, x]) => Number.isFinite(x))
+                        .map(([id, x]) => [id, { x, y: 0 }])
+                ),
+                ...nodePosById,
+            };
+            normalizedGraphViewByProgram[prog] = { collapsedIds, nodePosById: mergedNodePosById };
+        }
+        setGraphViewByProgram(normalizedGraphViewByProgram);
+        if (typeof snapshot?.programCode === "string" && snapshot.programCode.trim()) {
+            setProgramCode(snapshot.programCode);
+        }
+    }, []);
+
+    const clearPlannerState = useCallback(() => {
+        setProgramCode("066 937");
+        setCoursesByProgram({});
+        setDoneByProgram({});
+        setLastPlanChange(null);
+        setSelectedFocusByProgram({});
+        setGraphViewByProgram({});
+    }, []);
 
     const value = useMemo(() => ({
         programCode,
         setProgramCode,
-        coursesBySemester,     // storage = courses only
-        setCoursesFromNodes,   // updater you’ll call from App.jsx
+        coursesBySemester,
+        setCoursesFromNodes,
         doneCourseCodes,
         selectedFocus,
         setSelectedFocus,
@@ -357,10 +357,11 @@ export function ProgramProvider({ children }) {
         lastPlanChange,
         graphViewState,
         setGraphViewState,
-
-        // optional derived helpers
         getCoursesForSemester,
         getModulesForSemester,
+        exportPlannerStateSnapshot,
+        importPlannerStateSnapshot,
+        clearPlannerState,
     }), [
         programCode,
         coursesBySemester,
@@ -375,28 +376,10 @@ export function ProgramProvider({ children }) {
         setGraphViewState,
         getCoursesForSemester,
         getModulesForSemester,
+        exportPlannerStateSnapshot,
+        importPlannerStateSnapshot,
+        clearPlannerState,
     ]);
-
-    useEffect(() => {
-        console.log("[ProgramContext] programCode changed:", programCode);
-    }, [programCode]);
-
-    useEffect(() => {
-        console.log("[ProgramContext] coursesBySemester changed:", coursesBySemester);
-    }, [coursesBySemester]);
-
-    useEffect(() => {
-        console.log("[ProgramContext] doneCourseCodes changed:", doneCourseCodes);
-    }, [doneCourseCodes]);
-
-    useEffect(() => {
-        console.log("[ProgramContext] selectedFocus changed:", selectedFocus);
-    }, [selectedFocus]);
-
-    useEffect(() => {
-        if (!lastPlanChange) return;
-        console.log("[ProgramContext] lastPlanChange:", lastPlanChange);
-    }, [lastPlanChange]);
 
     return <ProgramContext.Provider value={value}>{children}</ProgramContext.Provider>;
 }

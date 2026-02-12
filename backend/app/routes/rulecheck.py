@@ -4,7 +4,7 @@ from dataclasses import asdict, is_dataclass
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..deps import get_current_user
+from ..deps import require_current_user
 from ..services.rule_checker_master import RuleChecker as MasterRuleChecker
 from ..services.rule_checker_bachelor import RuleChecker as BachelorRuleChecker
 
@@ -39,7 +39,7 @@ def _select_checker(program_code: str | None):
 
 
 @router.post("/rulecheck")
-async def rulecheck(payload: RuleCheckPayload, _user=Depends(get_current_user)):
+async def rulecheck(payload: RuleCheckPayload, _user=Depends(require_current_user)):
     checker = _select_checker(payload.programCode)
     try:
         result = checker.evaluate(payload.model_dump())

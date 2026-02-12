@@ -18,7 +18,12 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { fetchCatalog, sendRuleCheckUpdate } from "./lib/api";
+import {
+    fetchCatalog,
+    fetchPlannerState,
+    savePlannerState,
+    sendRuleCheckUpdate,
+} from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
@@ -231,7 +236,7 @@ const normalizeCatalog = (raw) => {
 /****************
  * Main component
  ****************/
-export default function App() {
+export default function App({ currentUser, onSignOut }) {
     const {
         programCode,
         setProgramCode,
@@ -245,6 +250,8 @@ export default function App() {
         lastPlanChange,
         graphViewState,
         setGraphViewState,
+        exportPlannerStateSnapshot,
+        importPlannerStateSnapshot,
     } = currentProgram();
     const [viewMode, setViewMode] = useState("table");
 
@@ -275,6 +282,30 @@ export default function App() {
     const latestRuleCheckChangeIdRef = useRef(null);
     const pendingInitialSyncProgramRef = useRef(programCode);
     const pendingDragPayloadRef = useRef(null);
+    const savePlannerTimerRef = useRef(null);
+    const hydratedProgramRef = useRef(null);
+    const latestGraphSnapshotRef = useRef(null);
+    const [plannerHydrated, setPlannerHydrated] = useState(false);
+    const [plannerLoadOk, setPlannerLoadOk] = useState(false);
+
+    const buildPersistSnapshot = useCallback(() => {
+        const snapshot = exportPlannerStateSnapshot?.() || {};
+        const latestGraphSnapshot = latestGraphSnapshotRef.current;
+        if (latestGraphSnapshot && typeof latestGraphSnapshot === "object") {
+            snapshot.graphViewByProgram = {
+                ...(snapshot.graphViewByProgram || {}),
+                [programCode]: {
+                    ...((snapshot.graphViewByProgram || {})[programCode] || {}),
+                    ...latestGraphSnapshot,
+                },
+            };
+        }
+        return snapshot;
+    }, [exportPlannerStateSnapshot, programCode]);
+
+    useEffect(() => {
+        latestGraphSnapshotRef.current = null;
+    }, [programCode]);
 
     // Fetch & normalize catalog whenever programCode changes
     useEffect(() => {
@@ -300,6 +331,50 @@ export default function App() {
         };
     }, [programCode]);
 
+    useEffect(() => {
+        let cancelled = false;
+        setPlannerHydrated(false);
+        setPlannerLoadOk(false);
+        hydratedProgramRef.current = null;
+        (async () => {
+            try {
+                const payload = await fetchPlannerState();
+                if (cancelled) return;
+                importPlannerStateSnapshot(payload?.state ?? {});
+                setPlannerLoadOk(true);
+            } catch (e) {
+                if (cancelled) return;
+                console.error("Failed to load planner state", e);
+                setPlannerLoadOk(false);
+            } finally {
+                if (!cancelled) setPlannerHydrated(true);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [importPlannerStateSnapshot]);
+
+    useEffect(() => {
+        if (!plannerHydrated || !plannerLoadOk) return;
+        if (savePlannerTimerRef.current) {
+            window.clearTimeout(savePlannerTimerRef.current);
+        }
+        savePlannerTimerRef.current = window.setTimeout(async () => {
+            try {
+                await savePlannerState(buildPersistSnapshot());
+            } catch (e) {
+                console.error("Failed to save planner state", e);
+            }
+        }, 500);
+        return () => {
+            if (savePlannerTimerRef.current) {
+                window.clearTimeout(savePlannerTimerRef.current);
+                savePlannerTimerRef.current = null;
+            }
+        };
+    }, [plannerHydrated, plannerLoadOk, buildPersistSnapshot]);
+
     // Lane background columns (static)
     const laneNodes = useMemo(
         () =>
@@ -322,15 +397,6 @@ export default function App() {
 
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
-
-    // Changing the study program invalidates placed nodes from the previous catalog.
-    // Keep only empty lane backgrounds and clear persisted semester storage.
-    useEffect(() => {
-        setNodes([...laneNodes]);
-        setCoursesFromNodes([]);
-        setNeedsPersist(false);
-        pendingInitialSyncProgramRef.current = programCode;
-    }, [programCode, laneNodes, setNodes, setCoursesFromNodes]);
 
     /***********************
      * Sidebar drag & drop *
@@ -742,12 +808,6 @@ export default function App() {
     /** Mark that we should persist after the next nodes commit. */
     const schedulePersist = useCallback(() => setNeedsPersist(true), []);
 
-    // Debug logging (kept, but behind dev-only guard if you add one later)
-    useEffect(() => {
-        // eslint-disable-next-line no-console
-        console.log("Full frontend plan storage:", coursesBySemester);
-    }, [coursesBySemester]);
-
     // Persist storage once, right after nodes changed (drop or drag-stop)
     useEffect(() => {
         if (!needsPersist) return;
@@ -759,12 +819,34 @@ export default function App() {
     // Keep node status visuals in sync with persisted done-state.
     useEffect(() => {
         const doneSet = new Set(doneCourseCodes || []);
-        setNodes((prev) => prev.map((n) => {
-            if (n.type !== "course") return n;
-            const status = doneSet.has(n?.data?.code) ? "done" : "in_plan";
-            if (n?.data?.status === status) return n;
-            return { ...n, data: { ...n.data, status } };
-        }));
+        setNodes((prev) => {
+            const groupStatuses = new Map();
+            for (const n of prev) {
+                if (n.type !== "course" || !n?.data?.groupId) continue;
+                const groupId = n.data.groupId;
+                const nextCourseStatus = doneSet.has(n?.data?.code) ? "done" : "in_plan";
+                const current = groupStatuses.get(groupId) || { total: 0, done: 0 };
+                current.total += 1;
+                if (nextCourseStatus === "done") current.done += 1;
+                groupStatuses.set(groupId, current);
+            }
+
+            return prev.map((n) => {
+                if (n.type === "course") {
+                    const status = doneSet.has(n?.data?.code) ? "done" : "in_plan";
+                    if (n?.data?.status === status) return n;
+                    return { ...n, data: { ...n.data, status } };
+                }
+                if (n.type === "moduleBg") {
+                    const group = groupStatuses.get(n.id);
+                    if (!group || group.total <= 0) return n;
+                    const status = group.done === group.total ? "done" : "in_plan";
+                    if (n?.data?.status === status) return n;
+                    return { ...n, data: { ...n.data, status } };
+                }
+                return n;
+            });
+        });
     }, [doneCourseCodes, setNodes]);
 
     // Notify backend rule-check endpoint on each plan/status change.
@@ -1080,6 +1162,160 @@ export default function App() {
         [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
     );
 
+    useEffect(() => {
+        if (!plannerHydrated) return;
+        if (hydratedProgramRef.current === programCode) return;
+
+        const doneSet = new Set(doneCourseCodes || []);
+        const courseRows = [];
+        for (const semester of SEMESTERS) {
+            const laneIndex = semester.id - 1;
+            const list = Array.isArray(coursesBySemester?.[semester.id]) ? coursesBySemester[semester.id] : [];
+            for (const course of list) {
+                courseRows.push({
+                    ...course,
+                    laneIndex: Number.isFinite(course?.laneIndex) ? course.laneIndex : laneIndex,
+                });
+            }
+        }
+
+        const grouped = new Map();
+        const standalone = [];
+        for (const course of courseRows) {
+            if (course?.module?.id) {
+                const key = course.module.id;
+                if (!grouped.has(key)) grouped.set(key, []);
+                grouped.get(key).push(course);
+            } else {
+                standalone.push(course);
+            }
+        }
+
+        const rebuilt = [...laneNodes];
+        const groupIds = [];
+
+        for (const [groupId, children] of grouped.entries()) {
+            const first = children[0] || {};
+            const moduleMeta = first?.module || {};
+            const codes = children.map((c) => c?.code).filter(Boolean);
+            const status = children.every((c) => doneSet.has(c?.code))
+                ? "done"
+                : "in_plan";
+
+            rebuilt.push({
+                id: groupId,
+                type: "moduleBg",
+                data: {
+                    title: moduleMeta?.title || "Module",
+                    code: null,
+                    moduleCode: moduleMeta?.code ?? null,
+                    moduleEcts: moduleMeta?.ects ?? null,
+                    moduleCourseCount: children.length,
+                    moduleCourseCodes: codes,
+                    status,
+                    groupId,
+                    onRemoveGroup: removeModuleGroup,
+                    onRemove: () => removeModuleGroup(groupId),
+                    onToggleModuleDone: toggleModuleDoneCodes,
+                    examSubject: moduleMeta?.examSubject ?? null,
+                    category: moduleMeta?.category ?? first?.category ?? "unknown",
+                    programCode,
+                    subjectColor: moduleMeta?.subjectColor ?? first?.subjectColor ?? "#2563eb",
+                },
+                position: { x: 0, y: 0 },
+                draggable: true,
+                selectable: false,
+                zIndex: 0,
+            });
+            groupIds.push(groupId);
+
+            children.forEach((course, idx) => {
+                const laneIndex = Math.max(0, Math.min(Number(course?.laneIndex) || 0, SEMESTERS.length - 1));
+                const x = Number.isFinite(course?.position?.x) ? course.position.x : centerX(laneIndex);
+                const y = Number.isFinite(course?.position?.y)
+                    ? course.position.y
+                    : (96 + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP));
+                rebuilt.push({
+                    id: course?.id || `${course?.code || "course"}-${groupId}-${idx}`,
+                    type: "course",
+                    data: {
+                        label: course?.name || course?.code || "Course",
+                        code: course?.code ?? null,
+                        ects: course?.ects ?? null,
+                        groupId,
+                        onRemove: removeCourseNode,
+                        onRemoveModuleGroup: removeModuleGroup,
+                        onToggleDone: toggleCourseDone,
+                        onUpdateEcts: updateCourseEcts,
+                        nodeId: course?.id || `${course?.code || "course"}-${groupId}-${idx}`,
+                        examSubject: course?.examSubject ?? moduleMeta?.examSubject ?? null,
+                        category: course?.category ?? moduleMeta?.category ?? "unknown",
+                        programCode,
+                        subjectColor: course?.subjectColor ?? moduleMeta?.subjectColor ?? "#2563eb",
+                        status: doneSet.has(course?.code) ? "done" : "in_plan",
+                    },
+                    position: { x, y },
+                    sourcePosition: "right",
+                    targetPosition: "left",
+                    zIndex: 1,
+                });
+            });
+        }
+
+        standalone.forEach((course, idx) => {
+            const laneIndex = Math.max(0, Math.min(Number(course?.laneIndex) || 0, SEMESTERS.length - 1));
+            const x = Number.isFinite(course?.position?.x) ? course.position.x : centerX(laneIndex);
+            const y = Number.isFinite(course?.position?.y)
+                ? course.position.y
+                : (96 + idx * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP));
+            const id = course?.id || `${course?.code || "course"}-${laneIndex}-${idx}`;
+            rebuilt.push({
+                id,
+                type: "course",
+                data: {
+                    label: course?.name || course?.code || "Course",
+                    code: course?.code ?? null,
+                    ects: course?.ects ?? null,
+                    onRemove: removeCourseNode,
+                    onToggleDone: toggleCourseDone,
+                    onUpdateEcts: updateCourseEcts,
+                    nodeId: id,
+                    examSubject: course?.examSubject ?? null,
+                    category: course?.category ?? "unknown",
+                    programCode,
+                    subjectColor: course?.subjectColor ?? "#2563eb",
+                    status: doneSet.has(course?.code) ? "done" : "in_plan",
+                },
+                position: { x, y },
+                sourcePosition: "right",
+                targetPosition: "left",
+                zIndex: 1,
+            });
+        });
+
+        let withGroups = rebuilt;
+        for (const groupId of groupIds) {
+            withGroups = recomputeGroupFromChildren(withGroups, groupId);
+        }
+        const resolved = resolveLaneCollisions(withGroups);
+        setNodes(resolved);
+        setNeedsPersist(false);
+        pendingInitialSyncProgramRef.current = programCode;
+        hydratedProgramRef.current = programCode;
+    }, [
+        plannerHydrated,
+        programCode,
+        coursesBySemester,
+        doneCourseCodes,
+        laneNodes,
+        removeCourseNode,
+        removeModuleGroup,
+        toggleCourseDone,
+        toggleModuleDoneCodes,
+        updateCourseEcts,
+        setNodes,
+    ]);
+
     /***************************************
      * Sidebar expand/collapse (per subject)
      ***************************************/
@@ -1323,9 +1559,29 @@ export default function App() {
     if (viewMode === "graph") {
         return (
             <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+                <button
+                    onClick={() => onSignOut?.(buildPersistSnapshot())}
+                    style={{
+                        position: "fixed",
+                        top: 12,
+                        right: 12,
+                        zIndex: 30,
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                    }}
+                    title={`Signed in as ${currentUser?.username || "user"}`}
+                >
+                    Sign Out ({currentUser?.username || "user"})
+                </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <CurriculumGraphView
                         catalog={catalog}
+                        catalogError={catalogError}
+                        loadingCatalog={loadingCatalog}
                         subjectColors={subjectColors}
                         onSwitchToTable={() => setViewMode("table")}
                         programCode={programCode}
@@ -1344,6 +1600,10 @@ export default function App() {
                         onRemoveModuleFromPlan={removeGraphModuleFromPlan}
                         graphViewState={graphViewState}
                         setGraphViewState={setGraphViewState}
+                        graphStateReady={plannerHydrated && plannerLoadOk}
+                        onGraphViewSnapshot={(snapshot) => {
+                            latestGraphSnapshotRef.current = snapshot;
+                        }}
                         isRuleDashboardOpen={isRuleDashboardOpen}
                         onToggleRuleDashboard={() => setIsRuleDashboardOpen((v) => !v)}
                         isLegendOpen={isLegendOpen}
@@ -1448,6 +1708,24 @@ export default function App() {
 
     return (
         <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+            <button
+                onClick={() => onSignOut?.(buildPersistSnapshot())}
+                style={{
+                    position: "fixed",
+                    top: 12,
+                    right: 12,
+                    zIndex: 30,
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                }}
+                title={`Signed in as ${currentUser?.username || "user"}`}
+            >
+                Sign Out ({currentUser?.username || "user"})
+            </button>
             <Sidebar
                 catalog={catalog}
                 loading={loadingCatalog}

@@ -746,11 +746,15 @@ class RuleChecker:
             if ek:
                 courses_by_exam.setdefault(ek, []).append(c)
 
-        # code_key -> laneIndex (earliest occurrence)
+        # code_key -> laneIndex (earliest occurrence, any status)
         lane_of: Dict[str, int] = {}
+        # code_key -> laneIndex (earliest occurrence, done only)
+        done_lane_of: Dict[str, int] = {}
         for c in courses:
             k = c["code_key"]
             lane_of[k] = min(lane_of.get(k, c["laneIndex"]), c["laneIndex"])
+            if c.get("status") == "done":
+                done_lane_of[k] = min(done_lane_of.get(k, c["laneIndex"]), c["laneIndex"])
 
         for exam_key, core_list in self.core_by_exam_subject.items():
             items = courses_by_exam.get(exam_key, [])
@@ -762,21 +766,33 @@ class RuleChecker:
                 continue
 
             # 1) Missing requirement: core must be present somewhere in plan
-            missing_cores = [core for core in core_list if self._norm_key(core) not in lane_of]
-            if missing_cores:
+            missing_cores_in_plan = [core for core in core_list if self._norm_key(core) not in lane_of]
+            if missing_cores_in_plan:
                 # One consolidated missing message per exam subject
                 missing.append(
-                    f"Core requirement for '{electives[0]['examSubject']}': add core module(s): {', '.join(missing_cores)} "
+                    f"Core requirement for '{electives[0]['examSubject']}': add core module(s): {', '.join(missing_cores_in_plan)} "
                     "(required because you selected electives in this exam subject)."
                 )
                 # Also a warning to make it visible immediately
                 warnings.append(
-                    f"You selected electives in '{electives[0]['examSubject']}' but core module(s) are not in your plan yet: {', '.join(missing_cores)}."
+                    f"You selected electives in '{electives[0]['examSubject']}' but core module(s) are not in your plan yet: {', '.join(missing_cores_in_plan)}."
                 )
                 # Can't do ordering warnings if cores aren't scheduled
                 continue
 
-            # 2) Ordering warning only (not a violation): elective before core
+            # 2) Core completion requirement: planned is not enough, core must be done.
+            missing_core_completions = [core for core in core_list if self._norm_key(core) not in done_lane_of]
+            if missing_core_completions:
+                missing.append(
+                    f"Core completion requirement for '{electives[0]['examSubject']}': complete core module(s): "
+                    f"{', '.join(missing_core_completions)} (planned core alone is not sufficient)."
+                )
+                warnings.append(
+                    f"You selected electives in '{electives[0]['examSubject']}' but required core module(s) are not done yet: "
+                    f"{', '.join(missing_core_completions)}."
+                )
+
+            # 3) Ordering warning only (not a violation): elective before core
             for e in electives:
                 e_lane = e["laneIndex"]
                 for core in core_list:

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactFlow, { Background, Controls, MarkerType, MiniMap, useNodesState } from "reactflow";
+import ReactFlow, { applyNodeChanges, Background, Controls, MarkerType, MiniMap, SelectionMode, useNodesState } from "reactflow";
 import "reactflow/dist/style.css";
 import { CARD_WIDTH, NODE_HEIGHT, SEMESTERS } from "../utils/constants.js";
 import {
@@ -22,6 +22,7 @@ const GRAPH_NODE_WIDTH = CARD_WIDTH;
 const GRAPH_NODE_HEIGHT = NODE_HEIGHT;
 const LEAF_VERTICAL_SPACING = NODE_HEIGHT + 36;
 const NODE_COLLISION_GAP = 12;
+const MAX_PERSISTED_ABS_X = 10000;
 
 const NODE_TYPES = {
     graphRoot: GraphRootNode,
@@ -57,7 +58,7 @@ function buildTree(catalog, subjectColors) {
                     courseName: course?.name ?? mod?.name ?? "Course",
                     ects: course?.ects ?? mod?.ects ?? null,
                     category: mod?.category ?? null,
-                    examSubject: mod?.module_exam_subject ?? pfName ?? null,
+                    examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     children: [],
                 }];
             }
@@ -96,7 +97,7 @@ function buildTree(catalog, subjectColors) {
                     courseName: course?.name ?? "Course",
                     ects: course?.ects ?? null,
                     category: mod?.category ?? null,
-                    examSubject: mod?.module_exam_subject ?? pfName ?? null,
+                    examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     parentModulePayload: modulePayload,
                     children: [],
                 })),
@@ -225,22 +226,34 @@ function layoutTree(root, collapsedIds, options = {}) {
     return { nodes, edges };
 }
 
-function mergeNodesWithPinnedPositions(nextNodes, prevNodes, edges, persistedXById = {}) {
+function mergeNodesWithPinnedPositions(nextNodes, prevNodes, edges, persistedPosById = {}) {
     const prevById = new Map((prevNodes || []).map((n) => [n.id, n]));
     const nextById = new Map((nextNodes || []).map((n) => [n.id, n]));
     const parentByChild = new Map((edges || []).map((e) => [e.target, e.source]));
-    const persisted = persistedXById && typeof persistedXById === "object" ? persistedXById : {};
+    const persisted = persistedPosById && typeof persistedPosById === "object" ? persistedPosById : {};
 
     return (nextNodes || []).map((nextNode) => {
-        const prevNode = prevById.get(nextNode.id);
-        if (prevNode) {
-            // Preserve only manual horizontal moves; vertical position should reflow.
-            return { ...nextNode, position: { x: prevNode.position.x, y: nextNode.position.y } };
+        const persistedValue = persisted?.[nextNode.id];
+        const persistedX = Number(persistedValue?.x);
+        if (Number.isFinite(persistedX) && Math.abs(persistedX) < MAX_PERSISTED_ABS_X) {
+            return {
+                ...nextNode,
+                position: {
+                    x: persistedX,
+                    y: nextNode.position.y,
+                },
+            };
         }
 
-        const persistedX = persisted?.[nextNode.id];
-        if (Number.isFinite(persistedX)) {
-            return { ...nextNode, position: { x: persistedX, y: nextNode.position.y } };
+        const prevNode = prevById.get(nextNode.id);
+        if (prevNode) {
+            return {
+                ...nextNode,
+                position: {
+                    x: prevNode.position.x,
+                    y: nextNode.position.y,
+                },
+            };
         }
 
         // New node (e.g. after expand): inherit parent's horizontal shift if parent moved.
@@ -323,7 +336,6 @@ function enforceHierarchicalOrder(nodes, subjectOrder, movedNodeIds) {
         if (!group.length) continue;
 
         const minY = Math.min(...group.map((n) => n.position.y));
-        const maxY = Math.max(...group.map((n) => n.position.y + GRAPH_NODE_HEIGHT));
         const needsShift = minY < cursorY;
         if (needsShift) {
             const dy = cursorY - minY;
@@ -371,7 +383,12 @@ export default function CurriculumGraphView({
     isLegendOpen,
     onToggleLegend,
 }) {
+    const rfRef = useRef(null);
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
+    const isDraggingRef = useRef(false);
+    const suppressCollapsedPersistRef = useRef(false);
+    const [isProgramSwitching, setIsProgramSwitching] = useState(false);
+    const [interactionMode, setInteractionMode] = useState("pan");
     const [collapsedIds, setCollapsedIds] = useState(() => {
         const saved = graphViewState?.collapsedIds;
         if (Array.isArray(saved)) return new Set(saved);
@@ -379,22 +396,48 @@ export default function CurriculumGraphView({
     });
 
     useEffect(() => {
+        suppressCollapsedPersistRef.current = true;
         setCollapsedIds((prev) => {
             const allowed = collectCollapsibleIds(root);
             const saved = Array.isArray(graphViewState?.collapsedIds) ? new Set(graphViewState.collapsedIds) : null;
-            if (saved) {
-                return new Set([...saved].filter((id) => allowed.has(id)));
+            const next = saved
+                ? new Set([...saved].filter((id) => allowed.has(id)))
+                : allowed;
+            const same = next.size === prev.size && [...next].every((id) => prev.has(id));
+            if (same) {
+                suppressCollapsedPersistRef.current = false;
+                return prev;
             }
-            return new Set([...prev].filter((id) => allowed.has(id)));
+            if (saved) {
+                return next;
+            }
+            // Program-specific default: start collapsed for this program's tree.
+            // Do not reuse previous program's collapsed set.
+            return next;
         });
     }, [root, graphViewState?.collapsedIds]);
 
     useEffect(() => {
+        if (suppressCollapsedPersistRef.current) return;
         const next = Array.from(collapsedIds);
         const current = Array.isArray(graphViewState?.collapsedIds) ? graphViewState.collapsedIds : [];
         if (next.length === current.length && next.every((v, i) => v === current[i])) return;
         setGraphViewState?.((prev) => ({ ...prev, collapsedIds: next }));
     }, [collapsedIds, graphViewState?.collapsedIds, setGraphViewState]);
+
+    useEffect(() => {
+        if (suppressCollapsedPersistRef.current) {
+            suppressCollapsedPersistRef.current = false;
+        }
+    }, [collapsedIds]);
+
+    useEffect(() => {
+        setIsProgramSwitching(true);
+        const t = window.setTimeout(() => {
+            setIsProgramSwitching(false);
+        }, 120);
+        return () => window.clearTimeout(t);
+    }, [programCode]);
 
     const { nodes, edges: autoEdges } = useMemo(() => {
         return layoutTree(root, collapsedIds, {
@@ -423,36 +466,39 @@ export default function CurriculumGraphView({
         () => (root?.children || []).map((s) => s.id),
         [root]
     );
-    const [displayNodes, setDisplayNodes, onNodesChange] = useNodesState(nodes);
+    const [displayNodes, setDisplayNodes] = useNodesState(nodes);
     const edges = autoEdges;
 
+    const onNodesChange = useCallback((changes) => {
+        setDisplayNodes((prevNodes) => {
+            const prevById = new Map((prevNodes || []).map((n) => [n.id, n]));
+            const clampedChanges = (changes || []).map((change) => {
+                if (change?.type !== "position" || !change?.position || !change?.id) {
+                    return change;
+                }
+                const prevNode = prevById.get(change.id);
+                const lockedY = Number(prevNode?.position?.y);
+                if (!Number.isFinite(lockedY)) return change;
+                return {
+                    ...change,
+                    position: {
+                        ...change.position,
+                        y: lockedY,
+                    },
+                };
+            });
+            return applyNodeChanges(clampedChanges, prevNodes);
+        });
+    }, [setDisplayNodes]);
+
     useEffect(() => {
+        if (isDraggingRef.current) return;
         setDisplayNodes((prev) => {
-            const merged = mergeNodesWithPinnedPositions(nodes, prev, autoEdges, graphViewState?.nodeXById);
+            const merged = mergeNodesWithPinnedPositions(nodes, prev, autoEdges, graphViewState?.nodePosById);
             const noOverlap = resolveNodeOverlaps(merged);
             return enforceHierarchicalOrder(noOverlap, subjectOrder, new Set());
         });
-    }, [nodes, autoEdges, subjectOrder, setDisplayNodes, graphViewState?.nodeXById]);
-
-    useEffect(() => {
-        const nextNodeXById = {};
-        for (const node of displayNodes || []) {
-            if (!node?.id) continue;
-            const x = Number(node?.position?.x);
-            if (!Number.isFinite(x)) continue;
-            nextNodeXById[node.id] = x;
-        }
-        const currentNodeXById = graphViewState?.nodeXById ?? {};
-        const currentKeys = Object.keys(currentNodeXById);
-        const nextKeys = Object.keys(nextNodeXById);
-        if (currentKeys.length === nextKeys.length && currentKeys.every((k) => currentNodeXById[k] === nextNodeXById[k])) {
-            return;
-        }
-        setGraphViewState?.((prev) => ({
-            ...prev,
-            nodeXById: nextNodeXById,
-        }));
-    }, [displayNodes, graphViewState?.nodeXById, setGraphViewState]);
+    }, [nodes, autoEdges, subjectOrder, setDisplayNodes, graphViewState?.nodePosById]);
 
     const onNodeClick = useCallback((_, node) => {
         if (node?.data?.level === "root" || !node?.data?.hasChildren) return;
@@ -464,21 +510,42 @@ export default function CurriculumGraphView({
         });
     }, []);
 
-    const dragStartYById = useRef(new Map());
+    const dragStartPosById = useRef(new Map());
+    const dragLeaderIdRef = useRef(null);
 
     const onNodeDragStart = useCallback((_, node) => {
         if (!node?.id) return;
-        dragStartYById.current.set(node.id, node.position.y);
-    }, []);
+        isDraggingRef.current = true;
+        dragLeaderIdRef.current = node.id;
+        const selectedNodes = (displayNodes || []).filter((n) => n?.selected);
+        const group = selectedNodes.length > 0 ? selectedNodes : (displayNodes || []).filter((n) => n.id === node.id);
+        const startMap = new Map();
+        for (const n of group) {
+            startMap.set(n.id, { x: Number(n?.position?.x ?? 0), y: Number(n?.position?.y ?? 0) });
+        }
+        // Ensure leader is always present.
+        if (!startMap.has(node.id)) {
+            startMap.set(node.id, { x: Number(node?.position?.x ?? 0), y: Number(node?.position?.y ?? 0) });
+        }
+        dragStartPosById.current = startMap;
+    }, [displayNodes]);
 
     const onNodeDrag = useCallback((_, node) => {
         if (!node?.id) return;
-        const lockedY = dragStartYById.current.get(node.id);
-        if (typeof lockedY !== "number") return;
+        const leaderId = dragLeaderIdRef.current || node.id;
+        const leaderStart = dragStartPosById.current.get(leaderId);
+        if (!leaderStart) return;
+        const dx = Number(node?.position?.x ?? 0) - Number(leaderStart.x ?? 0);
         setDisplayNodes((prev) =>
             prev.map((n) =>
-                n.id === node.id
-                    ? { ...n, position: { x: node.position.x, y: lockedY } }
+                dragStartPosById.current.has(n.id)
+                    ? {
+                        ...n,
+                        position: {
+                            x: Number(dragStartPosById.current.get(n.id)?.x ?? n.position.x) + dx,
+                            y: Number(dragStartPosById.current.get(n.id)?.y ?? n.position.y),
+                        },
+                    }
                     : n
             )
         );
@@ -486,13 +553,90 @@ export default function CurriculumGraphView({
 
     const onNodeDragStop = useCallback((_, node) => {
         if (!node?.id) return;
-        dragStartYById.current.delete(node.id);
-    }, []);
+        isDraggingRef.current = false;
+        const startPosById = dragStartPosById.current;
+        const movedNodeIds = Array.from(dragStartPosById.current.keys());
+        dragLeaderIdRef.current = null;
+        dragStartPosById.current = new Map();
+        if (movedNodeIds.length === 0) return;
+
+        // Enforce horizontal-only drag for single and multi-selection drags.
+        setDisplayNodes((prev) =>
+            prev.map((n) =>
+                movedNodeIds.includes(n.id)
+                    ? {
+                        ...n,
+                        position: {
+                            x: Number(n?.position?.x ?? 0),
+                            y: Number(startPosById.get(n.id)?.y ?? n?.position?.y ?? 0),
+                        },
+                    }
+                    : n
+            )
+        );
+
+        setGraphViewState?.((prev) => {
+            const currentPosById = prev?.nodePosById ?? {};
+            const byId = new Map((displayNodes || []).map((n) => [n.id, n]));
+            const nextPosById = { ...currentPosById };
+            let changed = false;
+            for (const id of movedNodeIds) {
+                const n = byId.get(id);
+                const x = Number(n?.position?.x);
+                if (!Number.isFinite(x) || Math.abs(x) >= MAX_PERSISTED_ABS_X) continue;
+                const prevEntry = currentPosById?.[id] ?? null;
+                const prevY = Number(prevEntry?.y);
+                const y = Number.isFinite(prevY) ? prevY : Number(n?.position?.y ?? 0);
+                const prevX = Number(prevEntry?.x);
+                if (Number.isFinite(prevX) && prevX === x && Number(prevEntry?.y) === y) continue;
+                nextPosById[id] = { x, y };
+                changed = true;
+            }
+            if (!changed) return prev;
+            return {
+                ...prev,
+                nodePosById: nextPosById,
+            };
+        });
+    }, [displayNodes, setGraphViewState]);
+
+    const persistGraphSnapshot = useCallback(() => {
+        const currentNodePosById = graphViewState?.nodePosById ?? {};
+        const nextNodePosById = {};
+        for (const node of displayNodes || []) {
+            if (!node?.id) continue;
+            const x = Number(node?.position?.x);
+            if (!Number.isFinite(x) || Math.abs(x) >= MAX_PERSISTED_ABS_X) continue;
+            const prevY = Number(currentNodePosById?.[node.id]?.y);
+            const y = Number.isFinite(prevY) ? prevY : Number(node?.position?.y ?? 0);
+            nextNodePosById[node.id] = { x, y };
+        }
+        setGraphViewState?.((prev) => ({
+            ...prev,
+            collapsedIds: Array.from(collapsedIds),
+            nodePosById: nextNodePosById,
+        }));
+    }, [displayNodes, graphViewState?.nodePosById, collapsedIds, setGraphViewState]);
+
+    useEffect(() => {
+        if (!rfRef.current) return;
+        if (!Array.isArray(displayNodes) || displayNodes.length === 0) return;
+        window.requestAnimationFrame(() => {
+            try {
+                rfRef.current.fitView({ padding: 0.2, includeHiddenNodes: true });
+            } catch {
+                // no-op
+            }
+        });
+    }, [displayNodes.length, programCode]);
 
     return (
         <div style={{ height: "100%", width: "100%", position: "relative", background: "#f9fafb" }}>
             <button
-                onClick={onSwitchToTable}
+                onClick={() => {
+                    persistGraphSnapshot();
+                    onSwitchToTable?.();
+                }}
                 style={{
                     position: "absolute",
                     top: 12,
@@ -510,6 +654,11 @@ export default function CurriculumGraphView({
             </button>
             <button
                 onClick={() => {
+                    isDraggingRef.current = false;
+                    setGraphViewState?.((prev) => ({
+                        ...prev,
+                        nodePosById: {},
+                    }));
                     setDisplayNodes(nodes);
                 }}
                 style={{
@@ -545,6 +694,25 @@ export default function CurriculumGraphView({
                 {isRuleDashboardOpen ? "Close Rule Dashboard" : "Open Rule Dashboard"}
             </button>
             <button
+                onClick={() => {
+                    setInteractionMode((m) => (m === "pan" ? "select" : "pan"));
+                }}
+                style={{
+                    position: "absolute",
+                    top: 92,
+                    left: 12,
+                    zIndex: 5,
+                    border: "1px solid #d1d5db",
+                    background: interactionMode === "select" ? "#dbeafe" : "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                }}
+            >
+                Mode: {interactionMode === "select" ? "Select" : "Pan"}
+            </button>
+            <button
                 onClick={() => onToggleLegend?.()}
                 style={{
                     position: "absolute",
@@ -563,7 +731,10 @@ export default function CurriculumGraphView({
             </button>
             <select
                 value={programCode}
-                onChange={(e) => setProgramCode?.(e.target.value)}
+                onChange={(e) => {
+                    persistGraphSnapshot();
+                    setProgramCode?.(e.target.value);
+                }}
                 style={{
                     position: "absolute",
                     top: 12,
@@ -633,26 +804,52 @@ export default function CurriculumGraphView({
                     <VisualLegend programCode={programCode} />
                 </div>
             )}
-            <ReactFlow
-                nodes={displayNodes}
-                edges={edges}
-                nodeTypes={NODE_TYPES}
-                onNodeClick={onNodeClick}
-                onNodesChange={onNodesChange}
-                onNodeDragStart={onNodeDragStart}
-                onNodeDrag={onNodeDrag}
-                onNodeDragStop={onNodeDragStop}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
-                nodesConnectable={false}
-                nodesDraggable
-                elementsSelectable
-                proOptions={{ hideAttribution: true }}
-            >
-                <MiniMap pannable zoomable />
-                <Controls />
-                <Background gap={18} />
-            </ReactFlow>
+            {isProgramSwitching ? (
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "grid",
+                        placeItems: "center",
+                        color: "#6b7280",
+                        fontSize: 13,
+                        fontWeight: 600,
+                    }}
+                >
+                    Loading graph...
+                </div>
+            ) : (
+                <ReactFlow
+                    onInit={(instance) => {
+                        rfRef.current = instance;
+                    }}
+                    nodes={displayNodes}
+                    edges={edges}
+                    nodeTypes={NODE_TYPES}
+                    onNodeClick={onNodeClick}
+                    onNodesChange={onNodesChange}
+                    onNodeDragStart={onNodeDragStart}
+                    onNodeDrag={onNodeDrag}
+                    onNodeDragStop={onNodeDragStop}
+                    fitView
+                    fitViewOptions={{ padding: 0.2 }}
+                    minZoom={0.2}
+                    nodesConnectable={false}
+                    nodesDraggable
+                    elementsSelectable
+                    selectNodesOnDrag={interactionMode === "select"}
+                    selectionOnDrag={interactionMode === "select"}
+                    selectionKeyCode={null}
+                    selectionMode={SelectionMode.Partial}
+                    multiSelectionKeyCode={["Meta", "Shift", "Control"]}
+                    panOnDrag={interactionMode === "pan"}
+                    proOptions={{ hideAttribution: true }}
+                >
+                    <MiniMap pannable zoomable />
+                    <Controls />
+                    <Background gap={18} />
+                </ReactFlow>
+            )}
         </div>
     );
 }

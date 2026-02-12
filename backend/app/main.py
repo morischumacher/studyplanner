@@ -5,6 +5,8 @@ from .settings import settings
 from .db import migrate_on_boot, get_pool
 from .routes.catalog import router as catalog_router
 from .routes.rulecheck import router as rulecheck_router
+from .routes.auth import router as auth_router
+from .routes.planner_state import router as planner_state_router
 
 app = FastAPI(
     title="My Service",
@@ -34,11 +36,6 @@ async def log_http_requests(request: Request, call_next):
     )
     return response
 
-@app.get("/health", tags=["health"])
-def health():
-    # Return a tiny body to ensure bytes are written
-    return {"status": "ok"}
-
 @app.on_event("startup")
 async def _startup():
     await migrate_on_boot()
@@ -52,3 +49,5 @@ async def health():
 
 app.include_router(catalog_router)
 app.include_router(rulecheck_router)
+app.include_router(auth_router)
+app.include_router(planner_state_router)
