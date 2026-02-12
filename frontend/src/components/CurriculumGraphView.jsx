@@ -663,8 +663,8 @@ export default function CurriculumGraphView({
                 }}
                 style={{
                     position: "absolute",
-                    top: 12,
-                    left: 122,
+                    top: 52,
+                    left: 352,
                     zIndex: 5,
                     border: "1px solid #d1d5db",
                     background: "#ffffff",
@@ -674,7 +674,7 @@ export default function CurriculumGraphView({
                     cursor: "pointer",
                 }}
             >
-                Reorder
+                Reorder Horizontal
             </button>
             <button
                 onClick={() => onToggleRuleDashboard?.()}
