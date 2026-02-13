@@ -6,7 +6,35 @@ const ProgramContext = createContext();
 const BACHELOR_PROGRAM_CODE = "033 521";
 const EMPTY_COURSES_PLAN = emptyCoursesOnlyPlan();
 const EMPTY_DONE_CODES = [];
-const EMPTY_GRAPH_VIEW_STATE = { collapsedIds: null, nodePosById: {} };
+const DEFAULT_GRAPH_FILTERS = {
+    obligationTypes: [],
+    ectsRange: null,
+    courseTypes: [],
+    examSubjects: [],
+    progressStates: ["todo", "in_plan", "done"],
+};
+const EMPTY_GRAPH_VIEW_STATE = {
+    collapsedIds: null,
+    nodePosById: {},
+    filters: DEFAULT_GRAPH_FILTERS,
+    filtersConfigured: false,
+};
+
+function sanitizeGraphFilters(filters) {
+    const source = filters && typeof filters === "object" ? filters : {};
+    return {
+        obligationTypes: Array.isArray(source.obligationTypes) ? source.obligationTypes : DEFAULT_GRAPH_FILTERS.obligationTypes,
+        ectsRange: source.ectsRange && typeof source.ectsRange === "object"
+            ? {
+                min: Number(source.ectsRange.min),
+                max: Number(source.ectsRange.max),
+            }
+            : null,
+        courseTypes: Array.isArray(source.courseTypes) ? source.courseTypes : DEFAULT_GRAPH_FILTERS.courseTypes,
+        examSubjects: Array.isArray(source.examSubjects) ? source.examSubjects : DEFAULT_GRAPH_FILTERS.examSubjects,
+        progressStates: Array.isArray(source.progressStates) ? source.progressStates : DEFAULT_GRAPH_FILTERS.progressStates,
+    };
+}
 
 function emptyCoursesOnlyPlan() {
     const bySem = {};
@@ -262,6 +290,7 @@ export function ProgramProvider({ children }) {
         setGraphViewByProgram((prev) => {
             const current = prev?.[programCode] ?? EMPTY_GRAPH_VIEW_STATE;
             const patch = typeof nextStateOrUpdater === "function" ? nextStateOrUpdater(current) : nextStateOrUpdater;
+            if (patch === current) return prev;
             const safePatch = patch && typeof patch === "object" ? patch : {};
             const nextCollapsedIds = Array.isArray(safePatch.collapsedIds) ? safePatch.collapsedIds : (current.collapsedIds ?? null);
             const legacyNodeXById = safePatch.nodeXById && typeof safePatch.nodeXById === "object"
@@ -280,8 +309,34 @@ export function ProgramProvider({ children }) {
                             .filter(([, x]) => Number.isFinite(x))
                             .map(([id, x]) => [id, { x, y: 0 }])
                     );
-
-            return { ...prev, [programCode]: { collapsedIds: nextCollapsedIds, nodePosById: nodePosCandidate } };
+            const nextFiltersCandidate = sanitizeGraphFilters(safePatch?.filters ?? current?.filters);
+            const filtersUnchanged =
+                JSON.stringify(current?.filters ?? null) === JSON.stringify(nextFiltersCandidate ?? null);
+            const filters = filtersUnchanged ? (current?.filters ?? nextFiltersCandidate) : nextFiltersCandidate;
+            const filtersConfigured =
+                typeof safePatch?.filtersConfigured === "boolean"
+                    ? safePatch.filtersConfigured
+                    : Boolean(current?.filtersConfigured);
+            const nextProgramGraphState = {
+                ...current,
+                ...safePatch,
+                collapsedIds: nextCollapsedIds,
+                nodePosById: nodePosCandidate,
+                filters,
+                filtersConfigured,
+            };
+            if (
+                current?.collapsedIds === nextProgramGraphState.collapsedIds &&
+                current?.nodePosById === nextProgramGraphState.nodePosById &&
+                current?.filters === nextProgramGraphState.filters &&
+                current?.filtersConfigured === nextProgramGraphState.filtersConfigured
+            ) {
+                return prev;
+            }
+            return {
+                ...prev,
+                [programCode]: nextProgramGraphState,
+            };
         });
     }, [programCode]);
 
@@ -327,7 +382,13 @@ export function ProgramProvider({ children }) {
                 ),
                 ...nodePosById,
             };
-            normalizedGraphViewByProgram[prog] = { collapsedIds, nodePosById: mergedNodePosById };
+            normalizedGraphViewByProgram[prog] = {
+                ...state,
+                collapsedIds,
+                nodePosById: mergedNodePosById,
+                filters: sanitizeGraphFilters(state?.filters),
+                filtersConfigured: Boolean(state?.filtersConfigured),
+            };
         }
         setGraphViewByProgram(normalizedGraphViewByProgram);
         if (typeof snapshot?.programCode === "string" && snapshot.programCode.trim()) {

@@ -3,3 +3,47 @@
     opacity: 0;
     pointer-events: none;
 }
+
+/* Dual-thumb range slider: let thumbs receive pointer events, not the full input overlay. */
+.dual-range-input {
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: none;
+    background: transparent;
+}
+
+.dual-range-input::-webkit-slider-runnable-track {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    height: 4px;
+}
+
+.dual-range-input::-moz-range-track {
+    background: transparent;
+    height: 4px;
+    border: 0;
+}
+
+.dual-range-input::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    pointer-events: all;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid #1d4ed8;
+    background: #ffffff;
+    cursor: pointer;
+    margin-top: -5px;
+}
+
+.dual-range-input::-moz-range-thumb {
+    pointer-events: all;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid #1d4ed8;
+    background: #ffffff;
+    cursor: pointer;
+}

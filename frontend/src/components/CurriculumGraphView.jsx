@@ -9,6 +9,7 @@ import {
     GraphSubjectNode,
 } from "./graphNodes/index.js";
 import VisualLegend from "./VisualLegend.jsx";
+import GraphFilterEngine from "../utils/GraphFilterEngine.js";
 
 const X_BY_LEVEL = {
     root: 40,
@@ -57,8 +58,10 @@ function buildTree(catalog, subjectColors) {
                     courseCode: course?.code ?? mod?.code ?? "",
                     courseName: course?.name ?? mod?.name ?? "Course",
                     ects: course?.ects ?? mod?.ects ?? null,
+                    courseType: GraphFilterEngine.normalizeCourseType(course?.type, course?.code ?? mod?.code),
                     category: mod?.category ?? null,
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
+                    isMandatory: Boolean(mod?.is_mandatory),
                     children: [],
                 }];
             }
@@ -68,11 +71,13 @@ function buildTree(catalog, subjectColors) {
                 name: mod?.name ?? "Module",
                 category: mod?.category ?? null,
                 examSubject: mod?.module_exam_subject ?? subjectName ?? null,
+                isMandatory: Boolean(mod?.is_mandatory),
                 subjectColor,
                 courses: courses.map((course) => ({
                     code: course?.code ?? "",
                     name: course?.name ?? "Course",
                     ects: course?.ects ?? null,
+                    type: GraphFilterEngine.normalizeCourseType(course?.type, course?.code),
                 })),
             };
 
@@ -86,8 +91,15 @@ function buildTree(catalog, subjectColors) {
                 moduleCourseCount: courses.length,
                 category: mod?.category ?? null,
                 examSubject: mod?.module_exam_subject ?? subjectName ?? null,
+                isMandatory: Boolean(mod?.is_mandatory),
                 modulePayload,
                 moduleCourseCodes: courses.map((course) => course?.code).filter(Boolean),
+                moduleCourseTypes: courses
+                    .map((course) => GraphFilterEngine.normalizeCourseType(course?.type, course?.code))
+                    .filter(Boolean),
+                moduleCourseEcts: courses
+                    .map((course) => Number(course?.ects))
+                    .filter((ects) => Number.isFinite(ects)),
                 children: courses.map((course, courseIdx) => ({
                     id: `course-${pfIdx}-${modIdx}-${courseIdx}-${course?.code || "course"}`,
                     label: `${course?.name || "Course"}`,
@@ -96,8 +108,10 @@ function buildTree(catalog, subjectColors) {
                     courseCode: course?.code ?? "",
                     courseName: course?.name ?? "Course",
                     ects: course?.ects ?? null,
+                    courseType: GraphFilterEngine.normalizeCourseType(course?.type, course?.code),
                     category: mod?.category ?? null,
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
+                    isMandatory: Boolean(mod?.is_mandatory),
                     parentModulePayload: modulePayload,
                     children: [],
                 })),
@@ -177,6 +191,7 @@ function layoutTree(root, collapsedIds, options = {}) {
             position: { x, y },
             data: {
                 label: `${prefix}${node.label}`,
+                subjectName: node.level === "subject" ? node.label : null,
                 level: node.level,
                 hasChildren: canExpand,
                 color: node.color,
@@ -186,9 +201,11 @@ function layoutTree(root, collapsedIds, options = {}) {
                 ects: node?.ects ?? null,
                 category: node?.category ?? null,
                 examSubject: node?.examSubject ?? null,
+                isMandatory: Boolean(node?.isMandatory),
                 programCode,
                 moduleCount: node?.moduleCount ?? null,
                 status,
+                courseType: node?.courseType ?? null,
                 onAddToPlan: (node.level === "course" || node.level === "courseDirect") ? onAddToPlan : null,
                 onToggleDone: (node.level === "course" || node.level === "courseDirect") ? onToggleDone : null,
                 semesters: (node.level === "course" || node.level === "courseDirect") ? SEMESTERS : null,
@@ -197,6 +214,8 @@ function layoutTree(root, collapsedIds, options = {}) {
                 moduleCode: node?.moduleCode ?? null,
                 moduleEcts: node?.moduleEcts ?? null,
                 moduleCourseCount: node?.moduleCourseCount ?? null,
+                moduleCourseTypes: node?.moduleCourseTypes ?? [],
+                moduleCourseEcts: node?.moduleCourseEcts ?? [],
                 parentModulePayload: node?.parentModulePayload ?? null,
                 onAddModuleToPlan: (node.level === "module" || node.level === "course") ? onAddModuleToPlan : null,
                 onToggleModuleDone: node.level === "module" ? onToggleModuleDone : null,
@@ -387,19 +406,74 @@ export default function CurriculumGraphView({
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
     const isDraggingRef = useRef(false);
     const suppressCollapsedPersistRef = useRef(false);
+    const filtersDirtyRef = useRef(false);
+    const collapsedBeforeForceHierarchyRef = useRef(null);
     const [isProgramSwitching, setIsProgramSwitching] = useState(false);
+    const [isFiltersOpen, setIsFiltersOpen] = useState(true);
     const [interactionMode, setInteractionMode] = useState("pan");
+    const [feedbackToast, setFeedbackToast] = useState({
+        visible: false,
+        text: "",
+        bg: "#f3f4f6",
+        border: "#d1d5db",
+        color: "#374151",
+    });
+    const [hierarchyMode, setHierarchyMode] = useState("normal");
+    const filterOptions = useMemo(() => GraphFilterEngine.collectCatalogFilterOptions(catalog), [catalog]);
+    const obligationOptions = useMemo(
+        () => GraphFilterEngine.obligationOptionsForProgram(programCode),
+        [programCode]
+    );
+    const buildDefaultFilters = useCallback((filters) => {
+        const allObligationTypes = obligationOptions.map((x) => x.value).filter(Boolean);
+        const allCourseTypes = Array.isArray(filterOptions?.courseTypes) ? filterOptions.courseTypes : [];
+        const allExamSubjects = Array.isArray(filterOptions?.examSubjects) ? filterOptions.examSubjects : [];
+        return {
+            ...filters,
+            obligationTypes: allObligationTypes,
+            courseTypes: allCourseTypes,
+            examSubjects: allExamSubjects,
+            progressStates: ["todo", "in_plan", "done"],
+        };
+    }, [obligationOptions, filterOptions?.courseTypes, filterOptions?.examSubjects]);
+    const withFilterDefaults = useCallback((filters) => {
+        const hasConfiguredFilters = Boolean(graphViewState?.filtersConfigured);
+        if (!hasConfiguredFilters) return buildDefaultFilters(filters);
+        return filters;
+    }, [
+        graphViewState?.filtersConfigured,
+        buildDefaultFilters,
+    ]);
+    const [graphFilters, setGraphFilters] = useState(() =>
+        withFilterDefaults(
+            GraphFilterEngine.normalizeFilters(graphViewState?.filters, filterOptions?.ectsBounds, programCode)
+        )
+    );
+    const markFiltersConfigured = useCallback(() => {
+        setGraphViewState?.((prev) => {
+            if (prev?.filtersConfigured) return prev;
+            return {
+                ...prev,
+                filtersConfigured: true,
+            };
+        });
+    }, [setGraphViewState]);
     const [collapsedIds, setCollapsedIds] = useState(() => {
         const saved = graphViewState?.collapsedIds;
         if (Array.isArray(saved)) return new Set(saved);
         return collectCollapsibleIds(root);
     });
+    const hasCatalogContent = Array.isArray(catalog) && catalog.length > 0;
 
     useEffect(() => {
         suppressCollapsedPersistRef.current = true;
         setCollapsedIds((prev) => {
             const allowed = collectCollapsibleIds(root);
             const saved = Array.isArray(graphViewState?.collapsedIds) ? new Set(graphViewState.collapsedIds) : null;
+            if (!saved && !hasCatalogContent) {
+                suppressCollapsedPersistRef.current = false;
+                return prev;
+            }
             const next = saved
                 ? new Set([...saved].filter((id) => allowed.has(id)))
                 : allowed;
@@ -415,15 +489,17 @@ export default function CurriculumGraphView({
             // Do not reuse previous program's collapsed set.
             return next;
         });
-    }, [root, graphViewState?.collapsedIds]);
+    }, [root, graphViewState?.collapsedIds, hasCatalogContent]);
 
     useEffect(() => {
         if (suppressCollapsedPersistRef.current) return;
+        if (hierarchyMode !== "normal") return;
+        if (!hasCatalogContent && !Array.isArray(graphViewState?.collapsedIds)) return;
         const next = Array.from(collapsedIds);
         const current = Array.isArray(graphViewState?.collapsedIds) ? graphViewState.collapsedIds : [];
         if (next.length === current.length && next.every((v, i) => v === current[i])) return;
         setGraphViewState?.((prev) => ({ ...prev, collapsedIds: next }));
-    }, [collapsedIds, graphViewState?.collapsedIds, setGraphViewState]);
+    }, [collapsedIds, graphViewState?.collapsedIds, setGraphViewState, hierarchyMode, hasCatalogContent]);
 
     useEffect(() => {
         if (suppressCollapsedPersistRef.current) {
@@ -432,15 +508,71 @@ export default function CurriculumGraphView({
     }, [collapsedIds]);
 
     useEffect(() => {
+        const next = withFilterDefaults(
+            GraphFilterEngine.normalizeFilters(graphViewState?.filters, filterOptions?.ectsBounds, programCode)
+        );
+        filtersDirtyRef.current = false;
+        setGraphFilters((prev) => (
+            JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+        ));
+    }, [graphViewState?.filters, programCode, filterOptions?.ectsBounds?.min, filterOptions?.ectsBounds?.max, withFilterDefaults]);
+
+    useEffect(() => {
+        if (!filtersDirtyRef.current) return;
+        if (!graphViewState?.filtersConfigured) return;
+        setGraphViewState?.((prev) => {
+            const current = prev?.filters && typeof prev.filters === "object" ? prev.filters : {};
+            const next = graphFilters && typeof graphFilters === "object" ? graphFilters : {};
+            if (JSON.stringify(current) === JSON.stringify(next)) {
+                filtersDirtyRef.current = false;
+                return prev;
+            }
+            filtersDirtyRef.current = false;
+            return {
+                ...prev,
+                filters: next,
+            };
+        });
+    }, [graphFilters, setGraphViewState, graphViewState?.filtersConfigured]);
+
+    useEffect(() => {
         setIsProgramSwitching(true);
+        setHierarchyMode("normal");
+        collapsedBeforeForceHierarchyRef.current = null;
         const t = window.setTimeout(() => {
             setIsProgramSwitching(false);
         }, 120);
         return () => window.clearTimeout(t);
     }, [programCode]);
 
+    useEffect(() => {
+        const text = ruleFeedback?.text || "";
+        if (!text) return;
+        setFeedbackToast({
+            visible: true,
+            text,
+            bg: ruleFeedback?.bg || "#f3f4f6",
+            border: ruleFeedback?.border || "#d1d5db",
+            color: ruleFeedback?.color || "#374151",
+        });
+        const t = window.setTimeout(() => {
+            setFeedbackToast((prev) => ({ ...prev, visible: false }));
+        }, 6000);
+        return () => window.clearTimeout(t);
+    }, [ruleFeedback?.text, ruleFeedback?.bg, ruleFeedback?.border, ruleFeedback?.color]);
+
+    const allCollapsibleIds = useMemo(() => collectCollapsibleIds(root), [root]);
+    const effectiveCollapsedIds = useMemo(
+        () => {
+            if (hierarchyMode === "force_expanded") return new Set();
+            if (hierarchyMode === "force_collapsed") return new Set(allCollapsibleIds);
+            return collapsedIds;
+        },
+        [hierarchyMode, collapsedIds, allCollapsibleIds]
+    );
+
     const { nodes, edges: autoEdges } = useMemo(() => {
-        return layoutTree(root, collapsedIds, {
+        return layoutTree(root, effectiveCollapsedIds, {
             getCourseStatus,
             onAddToPlan,
             onToggleDone,
@@ -452,7 +584,7 @@ export default function CurriculumGraphView({
         });
     }, [
         root,
-        collapsedIds,
+        effectiveCollapsedIds,
         getCourseStatus,
         onAddToPlan,
         onToggleDone,
@@ -467,7 +599,40 @@ export default function CurriculumGraphView({
         [root]
     );
     const [displayNodes, setDisplayNodes] = useNodesState(nodes);
-    const edges = autoEdges;
+    const areContentFiltersActive = hierarchyMode !== "force_expanded";
+    const exitForcedHierarchyOnFilterInteraction = useCallback(() => {
+        if (hierarchyMode === "normal") return;
+        const baseCollapsed = new Set(effectiveCollapsedIds);
+        setHierarchyMode("normal");
+        collapsedBeforeForceHierarchyRef.current = null;
+        setCollapsedIds(baseCollapsed);
+    }, [hierarchyMode, effectiveCollapsedIds]);
+    const visibleNodeIds = useMemo(
+        () => (
+            areContentFiltersActive
+                ? GraphFilterEngine.computeVisibleNodeIds(nodes, autoEdges, graphFilters, programCode)
+                : new Set((nodes || []).map((n) => n.id))
+        ),
+        [nodes, autoEdges, graphFilters, programCode, areContentFiltersActive]
+    );
+    const edges = useMemo(
+        () => autoEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)),
+        [autoEdges, visibleNodeIds]
+    );
+    const filteredDisplayNodes = useMemo(
+        () =>
+            (displayNodes || []).map((n) => {
+                return {
+                    ...n,
+                    hidden: !visibleNodeIds.has(n.id),
+                    style: {
+                        ...(n?.style || {}),
+                        opacity: 1,
+                    },
+                };
+            }),
+        [displayNodes, visibleNodeIds]
+    );
 
     const onNodesChange = useCallback((changes) => {
         setDisplayNodes((prevNodes) => {
@@ -500,15 +665,28 @@ export default function CurriculumGraphView({
         });
     }, [nodes, autoEdges, subjectOrder, setDisplayNodes, graphViewState?.nodePosById]);
 
+    useEffect(() => {
+        setDisplayNodes((prev) => {
+            const merged = mergeNodesWithPinnedPositions(nodes, prev, autoEdges, graphViewState?.nodePosById);
+            const noOverlap = resolveNodeOverlaps(merged);
+            return enforceHierarchicalOrder(noOverlap, subjectOrder, new Set());
+        });
+    }, [hierarchyMode, nodes, autoEdges, subjectOrder, setDisplayNodes, graphViewState?.nodePosById]);
+
     const onNodeClick = useCallback((_, node) => {
         if (node?.data?.level === "root" || !node?.data?.hasChildren) return;
+        const wasForced = hierarchyMode !== "normal";
+        if (wasForced) {
+            setHierarchyMode("normal");
+            collapsedBeforeForceHierarchyRef.current = null;
+        }
         setCollapsedIds((prev) => {
-            const next = new Set(prev);
+            const next = wasForced ? new Set(effectiveCollapsedIds) : new Set(prev);
             if (next.has(node.id)) next.delete(node.id);
             else next.add(node.id);
             return next;
         });
-    }, []);
+    }, [hierarchyMode, effectiveCollapsedIds]);
 
     const dragStartPosById = useRef(new Map());
     const dragLeaderIdRef = useRef(null);
@@ -600,6 +778,49 @@ export default function CurriculumGraphView({
         });
     }, [displayNodes, setGraphViewState]);
 
+    const toggleFilterValue = useCallback((key, value) => {
+        exitForcedHierarchyOnFilterInteraction();
+        markFiltersConfigured();
+        filtersDirtyRef.current = true;
+        setGraphFilters((prev) => {
+            const current = Array.isArray(prev?.[key]) ? prev[key] : [];
+            const nextSet = new Set(current);
+            if (nextSet.has(value)) nextSet.delete(value);
+            else nextSet.add(value);
+            return { ...prev, [key]: Array.from(nextSet) };
+        });
+    }, [exitForcedHierarchyOnFilterInteraction, markFiltersConfigured]);
+
+    const setEctsMin = useCallback((value) => {
+        exitForcedHierarchyOnFilterInteraction();
+        markFiltersConfigured();
+        filtersDirtyRef.current = true;
+        const nextMin = Number(value);
+        setGraphFilters((prev) => {
+            const current = GraphFilterEngine.normalizeFilters(prev, filterOptions?.ectsBounds, programCode);
+            const minBound = Number(filterOptions?.ectsBounds?.min);
+            const maxBound = Number(filterOptions?.ectsBounds?.max);
+            const max = Number(current?.ectsRange?.max ?? maxBound);
+            const min = Math.max(minBound, Math.min(nextMin, max));
+            return { ...current, ectsRange: { min, max } };
+        });
+    }, [filterOptions?.ectsBounds, programCode, exitForcedHierarchyOnFilterInteraction, markFiltersConfigured]);
+
+    const setEctsMax = useCallback((value) => {
+        exitForcedHierarchyOnFilterInteraction();
+        markFiltersConfigured();
+        filtersDirtyRef.current = true;
+        const nextMax = Number(value);
+        setGraphFilters((prev) => {
+            const current = GraphFilterEngine.normalizeFilters(prev, filterOptions?.ectsBounds, programCode);
+            const minBound = Number(filterOptions?.ectsBounds?.min);
+            const maxBound = Number(filterOptions?.ectsBounds?.max);
+            const min = Number(current?.ectsRange?.min ?? minBound);
+            const max = Math.min(maxBound, Math.max(nextMax, min));
+            return { ...current, ectsRange: { min, max } };
+        });
+    }, [filterOptions?.ectsBounds, programCode, exitForcedHierarchyOnFilterInteraction, markFiltersConfigured]);
+
     const persistGraphSnapshot = useCallback(() => {
         const currentNodePosById = graphViewState?.nodePosById ?? {};
         const nextNodePosById = {};
@@ -618,6 +839,18 @@ export default function CurriculumGraphView({
         }));
     }, [displayNodes, graphViewState?.nodePosById, collapsedIds, setGraphViewState]);
 
+    const scheduleFitToGraph = useCallback(() => {
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                try {
+                    rfRef.current?.fitView({ padding: 0.2, includeHiddenNodes: true });
+                } catch {
+                    // no-op
+                }
+            });
+        });
+    }, []);
+
     useEffect(() => {
         if (!rfRef.current) return;
         if (!Array.isArray(displayNodes) || displayNodes.length === 0) return;
@@ -630,175 +863,483 @@ export default function CurriculumGraphView({
         });
     }, [displayNodes.length, programCode]);
 
+    const topControlsTop = programCode === bachelorProgramCode ? 152 : 88;
+    const filterPanelTop = topControlsTop + 44;
+    const filterPanelWidth = 380;
+    const programBoxWidth = 380;
+    const topButtonStyle = {
+        border: "1px solid #d1d5db",
+        background: "#ffffff",
+        borderRadius: 8,
+        padding: "0 12px",
+        height: 36,
+        lineHeight: "36px",
+        fontWeight: 600,
+        cursor: "pointer",
+        boxSizing: "border-box",
+    };
+
     return (
         <div style={{ height: "100%", width: "100%", position: "relative", background: "#f9fafb" }}>
-            <button
-                onClick={() => {
-                    persistGraphSnapshot();
-                    onSwitchToTable?.();
-                }}
+            <div
                 style={{
                     position: "absolute",
-                    top: 12,
+                    top: topControlsTop,
                     left: 12,
-                    zIndex: 5,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
+                    width: programBoxWidth,
+                    zIndex: 6,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "nowrap",
+                    gap: 8,
                 }}
             >
-                Table View
-            </button>
-            <button
-                onClick={() => {
-                    isDraggingRef.current = false;
-                    setGraphViewState?.((prev) => ({
-                        ...prev,
-                        nodePosById: {},
-                    }));
-                    setDisplayNodes(nodes);
-                }}
-                style={{
-                    position: "absolute",
-                    top: 52,
-                    left: 352,
-                    zIndex: 5,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                }}
-            >
-                Reorder Horizontal
-            </button>
-            <button
-                onClick={() => onToggleRuleDashboard?.()}
-                style={{
-                    position: "absolute",
-                    top: 52,
-                    left: 12,
-                    zIndex: 5,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                }}
-            >
-                {isRuleDashboardOpen ? "Close Rule Dashboard" : "Open Rule Dashboard"}
-            </button>
-            <button
-                onClick={() => {
-                    setInteractionMode((m) => (m === "pan" ? "select" : "pan"));
-                }}
-                style={{
-                    position: "absolute",
-                    top: 92,
-                    left: 12,
-                    zIndex: 5,
-                    border: "1px solid #d1d5db",
-                    background: interactionMode === "select" ? "#dbeafe" : "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                }}
-            >
-                Mode: {interactionMode === "select" ? "Select" : "Pan"}
-            </button>
-            <button
-                onClick={() => onToggleLegend?.()}
-                style={{
-                    position: "absolute",
-                    top: 52,
-                    left: 212,
-                    zIndex: 5,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                }}
-            >
-                {isLegendOpen ? "Hide Legend" : "Show Legend"}
-            </button>
-            <select
-                value={programCode}
-                onChange={(e) => {
-                    persistGraphSnapshot();
-                    setProgramCode?.(e.target.value);
-                }}
-                style={{
-                    position: "absolute",
-                    top: 12,
-                    left: 214,
-                    zIndex: 5,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 10px",
-                    fontWeight: 600,
-                    minWidth: 290,
-                }}
-            >
-                {(programOptions || []).map((opt) => (
-                    <option key={opt.code} value={opt.code}>
-                        {opt.label} ({opt.code})
-                    </option>
-                ))}
-            </select>
-            {programCode === bachelorProgramCode && (
-                <select
-                    value={selectedFocus || ""}
-                    onChange={(e) => setSelectedFocus?.(e.target.value)}
+                <button
+                    onClick={() => {
+                        persistGraphSnapshot();
+                        onSwitchToTable?.();
+                    }}
                     style={{
-                        position: "absolute",
-                        top: 12,
-                        left: 512,
-                        zIndex: 5,
-                        border: "1px solid #d1d5db",
-                        background: "#ffffff",
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        fontWeight: 600,
-                        minWidth: 320,
+                        ...topButtonStyle,
+                        padding: "0 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
                     }}
                 >
-                    <option value="">Select focus area</option>
-                    {(bachelorFocusOptions || []).map((focus) => (
-                        <option key={focus} value={focus}>
-                            {focus}
-                        </option>
-                    ))}
-                </select>
+                    ⇆ Table View
+                </button>
+                <button
+                    onClick={() => setIsFiltersOpen((v) => !v)}
+                    style={{
+                        ...topButtonStyle,
+                        padding: "0 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    {isFiltersOpen ? "☰ Hide Filters" : "☰ Show Filters"}
+                </button>
+                <button
+                    onClick={() => onToggleRuleDashboard?.()}
+                    style={{
+                        ...topButtonStyle,
+                        padding: "0 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                    }}
+                >
+                    {isRuleDashboardOpen ? "▦ Close Dashboard" : "▦ Open Dashboard"}
+                </button>
+            </div>
+            {isFiltersOpen && (
+                <div
+                    style={{
+                        position: "absolute",
+                        top: filterPanelTop,
+                        left: 12,
+                        zIndex: 5,
+                        width: filterPanelWidth,
+                        maxHeight: "calc(100% - 92px)",
+                        overflow: "auto",
+                        border: "1px solid #d1d5db",
+                        borderRadius: 8,
+                        background: "#ffffff",
+                        padding: 10,
+                        boxSizing: "border-box",
+                        display: "grid",
+                        gap: 10,
+                    }}
+                >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>Filters</div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                            onClick={() => {
+                                isDraggingRef.current = false;
+                                setGraphViewState?.((prev) => ({
+                                    ...prev,
+                                    nodePosById: {},
+                                }));
+                                setDisplayNodes(nodes);
+                            }}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                            }}
+                        >
+                            ↺ Align
+                        </button>
+                        <button
+                            onClick={() => {
+                                setHierarchyMode("normal");
+                                const next = new Set();
+                                setCollapsedIds(next);
+                                setGraphViewState?.((prev) => ({ ...prev, collapsedIds: [] }));
+                                scheduleFitToGraph();
+                            }}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: (allCollapsibleIds.size > 0 && collapsedIds.size === 0) ? "#dbeafe" : "#ffffff",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                            }}
+                        >
+                            ▾ Expand
+                        </button>
+                        <button
+                            onClick={() => {
+                                setHierarchyMode("normal");
+                                const next = new Set(allCollapsibleIds);
+                                setCollapsedIds(next);
+                                setGraphViewState?.((prev) => ({ ...prev, collapsedIds: Array.from(next) }));
+                                scheduleFitToGraph();
+                            }}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: (
+                                    allCollapsibleIds.size > 0 &&
+                                    collapsedIds.size === allCollapsibleIds.size
+                                ) ? "#dbeafe" : "#ffffff",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                            }}
+                        >
+                            ▸ Collapse
+                        </button>
+                    </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Obligation type</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {obligationOptions.map(({ value, label }) => {
+                            const active = graphFilters.obligationTypes.includes(value);
+                            return (
+                                <button
+                                    key={value}
+                                    onClick={() => toggleFilterValue("obligationTypes", value)}
+                                    style={{
+                                        border: "1px solid #d1d5db",
+                                        background: active ? "#dbeafe" : "#ffffff",
+                                        borderRadius: 6,
+                                        padding: "4px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>
+                        ECTS range: {Number(graphFilters?.ectsRange?.min ?? 0)} - {Number(graphFilters?.ectsRange?.max ?? 0)}
+                    </div>
+                    <div style={{ position: "relative", height: 28 }}>
+                        <div
+                            style={{
+                                position: "absolute",
+                                left: 0,
+                                right: 0,
+                                top: "50%",
+                                height: 4,
+                                transform: "translateY(-50%)",
+                                background: "#e5e7eb",
+                                borderRadius: 999,
+                            }}
+                        />
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: "50%",
+                                height: 4,
+                                transform: "translateY(-50%)",
+                                background: "#93c5fd",
+                                borderRadius: 999,
+                                left: `${(
+                                    ((Number(graphFilters?.ectsRange?.min ?? filterOptions?.ectsBounds?.min ?? 0) - Number(filterOptions?.ectsBounds?.min ?? 0)) /
+                                        Math.max(1, Number(filterOptions?.ectsBounds?.max ?? 0) - Number(filterOptions?.ectsBounds?.min ?? 0))) * 100
+                                )}%`,
+                                width: `${(
+                                    ((Number(graphFilters?.ectsRange?.max ?? filterOptions?.ectsBounds?.max ?? 0) - Number(graphFilters?.ectsRange?.min ?? filterOptions?.ectsBounds?.min ?? 0)) /
+                                        Math.max(1, Number(filterOptions?.ectsBounds?.max ?? 0) - Number(filterOptions?.ectsBounds?.min ?? 0))) * 100
+                                )}%`,
+                            }}
+                        />
+                        <input
+                            className="dual-range-input"
+                            type="range"
+                            min={Number(filterOptions?.ectsBounds?.min ?? 0)}
+                            max={Number(filterOptions?.ectsBounds?.max ?? 0)}
+                            step="0.5"
+                            value={Number(graphFilters?.ectsRange?.min ?? filterOptions?.ectsBounds?.min ?? 0)}
+                            onChange={(e) => setEctsMin(e.target.value)}
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                width: "100%",
+                                background: "transparent",
+                            }}
+                        />
+                        <input
+                            className="dual-range-input"
+                            type="range"
+                            min={Number(filterOptions?.ectsBounds?.min ?? 0)}
+                            max={Number(filterOptions?.ectsBounds?.max ?? 0)}
+                            step="0.5"
+                            value={Number(graphFilters?.ectsRange?.max ?? filterOptions?.ectsBounds?.max ?? 0)}
+                            onChange={(e) => setEctsMax(e.target.value)}
+                            style={{
+                                position: "absolute",
+                                inset: 0,
+                                width: "100%",
+                                background: "transparent",
+                            }}
+                        />
+                    </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Course type</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {(filterOptions?.courseTypes || []).map((type) => {
+                            const active = graphFilters.courseTypes.includes(type);
+                            return (
+                                <button
+                                    key={type}
+                                    onClick={() => toggleFilterValue("courseTypes", type)}
+                                    style={{
+                                        border: "1px solid #d1d5db",
+                                        background: active ? "#dbeafe" : "#ffffff",
+                                        borderRadius: 6,
+                                        padding: "4px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {type}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Exam subjects</div>
+                    <div style={{ display: "grid", gap: 6, justifyItems: "start" }}>
+                        {(filterOptions?.examSubjects || []).map((subject) => {
+                            const active = graphFilters.examSubjects.includes(subject);
+                            const subjectColor = subjectColors?.[subject] ?? "#6b7280";
+                            return (
+                                <button
+                                    key={subject}
+                                    onClick={() => toggleFilterValue("examSubjects", subject)}
+                                    style={{
+                                        border: active ? `1px solid ${subjectColor}` : "1px solid #d1d5db",
+                                        background: active ? subjectColor : "#ffffff",
+                                        color: active ? "#ffffff" : "#6b7280",
+                                        borderRadius: 6,
+                                        padding: "6px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        textAlign: "left",
+                                        width: "fit-content",
+                                    }}
+                                >
+                                    {subject}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Course state</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {[
+                            ["todo", "Not Planned"],
+                            ["in_plan", "Planned"],
+                            ["done", "Done"],
+                        ].map(([state, label]) => {
+                            const active = graphFilters.progressStates.includes(state);
+                            return (
+                                <button
+                                    key={state}
+                                    onClick={() => toggleFilterValue("progressStates", state)}
+                                    style={{
+                                        border: "1px solid #d1d5db",
+                                        background: active ? "#dbeafe" : "#ffffff",
+                                        borderRadius: 6,
+                                        padding: "4px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                </div>
             )}
-            {ruleFeedback?.text && (
+            <div
+                style={{
+                    position: "absolute",
+                    top: 12,
+                    left: 12,
+                    zIndex: 6,
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: 8,
+                    display: "grid",
+                    gap: 8,
+                    width: programBoxWidth,
+                    minWidth: programBoxWidth,
+                    maxWidth: programBoxWidth,
+                    boxSizing: "border-box",
+                }}
+            >
+                <div style={{ display: "grid", gap: 4 }}>
+                    <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
+                    <select
+                        value={programCode}
+                        onChange={(e) => {
+                            persistGraphSnapshot();
+                            setProgramCode?.(e.target.value);
+                        }}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontWeight: 600,
+                            width: "100%",
+                            display: "block",
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        {(programOptions || []).map((opt) => (
+                            <option key={opt.code} value={opt.code}>
+                                {opt.label} ({opt.code})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {programCode === bachelorProgramCode && (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
+                        <select
+                            value={selectedFocus || ""}
+                            onChange={(e) => setSelectedFocus?.(e.target.value)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                display: "block",
+                                boxSizing: "border-box",
+                            }}
+                        >
+                            <option value="">Select focus area</option>
+                            {(bachelorFocusOptions || []).map((focus) => (
+                                <option key={focus} value={focus}>
+                                    {focus}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+            </div>
+            {feedbackToast.visible && feedbackToast.text && (
                 <div
                     style={{
                         position: "absolute",
                         top: 12,
-                        right: 12,
-                        zIndex: 5,
-                        border: `1px solid ${ruleFeedback.border || "#d1d5db"}`,
-                        background: ruleFeedback.bg || "#f3f4f6",
-                        color: ruleFeedback.color || "#374151",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 7,
+                        border: `1px solid ${feedbackToast.border || "#d1d5db"}`,
+                        background: feedbackToast.bg || "#f3f4f6",
+                        color: feedbackToast.color || "#374151",
                         borderRadius: 8,
                         padding: "8px 10px",
                         fontSize: 12,
                         fontWeight: 600,
-                        maxWidth: 360,
+                        maxWidth: 520,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
                     }}
                 >
-                    {ruleFeedback.text}
+                    <span style={{ flex: 1 }}>{feedbackToast.text}</span>
+                    <button
+                        onClick={() => setFeedbackToast((prev) => ({ ...prev, visible: false }))}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 6,
+                            padding: "2px 6px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            color: "#374151",
+                        }}
+                        aria-label="Close feedback"
+                        title="Close"
+                    >
+                        x
+                    </button>
                 </div>
             )}
+            <div
+                style={{
+                    position: "absolute",
+                    left: 84,
+                    bottom: 12,
+                    zIndex: 6,
+                    display: "flex",
+                    gap: 6,
+                    flexWrap: "wrap",
+                }}
+            >
+                <button
+                    onClick={() => setInteractionMode((m) => (m === "pan" ? "select" : "pan"))}
+                    style={{
+                        border: "1px solid #d1d5db",
+                        background: interactionMode === "select" ? "#dbeafe" : "#ffffff",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    ◫ Mode: {interactionMode === "select" ? "Select" : "Pan"}
+                </button>
+                <button
+                    onClick={() => onToggleLegend?.()}
+                    style={{ border: "1px solid #d1d5db", background: "#ffffff", borderRadius: 8, padding: "6px 10px", fontWeight: 600, cursor: "pointer" }}
+                >
+                    {isLegendOpen ? "ℹ Hide Legend" : "ℹ Show Legend"}
+                </button>
+            </div>
             {isLegendOpen && (
                 <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 5 }}>
                     <VisualLegend programCode={programCode} />
@@ -823,7 +1364,7 @@ export default function CurriculumGraphView({
                     onInit={(instance) => {
                         rfRef.current = instance;
                     }}
-                    nodes={displayNodes}
+                    nodes={filteredDisplayNodes}
                     edges={edges}
                     nodeTypes={NODE_TYPES}
                     onNodeClick={onNodeClick}

@@ -226,6 +226,7 @@ const normalizeCatalog = (raw) => {
                         name: c.title ?? c.name ?? "",
                         code: c.code ?? "",
                         ects: Number(c.ects) || null,
+                        type: c.type ?? null,
                     })),
                 };
             }),
@@ -287,6 +288,7 @@ export default function App({ currentUser, onSignOut }) {
     const latestGraphSnapshotRef = useRef(null);
     const [plannerHydrated, setPlannerHydrated] = useState(false);
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
+    const [isSigningOut, setIsSigningOut] = useState(false);
 
     const buildPersistSnapshot = useCallback(() => {
         const snapshot = exportPlannerStateSnapshot?.() || {};
@@ -374,6 +376,25 @@ export default function App({ currentUser, onSignOut }) {
             }
         };
     }, [plannerHydrated, plannerLoadOk, buildPersistSnapshot]);
+
+    const handleSignOut = useCallback(async () => {
+        if (isSigningOut) return;
+        setIsSigningOut(true);
+        try {
+            if (savePlannerTimerRef.current) {
+                window.clearTimeout(savePlannerTimerRef.current);
+                savePlannerTimerRef.current = null;
+            }
+            try {
+                await savePlannerState(buildPersistSnapshot());
+            } catch (e) {
+                console.error("Failed to save planner state before sign out", e);
+            }
+            await onSignOut?.();
+        } finally {
+            setIsSigningOut(false);
+        }
+    }, [isSigningOut, buildPersistSnapshot, onSignOut]);
 
     // Lane background columns (static)
     const laneNodes = useMemo(
@@ -1560,7 +1581,8 @@ export default function App({ currentUser, onSignOut }) {
         return (
             <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
                 <button
-                    onClick={() => onSignOut?.(buildPersistSnapshot())}
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
                     style={{
                         position: "fixed",
                         top: 12,
@@ -1572,10 +1594,11 @@ export default function App({ currentUser, onSignOut }) {
                         padding: "8px 12px",
                         fontWeight: 700,
                         cursor: "pointer",
+                        opacity: isSigningOut ? 0.65 : 1,
                     }}
                     title={`Signed in as ${currentUser?.username || "user"}`}
                 >
-                    Sign Out ({currentUser?.username || "user"})
+                    {isSigningOut ? "⏻ Signing Out..." : `⏻ Sign Out (${currentUser?.username || "user"})`}
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <CurriculumGraphView
@@ -1709,7 +1732,8 @@ export default function App({ currentUser, onSignOut }) {
     return (
         <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
             <button
-                onClick={() => onSignOut?.(buildPersistSnapshot())}
+                onClick={handleSignOut}
+                disabled={isSigningOut}
                 style={{
                     position: "fixed",
                     top: 12,
@@ -1721,10 +1745,11 @@ export default function App({ currentUser, onSignOut }) {
                     padding: "8px 12px",
                     fontWeight: 700,
                     cursor: "pointer",
+                    opacity: isSigningOut ? 0.65 : 1,
                 }}
                 title={`Signed in as ${currentUser?.username || "user"}`}
             >
-                Sign Out ({currentUser?.username || "user"})
+                {isSigningOut ? "⏻ Signing Out..." : `⏻ Sign Out (${currentUser?.username || "user"})`}
             </button>
             <Sidebar
                 catalog={catalog}
@@ -1735,7 +1760,7 @@ export default function App({ currentUser, onSignOut }) {
                 onDragStart={handleDragStart}
                 subjectColors={subjectColors}
                 programCode={programCode}
-                setProgramCode={setProgramCode}
+                onProgramChange={setProgramCode}
                 programOptions={PROGRAM_OPTIONS}
                 selectedFocus={selectedFocus}
                 setSelectedFocus={setSelectedFocus}
@@ -1840,7 +1865,7 @@ export default function App({ currentUser, onSignOut }) {
                             proOptions={{ hideAttribution: true }}
                         >
                             <MiniMap pannable zoomable />
-                            <Controls position="top-right" />
+                            <Controls position="bottom-left" />
                             <Background gap={GRID_SIZE} />
                         </ReactFlow>
                     </div>

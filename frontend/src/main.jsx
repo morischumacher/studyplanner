@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import { ProgramProvider } from "./ProgramContext.jsx";
 import AuthGate from "./AuthGate.jsx";
-import { fetchCurrentUser, savePlannerState, signOut } from "./lib/api.js";
+import { fetchCurrentUser, signOut } from "./lib/api.js";
 import "./global.css";
 
 const container = document.getElementById("root");
@@ -66,10 +66,7 @@ function Root() {
         <ProgramProvider>
             <App
                 currentUser={user}
-                onSignOut={async (snapshot) => {
-                    if (snapshot && typeof snapshot === "object") {
-                        await savePlannerState(snapshot).catch(() => null);
-                    }
+                onSignOut={async () => {
                     await signOut().catch(() => null);
                     setAuthError("");
                     setUser(null);
