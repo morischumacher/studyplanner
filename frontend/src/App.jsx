@@ -32,6 +32,7 @@ import {
     CARD_WIDTH,
     COLLISION_GAP,
     GRID_SIZE,
+    LANE_GAP,
     LANE_WIDTH,
     GROUP_EXTRA_RIGHT,
     GROUP_PADDING_X,
@@ -40,10 +41,10 @@ import {
     COURSE_LAYOUT_HEIGHT,
     MODULE_BOTTOM_PADDING,
     MODULE_HEADER_HEIGHT,
-    SEMESTERS,
 } from "./utils/constants.js";
 import { centerX, laneIndexFromX, laneX, projectToLaneAndSnap } from "./utils/geometry.js";
 import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
+import { buildSemesterList, semesterBoundsForProgram } from "./utils/semesters.js";
 
 /*********************************
  * React Flow node type registry *
@@ -96,7 +97,9 @@ Die Detailhinweise findest du in "Missing Requirements".`;
 
 /** Return lane index for a node (based on its X). */
 function laneIdx(node) {
-    return laneIndexFromX(node.position.x);
+    const span = LANE_WIDTH + LANE_GAP;
+    const idx = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
+    return Math.max(0, idx);
 }
 
 /***********************
@@ -309,6 +312,10 @@ export default function App({ currentUser, onSignOut }) {
         latestGraphSnapshotRef.current = null;
     }, [programCode]);
 
+    useEffect(() => {
+        setDragPreviewSemesterCount(null);
+    }, [programCode]);
+
     // Fetch & normalize catalog whenever programCode changes
     useEffect(() => {
         let cancelled = false;
@@ -396,36 +403,113 @@ export default function App({ currentUser, onSignOut }) {
         }
     }, [isSigningOut, buildPersistSnapshot, onSignOut]);
 
-    // Lane background columns (static)
+    const semesterBounds = useMemo(() => semesterBoundsForProgram(programCode), [programCode]);
+    const minSemesterCount = semesterBounds.min;
+    const maxSemesterCount = semesterBounds.max;
+    const [dragPreviewSemesterCount, setDragPreviewSemesterCount] = useState(null);
+
+    const usedSemesterCount = useMemo(() => {
+        let maxLane = -1;
+        let maxSemesterKey = -1;
+        const bySem = coursesBySemester && typeof coursesBySemester === "object" ? coursesBySemester : {};
+        for (const [semesterKey, list] of Object.entries(bySem)) {
+            const semNum = Number(semesterKey);
+            const safeList = Array.isArray(list) ? list : [];
+            if (Number.isInteger(semNum) && safeList.length > 0) maxSemesterKey = Math.max(maxSemesterKey, semNum - 1);
+            for (const course of safeList) {
+                const li = Number(course?.laneIndex);
+                if (Number.isFinite(li)) maxLane = Math.max(maxLane, Math.floor(li));
+            }
+        }
+        const requiredByData = Math.max(maxLane, maxSemesterKey) + 1;
+        return Math.max(minSemesterCount, Math.min(maxSemesterCount, requiredByData));
+    }, [coursesBySemester, minSemesterCount, maxSemesterCount]);
+
+    const activeSemesterCount = useMemo(
+        () => Math.max(minSemesterCount, Math.min(maxSemesterCount, usedSemesterCount)),
+        [minSemesterCount, maxSemesterCount, usedSemesterCount]
+    );
+    const displayedSemesterCount = useMemo(
+        () => Math.max(activeSemesterCount, Math.min(maxSemesterCount, Number(dragPreviewSemesterCount) || 0)),
+        [activeSemesterCount, dragPreviewSemesterCount, maxSemesterCount]
+    );
+    const semesters = useMemo(() => buildSemesterList(displayedSemesterCount), [displayedSemesterCount]);
+    const semesterIdsFromPlan = useMemo(() => {
+        const ids = new Set();
+        for (let i = 1; i <= minSemesterCount; i += 1) ids.add(i);
+        const bySem = coursesBySemester && typeof coursesBySemester === "object" ? coursesBySemester : {};
+        for (const key of Object.keys(bySem)) {
+            const n = Number(key);
+            if (Number.isInteger(n) && n >= 1 && n <= maxSemesterCount) ids.add(n);
+        }
+        return [...ids].sort((a, b) => a - b);
+    }, [coursesBySemester, maxSemesterCount, minSemesterCount]);
+    const sidebarSemesters = useMemo(
+        () => buildSemesterList(maxSemesterCount).map((semester) => ({
+            ...semester,
+            isPlus: semester.id > activeSemesterCount,
+        })),
+        [activeSemesterCount, maxSemesterCount]
+    );
+
+    // Lane background columns
     const laneNodes = useMemo(
         () =>
-            SEMESTERS.map((s, i) => ({
+            semesters.map((s, i) => ({
                 id: `lane-${s.id}`,
                 type: "lane",
-                data: { title: s.title, even: i % 2 === 0 },
+                data: { title: s.title, even: i % 2 === 0, height: CANVAS_HEIGHT },
                 position: { x: laneX(i), y: 0 },
                 draggable: false,
                 selectable: false,
                 zIndex: 0,
                 style: { height: CANVAS_HEIGHT },
             })),
-        []
+        [semesters]
     );
 
     // React Flow state
     const initialNodes = useMemo(() => [...laneNodes], [laneNodes]);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const requiredLaneHeight = useMemo(() => {
+        let maxBottom = 0;
+        for (const node of nodes) {
+            if (node?.type === "lane") continue;
+            if (node?.type === "course") {
+                maxBottom = Math.max(maxBottom, Number(node?.position?.y || 0) + COURSE_LAYOUT_HEIGHT);
+                continue;
+            }
+            if (node?.type === "moduleBg") {
+                const groupHeight =
+                    Number(node?.data?.height) ||
+                    (COURSE_LAYOUT_HEIGHT + MODULE_HEADER_HEIGHT + GROUP_PADDING_Y + MODULE_BOTTOM_PADDING);
+                maxBottom = Math.max(maxBottom, Number(node?.position?.y || 0) + groupHeight);
+            }
+        }
+        const padded = Math.max(CANVAS_HEIGHT, maxBottom + 220);
+        return Math.ceil(padded / GRID_SIZE) * GRID_SIZE;
+    }, [nodes]);
     const plannedEctsBySemester = useMemo(() => {
         const out = {};
-        for (const semester of SEMESTERS) {
+        for (const semester of semesters) {
             const list = Array.isArray(coursesBySemester?.[semester.id]) ? coursesBySemester[semester.id] : [];
             out[semester.id] = list.reduce((sum, course) => sum + Number(course?.ects || 0), 0);
         }
         return out;
-    }, [coursesBySemester]);
+    }, [coursesBySemester, semesters]);
 
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
+
+    useEffect(() => {
+        setNodes((prev) => {
+            const nonLane = prev.filter((n) => n.type !== "lane");
+            const prevLaneIds = prev.filter((n) => n.type === "lane").map((n) => n.id).join("|");
+            const nextLaneIds = laneNodes.map((n) => n.id).join("|");
+            if (prevLaneIds === nextLaneIds) return prev;
+            return [...laneNodes, ...nonLane];
+        });
+    }, [laneNodes, setNodes]);
 
     useEffect(() => {
         setNodes((prev) => {
@@ -435,19 +519,21 @@ export default function App({ currentUser, onSignOut }) {
                 const semesterId = Number(String(node.id).replace("lane-", ""));
                 const ectsPlanned = Number(plannedEctsBySemester?.[semesterId] ?? 0);
                 const currentEcts = Number(node?.data?.ectsPlanned ?? 0);
-                if (currentEcts === ectsPlanned) return node;
+                const currentHeight = Number(node?.data?.height ?? 0);
+                if (currentEcts === ectsPlanned && currentHeight === requiredLaneHeight) return node;
                 changed = true;
                 return {
                     ...node,
                     data: {
                         ...node.data,
                         ectsPlanned,
+                        height: requiredLaneHeight,
                     },
                 };
             });
             return changed ? next : prev;
         });
-    }, [plannedEctsBySemester, setNodes]);
+    }, [plannedEctsBySemester, requiredLaneHeight, setNodes]);
 
     /***********************
      * Sidebar drag & drop *
@@ -464,10 +550,41 @@ export default function App({ currentUser, onSignOut }) {
         }
     }, []);
 
+    const laneIndexFromClientPosition = useCallback((clientX) => {
+        const bounds = wrapperRef.current?.getBoundingClientRect?.();
+        const viewport = typeof rfRef.current?.getViewport === "function"
+            ? rfRef.current.getViewport()
+            : { x: 0, zoom: 1 };
+        const zoom = Number.isFinite(viewport?.zoom) && viewport.zoom > 0 ? viewport.zoom : 1;
+        const vx = Number.isFinite(viewport?.x) ? viewport.x : 0;
+        const left = Number.isFinite(bounds?.left) ? bounds.left : 0;
+        const flowX = (Number(clientX) - left - vx) / zoom;
+        const span = LANE_WIDTH + LANE_GAP;
+        return Math.max(0, Math.floor((flowX + LANE_GAP * 0.5) / span));
+    }, []);
+
+    const clampPlacementLane = useCallback((requestedLaneIndex) => {
+        const raw = Math.max(0, Math.floor(Number(requestedLaneIndex) || 0));
+        const highestActive = Math.max(0, activeSemesterCount - 1);
+        const nextAllowed = activeSemesterCount < maxSemesterCount ? activeSemesterCount : highestActive;
+        return Math.max(0, Math.min(raw, nextAllowed));
+    }, [activeSemesterCount, maxSemesterCount]);
+
     const onDragOver = useCallback((event) => {
         event.preventDefault();
         const dt = event?.dataTransfer || event?.nativeEvent?.dataTransfer || null;
         if (dt) dt.dropEffect = "move";
+        const previewLane = laneIndexFromClientPosition(event?.clientX);
+        const nextAllowedLane = activeSemesterCount;
+        if (previewLane === nextAllowedLane && activeSemesterCount < maxSemesterCount) {
+            setDragPreviewSemesterCount(nextAllowedLane + 1);
+        } else {
+            setDragPreviewSemesterCount(null);
+        }
+    }, [activeSemesterCount, laneIndexFromClientPosition, maxSemesterCount]);
+
+    const onDragLeave = useCallback(() => {
+        setDragPreviewSemesterCount(null);
     }, []);
 
     /***********************
@@ -581,11 +698,14 @@ export default function App({ currentUser, onSignOut }) {
         });
     }, [nodes, setCourseDone, setNodes]);
 
-    const addGraphCourseToPlan = useCallback((course, requestedLaneIndex) => {
+    const addGraphCourseToPlan = useCallback((course, requestedLaneIndex, options = null) => {
         const courseCode = course?.code;
         if (!courseCode || getCourseStatus(courseCode) !== "todo") return false;
 
-        const laneIndex = Math.max(0, Math.min(Number(requestedLaneIndex) || 0, SEMESTERS.length - 1));
+        const allowDirect = Boolean(options?.allowDirectLaneSelection);
+        const laneIndex = allowDirect
+            ? Math.max(0, Math.min(Number(requestedLaneIndex) || 0, maxSemesterCount - 1))
+            : clampPlacementLane(requestedLaneIndex);
         const x = centerX(laneIndex);
         const now = Date.now();
         const id = `${courseCode}-${now}-graph`;
@@ -613,6 +733,7 @@ export default function App({ currentUser, onSignOut }) {
                     label: course?.name || courseCode,
                     code: courseCode,
                     ects: course?.ects ?? null,
+                    moduleMeta: course?.moduleMeta ?? null,
                     onRemove: removeCourseNode,
                     onRemoveModuleGroup: removeModuleGroup,
                     onToggleDone: toggleCourseDone,
@@ -642,16 +763,19 @@ export default function App({ currentUser, onSignOut }) {
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, getCourseStatus, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+    }, [catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
 
-    const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex) => {
+    const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex, options = null) => {
         const courses = Array.isArray(modulePayload?.courses) ? modulePayload.courses : [];
         if (courses.length < 2) return false;
         const codes = courses.map((c) => c?.code).filter(Boolean);
         if (!codes.length) return false;
         if (codes.some((code) => getCourseStatus(code) !== "todo")) return false;
 
-        const laneIndex = Math.max(0, Math.min(Number(requestedLaneIndex) || 0, SEMESTERS.length - 1));
+        const allowDirect = Boolean(options?.allowDirectLaneSelection);
+        const laneIndex = allowDirect
+            ? Math.max(0, Math.min(Number(requestedLaneIndex) || 0, maxSemesterCount - 1))
+            : clampPlacementLane(requestedLaneIndex);
         const x = centerX(laneIndex);
         const y = 144;
         const now = Date.now();
@@ -746,7 +870,7 @@ export default function App({ currentUser, onSignOut }) {
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
+    }, [catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
 
     const toggleGraphCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
@@ -832,6 +956,13 @@ export default function App({ currentUser, onSignOut }) {
     }, []);
 
     const onNodeDrag = useCallback((_, node) => {
+        const rawLane = laneIndexFromX(node?.position?.x ?? 0, maxSemesterCount - 1);
+        if (rawLane === activeSemesterCount && activeSemesterCount < maxSemesterCount) {
+            setDragPreviewSemesterCount(activeSemesterCount + 1);
+        } else {
+            setDragPreviewSemesterCount(null);
+        }
+
         // Dragging a module background: move all children by the same live delta.
         if (node?.type === "moduleBg") {
             const st = groupDragRef.current.get(node.id) || { lastX: node.position.x, lastY: node.position.y };
@@ -857,7 +988,7 @@ export default function App({ currentUser, onSignOut }) {
                 return recomputeGroupFromChildren(withDraggedCourse, groupId);
             });
         }
-    }, [setNodes]);
+    }, [activeSemesterCount, maxSemesterCount, setNodes]);
 
     /** Mark that we should persist after the next nodes commit. */
     const schedulePersist = useCallback(() => setNeedsPersist(true), []);
@@ -1019,6 +1150,7 @@ export default function App({ currentUser, onSignOut }) {
      * Snap & collision resolve *
      ***************************/
     const onNodeDragStop = useCallback((_, node) => {
+        setDragPreviewSemesterCount(null);
         const snappedY = Math.max(0, Math.round(node.position.y / GRID_SIZE) * GRID_SIZE);
 
         // If a whole module group was dragged: shift children by the snap delta, snap the group,
@@ -1028,8 +1160,8 @@ export default function App({ currentUser, onSignOut }) {
                 const children = prev.filter((n) => n.type === "course" && n.data?.groupId === node.id);
                 const avgChildX = children.length
                     ? (children.reduce((sum, c) => sum + Number(c?.position?.x || 0), 0) / children.length)
-                    : centerX(laneIndexFromX(node.position.x));
-                const targetLane = laneIndexFromX(avgChildX);
+                    : centerX(clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1)));
+                const targetLane = clampPlacementLane(laneIndexFromX(avgChildX, maxSemesterCount - 1));
                 const targetChildX = centerX(targetLane);
                 const dxSnap = targetChildX - avgChildX;
                 const dySnap = snappedY - node.position.y;
@@ -1050,7 +1182,7 @@ export default function App({ currentUser, onSignOut }) {
         if (node?.type === "course" && node?.data?.groupId) {
             const groupId = node.data.groupId;
             setNodes((prev) => {
-                const targetLane = laneIndexFromX(node.position.x);
+                const targetLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
                 const targetLaneX = centerX(targetLane);
                 const updated = prev.map((n) =>
                     n.id === node.id ? { ...n, position: { x: targetLaneX, y: snappedY } } : n
@@ -1062,13 +1194,13 @@ export default function App({ currentUser, onSignOut }) {
         }
 
         // All other nodes: normal snapping + collision resolution
-        const li = laneIndexFromX(node.position.x);
+        const li = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
         const snappedX = centerX(li);
         setNodes((prev) => {
             const next = prev.map((n) => (n.id === node.id ? { ...n, position: { x: snappedX, y: snappedY } } : n));
             return resolveLaneCollisions(next);
         });
-    }, [setNodes]);
+    }, [clampPlacementLane, maxSemesterCount, setNodes]);
 
     // Merge: run drag-stop logic, then schedule a persist
     const onNodeDragStopMerged = useCallback((evt, node) => {
@@ -1095,8 +1227,14 @@ export default function App({ currentUser, onSignOut }) {
             }
             if (!payload) return;
             pendingDragPayloadRef.current = null;
+            setDragPreviewSemesterCount(null);
 
-            const { x, y } = projectToLaneAndSnap({ evt, wrapperEl: wrapperRef.current, rfInstance: rfRef.current });
+            const { x, y } = projectToLaneAndSnap({
+                evt,
+                wrapperEl: wrapperRef.current,
+                rfInstance: rfRef.current,
+                maxLaneIndex: Math.min(maxSemesterCount - 1, activeSemesterCount),
+            });
             const now = Date.now();
 
             // A) Module with >= 2 courses → create group + children
@@ -1197,6 +1335,7 @@ export default function App({ currentUser, onSignOut }) {
                         label: payload.name,
                         code: payload.code,
                         ects: payload.ects ?? null,
+                        moduleMeta: payload?.moduleMeta ?? null,
                         onRemove: removeCourseNode,
                         onToggleDone: toggleCourseDone,
                         onUpdateEcts: updateCourseEcts,
@@ -1216,7 +1355,7 @@ export default function App({ currentUser, onSignOut }) {
             });
             schedulePersist();
         },
-        [catalog, getCourseStatus, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
+        [activeSemesterCount, catalog, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
     );
 
     useEffect(() => {
@@ -1225,9 +1364,9 @@ export default function App({ currentUser, onSignOut }) {
 
         const doneSet = new Set(doneCourseCodes || []);
         const courseRows = [];
-        for (const semester of SEMESTERS) {
-            const laneIndex = semester.id - 1;
-            const list = Array.isArray(coursesBySemester?.[semester.id]) ? coursesBySemester[semester.id] : [];
+        for (const semesterId of semesterIdsFromPlan) {
+            const laneIndex = semesterId - 1;
+            const list = Array.isArray(coursesBySemester?.[semesterId]) ? coursesBySemester[semesterId] : [];
             for (const course of list) {
                 courseRows.push({
                     ...course,
@@ -1287,7 +1426,7 @@ export default function App({ currentUser, onSignOut }) {
             groupIds.push(groupId);
 
             children.forEach((course, idx) => {
-                const laneIndex = Math.max(0, Math.min(Number(course?.laneIndex) || 0, SEMESTERS.length - 1));
+                const laneIndex = Math.max(0, Math.min(Number(course?.laneIndex) || 0, maxSemesterCount - 1));
                 const x = Number.isFinite(course?.position?.x) ? course.position.x : centerX(laneIndex);
                 const y = Number.isFinite(course?.position?.y)
                     ? course.position.y
@@ -1320,7 +1459,7 @@ export default function App({ currentUser, onSignOut }) {
         }
 
         standalone.forEach((course, idx) => {
-            const laneIndex = Math.max(0, Math.min(Number(course?.laneIndex) || 0, SEMESTERS.length - 1));
+            const laneIndex = Math.max(0, Math.min(Number(course?.laneIndex) || 0, maxSemesterCount - 1));
             const x = Number.isFinite(course?.position?.x) ? course.position.x : centerX(laneIndex);
             const y = Number.isFinite(course?.position?.y)
                 ? course.position.y
@@ -1333,6 +1472,7 @@ export default function App({ currentUser, onSignOut }) {
                     label: course?.name || course?.code || "Course",
                     code: course?.code ?? null,
                     ects: course?.ects ?? null,
+                    moduleMeta: course?.module ?? null,
                     onRemove: removeCourseNode,
                     onToggleDone: toggleCourseDone,
                     onUpdateEcts: updateCourseEcts,
@@ -1365,8 +1505,10 @@ export default function App({ currentUser, onSignOut }) {
         coursesBySemester,
         doneCourseCodes,
         laneNodes,
+        maxSemesterCount,
         removeCourseNode,
         removeModuleGroup,
+        semesterIdsFromPlan,
         toggleCourseDone,
         toggleModuleDoneCodes,
         updateCourseEcts,
@@ -1413,6 +1555,21 @@ export default function App({ currentUser, onSignOut }) {
         return n.type === "moduleBg" || (n.type === "course" && !n.data?.groupId);
     }
 
+    function coveredLaneIndicesForNode(n) {
+        if (n?.type !== "moduleBg") return [laneIdx(n)];
+        const box = nodeBBox(n);
+        const laneFromX = (x) => {
+            const span = LANE_WIDTH + LANE_GAP;
+            const idx = Math.floor((Number(x) + LANE_GAP * 0.5) / span);
+            return Math.max(0, Math.min(maxSemesterCount - 1, idx));
+        };
+        const start = laneFromX(box.x1);
+        const end = laneFromX(Math.max(box.x1, box.x2 - 1));
+        const out = [];
+        for (let li = start; li <= end; li += 1) out.push(li);
+        return out.length ? out : [start];
+    }
+
     function applyDeltaToGroupChildren(nodes, groupId, dx, dy) {
         if (!groupId || (dx === 0 && dy === 0)) return nodes;
         return nodes.map((n) =>
@@ -1434,9 +1591,11 @@ export default function App({ currentUser, onSignOut }) {
         const lanes = new Map();
         for (const n of nodes) {
             if (!isRelevantForCollision(n)) continue;
-            const li = laneIdx(n);
-            if (!lanes.has(li)) lanes.set(li, []);
-            lanes.get(li).push(n.id);
+            const laneIndices = coveredLaneIndicesForNode(n);
+            for (const li of laneIndices) {
+                if (!lanes.has(li)) lanes.set(li, []);
+                lanes.get(li).push(n.id);
+            }
         }
 
         for (const ids of lanes.values()) {
@@ -1809,6 +1968,7 @@ export default function App({ currentUser, onSignOut }) {
                 onToggleModuleDone={toggleGraphModuleDone}
                 onRemoveCourseFromPlan={removeGraphCourseFromPlan}
                 onRemoveModuleFromPlan={removeGraphModuleFromPlan}
+                semesterOptions={sidebarSemesters}
             />
 
             <div style={{ flex: 1, display: "flex", minWidth: 0 }}>
@@ -1885,7 +2045,7 @@ export default function App({ currentUser, onSignOut }) {
                         {feedbackText}
                     </div>
 
-                    <div className="rf-wrapper" ref={wrapperRef} onDrop={onDrop} onDragOver={onDragOver} style={{ position: "absolute", inset: 0 }}>
+                    <div className="rf-wrapper" ref={wrapperRef} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave} style={{ position: "absolute", inset: 0 }}>
                         <ReactFlow
                             onInit={(inst) => (rfRef.current = inst)}
                             nodes={nodes}

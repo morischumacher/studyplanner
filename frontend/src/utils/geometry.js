@@ -4,7 +4,6 @@ import {
     GRID_SIZE,
     NODE_HEIGHT,
     VISUAL_CENTER_OFFSET_X,
-    SEMESTERS,
     CARD_WIDTH,
 } from "./constants.js";
 
@@ -19,11 +18,12 @@ export const centerX = (laneIndex) =>
     laneX(laneIndex) + (LANE_WIDTH - CARD_WIDTH) / 2 + (VISUAL_CENTER_OFFSET_X ?? 0);
 
 // Determine lane from a flow-space X
-export const laneIndexFromX = (flowX) => {
+export const laneIndexFromX = (flowX, maxLaneIndex = null) => {
     const span = LANE_WIDTH + LANE_GAP;
     // give half the gap visually to the lane on the left to avoid rounding up near edges
     const idx = Math.floor((flowX + LANE_GAP * 0.5) / span);
-    return clamp(idx, 0, SEMESTERS.length - 1);
+    if (Number.isFinite(maxLaneIndex)) return clamp(idx, 0, Number(maxLaneIndex));
+    return Math.max(0, idx);
 };
 
 /**
@@ -31,7 +31,7 @@ export const laneIndexFromX = (flowX) => {
  * We derive flow-space coordinates from wrapper bounds + viewport transform,
  * which is stable across browsers and React Flow versions.
  */
-export const projectToLaneAndSnap = ({ evt, wrapperEl, rfInstance }) => {
+export const projectToLaneAndSnap = ({ evt, wrapperEl, rfInstance, maxLaneIndex = null }) => {
     const bounds = wrapperEl?.getBoundingClientRect?.();
     const viewport = typeof rfInstance?.getViewport === "function"
         ? rfInstance.getViewport()
@@ -49,7 +49,7 @@ export const projectToLaneAndSnap = ({ evt, wrapperEl, rfInstance }) => {
     const flowX = (clientX - left - vx) / zoom;
     const flowY = (clientY - top - vy) / zoom;
 
-    const laneIndex = laneIndexFromX(flowX);
+    const laneIndex = laneIndexFromX(flowX, maxLaneIndex);
     const x = Math.max(0, centerX(laneIndex));
     const y = Math.max(0, Math.round(flowY / GRID_SIZE) * GRID_SIZE - NODE_HEIGHT / 2);
 

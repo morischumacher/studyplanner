@@ -1,10 +1,8 @@
 import React, { createContext, useContext, useMemo, useState, useCallback } from "react";
-import { SEMESTERS } from "./utils/constants.js";
 import { laneIndexFromX } from "./utils/geometry.js";
+import { BACHELOR_PROGRAM_CODE, semesterBoundsForProgram } from "./utils/semesters.js";
 
 const ProgramContext = createContext();
-const BACHELOR_PROGRAM_CODE = "033 521";
-const EMPTY_COURSES_PLAN = emptyCoursesOnlyPlan();
 const EMPTY_DONE_CODES = [];
 const DEFAULT_GRAPH_FILTERS = {
     obligationTypes: [],
@@ -36,24 +34,39 @@ function sanitizeGraphFilters(filters) {
     };
 }
 
-function emptyCoursesOnlyPlan() {
+function emptyCoursesOnlyPlan(minCount = 6) {
     const bySem = {};
-    for (const s of SEMESTERS) bySem[s.id] = [];
+    for (let i = 1; i <= Math.max(1, Number(minCount) || 1); i += 1) bySem[i] = [];
     return bySem;
 }
 
-function normalizeBySemesterMap(value) {
-    const next = emptyCoursesOnlyPlan();
+function numericSemesterIds(bySemester, minCount, maxCount) {
+    const ids = new Set();
+    const min = Math.max(1, Number(minCount) || 1);
+    const max = Math.max(min, Number(maxCount) || min);
+    for (let i = 1; i <= min; i += 1) ids.add(i);
+    if (bySemester && typeof bySemester === "object") {
+        for (const key of Object.keys(bySemester)) {
+            const n = Number(key);
+            if (Number.isInteger(n) && n >= 1 && n <= max) ids.add(n);
+        }
+    }
+    return [...ids].sort((a, b) => a - b);
+}
+
+function normalizeBySemesterMap(value, minCount, maxCount) {
+    const next = emptyCoursesOnlyPlan(minCount);
     if (!value || typeof value !== "object") return next;
-    for (const s of SEMESTERS) {
-        const arr = Array.isArray(value?.[s.id]) ? value[s.id] : [];
-        next[s.id] = arr;
+    for (const id of numericSemesterIds(value, minCount, maxCount)) {
+        const arr = Array.isArray(value?.[id]) ? value[id] : [];
+        next[id] = arr;
     }
     return next;
 }
 
-function buildCoursesOnlyFromNodes(nodes) {
-    if (!Array.isArray(nodes)) return emptyCoursesOnlyPlan();
+function buildCoursesOnlyFromNodes(nodes, programCode) {
+    const bounds = semesterBoundsForProgram(programCode);
+    if (!Array.isArray(nodes)) return emptyCoursesOnlyPlan(bounds.min);
 
     const modules = new Map();
     for (const n of nodes) {
@@ -70,14 +83,18 @@ function buildCoursesOnlyFromNodes(nodes) {
         }
     }
 
-    const bySem = emptyCoursesOnlyPlan();
+    const bySem = emptyCoursesOnlyPlan(bounds.min);
     const yById = Object.fromEntries(nodes.map((n) => [n.id, n?.position?.y ?? 0]));
 
     for (const n of nodes) {
         if (n?.type !== "course") continue;
-        const laneIdx = Math.max(0, Math.min(laneIndexFromX(n.position?.x ?? 0), SEMESTERS.length - 1));
-        const semesterId = SEMESTERS[laneIdx].id;
-        const modMeta = n?.data?.groupId ? (modules.get(n.data.groupId) || { id: n.data.groupId }) : null;
+        const laneIdx = Math.max(0, Math.min(laneIndexFromX(n.position?.x ?? 0, bounds.max - 1), bounds.max - 1));
+        const semesterId = laneIdx + 1;
+        const modMeta = n?.data?.groupId
+            ? (modules.get(n.data.groupId) || { id: n.data.groupId })
+            : (n?.data?.moduleMeta && typeof n.data.moduleMeta === "object" ? n.data.moduleMeta : null);
+
+        if (!bySem[semesterId]) bySem[semesterId] = [];
 
         bySem[semesterId].push({
             id: n.id,
@@ -89,21 +106,21 @@ function buildCoursesOnlyFromNodes(nodes) {
             position: { x: n?.position?.x ?? 0, y: n?.position?.y ?? 0 },
             laneIndex: laneIdx,
             subjectColor: n?.data?.subjectColor ?? null,
-            module: n?.data?.groupId ? { ...modMeta } : null,
+            module: modMeta ? { ...modMeta } : null,
         });
     }
 
-    for (const s of SEMESTERS) {
-        bySem[s.id].sort((a, b) => (yById[a.id] ?? 0) - (yById[b.id] ?? 0));
+    for (const semesterId of Object.keys(bySem)) {
+        bySem[semesterId].sort((a, b) => (yById[a.id] ?? 0) - (yById[b.id] ?? 0));
     }
     return bySem;
 }
 
-function flattenBySemester(bySemester) {
+function flattenBySemester(bySemester, minCount, maxCount) {
     const out = [];
-    for (const s of SEMESTERS) {
-        const list = bySemester?.[s.id] ?? [];
-        for (const c of list) out.push({ ...c, semesterId: s.id });
+    for (const id of numericSemesterIds(bySemester, minCount, maxCount)) {
+        const list = bySemester?.[id] ?? [];
+        for (const c of list) out.push({ ...c, semesterId: id });
     }
     return out;
 }
@@ -116,9 +133,9 @@ function mapByCourseId(list) {
     return byId;
 }
 
-function diffPlannedCourses(prevBySemester, nextBySemester) {
-    const prevFlat = flattenBySemester(prevBySemester);
-    const nextFlat = flattenBySemester(nextBySemester);
+function diffPlannedCourses(prevBySemester, nextBySemester, minCount, maxCount) {
+    const prevFlat = flattenBySemester(prevBySemester, minCount, maxCount);
+    const nextFlat = flattenBySemester(nextBySemester, minCount, maxCount);
     const prevById = mapByCourseId(prevFlat);
     const nextById = mapByCourseId(nextFlat);
     const added = [];
@@ -195,22 +212,25 @@ export function ProgramProvider({ children }) {
     const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
     const [graphViewByProgram, setGraphViewByProgram] = useState({});
 
-    const coursesBySemester = coursesByProgram?.[programCode] ?? EMPTY_COURSES_PLAN;
+    const semesterBounds = semesterBoundsForProgram(programCode);
+    const emptyPlanForProgram = useMemo(() => emptyCoursesOnlyPlan(semesterBounds.min), [semesterBounds.min]);
+    const coursesBySemester = coursesByProgram?.[programCode] ?? emptyPlanForProgram;
     const doneCourseCodes = doneByProgram?.[programCode] ?? EMPTY_DONE_CODES;
     const selectedFocus = selectedFocusByProgram?.[programCode] ?? "";
     const graphViewState = graphViewByProgram?.[programCode] ?? EMPTY_GRAPH_VIEW_STATE;
 
     const setCoursesFromNodes = useCallback((nodes) => {
-        const nextPlan = buildCoursesOnlyFromNodes(nodes);
+        const bounds = semesterBoundsForProgram(programCode);
+        const nextPlan = buildCoursesOnlyFromNodes(nodes, programCode);
 
         setCoursesByProgram((prev) => {
-            const prevPlan = prev?.[programCode] ?? emptyCoursesOnlyPlan();
-            const diff = diffPlannedCourses(prevPlan, nextPlan);
+            const prevPlan = prev?.[programCode] ?? emptyCoursesOnlyPlan(bounds.min);
+            const diff = diffPlannedCourses(prevPlan, nextPlan, bounds.min, bounds.max);
             if (diff) setLastPlanChange({ id: Date.now(), ...diff });
             return { ...prev, [programCode]: nextPlan };
         });
 
-        const plannedCodes = new Set(flattenBySemester(nextPlan).map((c) => c?.code).filter(Boolean));
+        const plannedCodes = new Set(flattenBySemester(nextPlan, bounds.min, bounds.max).map((c) => c?.code).filter(Boolean));
         setDoneByProgram((prev) => {
             const currentDone = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
             const pruned = currentDone.filter((code) => plannedCodes.has(code));
@@ -238,21 +258,21 @@ export function ProgramProvider({ children }) {
     const getCourseStatus = useCallback((courseCode) => {
         if (!courseCode) return "todo";
         if ((doneByProgram?.[programCode] ?? []).includes(courseCode)) return "done";
-        for (const s of SEMESTERS) {
-            if ((coursesBySemester?.[s.id] ?? []).some((c) => c?.code === courseCode)) return "in_plan";
+        for (const semesterId of numericSemesterIds(coursesBySemester, semesterBounds.min, semesterBounds.max)) {
+            if ((coursesBySemester?.[semesterId] ?? []).some((c) => c?.code === courseCode)) return "in_plan";
         }
         return "todo";
-    }, [coursesBySemester, doneByProgram, programCode]);
+    }, [coursesBySemester, doneByProgram, programCode, semesterBounds.max, semesterBounds.min]);
 
     const setCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
         let currentLaneIndex = null;
         let currentSemesterId = null;
-        for (const s of SEMESTERS) {
-            const match = (coursesBySemester?.[s.id] ?? []).find((c) => c?.code === courseCode);
+        for (const semesterId of numericSemesterIds(coursesBySemester, semesterBounds.min, semesterBounds.max)) {
+            const match = (coursesBySemester?.[semesterId] ?? []).find((c) => c?.code === courseCode);
             if (match) {
                 currentLaneIndex = Number.isFinite(match?.laneIndex) ? match.laneIndex : null;
-                currentSemesterId = s.id;
+                currentSemesterId = semesterId;
                 break;
             }
         }
@@ -273,7 +293,7 @@ export function ProgramProvider({ children }) {
             semesterId: currentSemesterId,
             semesterNumber: currentLaneIndex != null ? currentLaneIndex + 1 : null,
         });
-    }, [coursesBySemester, programCode]);
+    }, [coursesBySemester, programCode, semesterBounds.max, semesterBounds.min]);
 
     const setSelectedFocus = useCallback((focusName) => {
         const nextValue = typeof focusName === "string" ? focusName : "";
@@ -356,7 +376,8 @@ export function ProgramProvider({ children }) {
             : {};
         const normalizedCoursesByProgram = {};
         for (const [prog, bySem] of Object.entries(nextCoursesByProgram)) {
-            normalizedCoursesByProgram[prog] = normalizeBySemesterMap(bySem);
+            const bounds = semesterBoundsForProgram(prog);
+            normalizedCoursesByProgram[prog] = normalizeBySemesterMap(bySem, bounds.min, bounds.max);
         }
         setCoursesByProgram(normalizedCoursesByProgram);
         setDoneByProgram(snapshot?.doneByProgram && typeof snapshot.doneByProgram === "object" ? snapshot.doneByProgram : {});

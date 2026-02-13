@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     hexToRgba,
     MODULE_GROUP_COLOR_ALPHA,
 } from "../utils/examSubjectColors.js";
-import { SEMESTERS } from "../utils/constants.js";
 import {
     combinedCardShadow,
     layeredTypeShadow,
@@ -34,12 +33,49 @@ export default function Sidebar({
     onToggleModuleDone,
     onRemoveCourseFromPlan,
     onRemoveModuleFromPlan,
+    semesterOptions,
 }) {
     const [menuState, setMenuState] = useState({ key: null, view: "root" });
+    const [plusRevealCount, setPlusRevealCount] = useState(0);
+    const semesters = Array.isArray(semesterOptions) ? semesterOptions : [];
 
-    const openMenu = (key) => setMenuState({ key, view: "root" });
-    const closeMenu = () => setMenuState({ key: null, view: "root" });
-    const gotoSemesters = (key) => setMenuState({ key, view: "semesters" });
+    const openMenu = (key) => {
+        setPlusRevealCount(0);
+        setMenuState({ key, view: "root" });
+    };
+    const closeMenu = () => {
+        setPlusRevealCount(0);
+        setMenuState({ key: null, view: "root" });
+    };
+    const gotoSemesters = (key) => {
+        setPlusRevealCount(0);
+        setMenuState({ key, view: "semesters" });
+    };
+    const semesterButtonLabel = (semester) => (semester?.isPlus ? `+ ${semester.title}` : semester?.title);
+    const baseSemesters = semesters.filter((s) => !s?.isPlus);
+    const plusSemesters = semesters.filter((s) => s?.isPlus);
+    const visibleSemesters = [...baseSemesters, ...plusSemesters.slice(0, plusRevealCount)];
+    const canRevealMoreSemesters = plusRevealCount < plusSemesters.length;
+    useEffect(() => {
+        if (!menuState?.key) return;
+        const isInsideOpenMenuContext = (node) => {
+            let current = node;
+            while (current && current !== document.body) {
+                if (typeof current.getAttribute === "function") {
+                    const key = current.getAttribute("data-sidebar-menu-key");
+                    if (key && key === menuState.key) return true;
+                }
+                current = current.parentElement;
+            }
+            return false;
+        };
+        const onPointerDown = (event) => {
+            if (isInsideOpenMenuContext(event?.target)) return;
+            closeMenu();
+        };
+        document.addEventListener("mousedown", onPointerDown);
+        return () => document.removeEventListener("mousedown", onPointerDown);
+    }, [menuState?.key]);
 
     const statusLabel = (status) => {
         if (status === "done") return "done";
@@ -191,7 +227,7 @@ export default function Sidebar({
                                 border: `2px solid ${subjectColor}`,
                                 borderRadius: 12,
                                 background: "#fff",
-                                overflow: "hidden",
+                                overflow: "visible",
                             }}
                         >
                             {/* Header */}
@@ -208,6 +244,10 @@ export default function Sidebar({
                                     alignItems: "center",
                                     gap: 8,
                                     cursor: "pointer",
+                                    borderTopLeftRadius: 10,
+                                    borderTopRightRadius: 10,
+                                    borderBottomLeftRadius: isOpen ? 0 : 10,
+                                    borderBottomRightRadius: isOpen ? 0 : 10,
                                 }}
                                 aria-expanded={isOpen}
                             >
@@ -231,9 +271,137 @@ export default function Sidebar({
 
                             {/* Body */}
                             {isOpen && (
-                                <div style={{ padding: "8px 10px 12px 10px", display: "grid", gap: 8 }}>
+                                <div style={{ padding: "8px 10px 12px 10px", display: "grid", gap: 8, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 }}>
                                     {modules.map((mod, modIdx) => {
                                         const courses = Array.isArray(mod.courses) ? mod.courses : [];
+                                        const moduleCodeFallback = String(mod?.code || `MOD-${pfIdx + 1}-${modIdx + 1}`);
+                                        const moduleEctsFallback = Number(mod?.ects);
+                                        const resolvedModuleEcts = Number.isFinite(moduleEctsFallback) && moduleEctsFallback > 0 ? moduleEctsFallback : 1;
+
+                                        // Case A: module without child courses (e.g. Transferable Skills)
+                                        if (courses.length === 0) {
+                                            const standaloneLabel = String(mod?.name || "").toLowerCase();
+                                            const standaloneCategory = String(mod?.category || "").toLowerCase();
+                                            const isTransferableStandalone =
+                                                standaloneCategory.includes("transferable") ||
+                                                standaloneCategory.includes("ts") ||
+                                                standaloneLabel.includes("transferable");
+                                            const plannedEntryEcts = isTransferableStandalone ? 9 : resolvedModuleEcts;
+                                            const standaloneStatus = getCourseStatus?.(moduleCodeFallback) ?? "todo";
+                                            const style = statusStyle(standaloneStatus);
+                                            const typeMeta = mapTypeForProgram(mod?.category, programCode);
+                                            const stateMeta = stateVisualByStatus(standaloneStatus);
+                                            const typeShadow = layeredTypeShadow(subjectColor, typeMeta.layers, stateMeta.background || "transparent");
+                                            const menuKey = `module-standalone-${pfIdx}-${moduleCodeFallback}-${modIdx}`;
+                                            const standalonePayload = {
+                                                kind: "module_standalone",
+                                                code: moduleCodeFallback,
+                                                name: mod?.name || moduleCodeFallback,
+                                                ects: plannedEntryEcts,
+                                                category: mod?.category ?? "transferable_skills",
+                                                subjectColor,
+                                                moduleMeta: {
+                                                    id: `module-standalone-${moduleCodeFallback}`,
+                                                    title: mod?.name || moduleCodeFallback,
+                                                    examSubject: pfName,
+                                                    category: mod?.category ?? "transferable_skills",
+                                                    subjectColor,
+                                                    code: mod?.code ?? moduleCodeFallback,
+                                                    ects: resolvedModuleEcts,
+                                                },
+                                            };
+                                            return (
+                                                <div
+                                                    key={menuKey}
+                                                    data-sidebar-menu-key={menuKey}
+                                                    draggable={standaloneStatus === "todo"}
+                                                    onDragStart={(e) => {
+                                                        if (standaloneStatus !== "todo") return;
+                                                        onDragStart(e, standalonePayload);
+                                                    }}
+                                                    title="Drag into the graph"
+                                                    style={{
+                                                        textAlign: "left",
+                                                        border: `1px solid ${stateMeta.borderColor || subjectColor}`,
+                                                        borderRadius: 12,
+                                                        background: stateMeta.background,
+                                                        boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
+                                                        padding: "12px 12px",
+                                                        cursor: standaloneStatus === "todo" ? "grab" : "default",
+                                                        opacity: stateMeta.opacity,
+                                                        display: "grid",
+                                                        gap: 8,
+                                                        position: "relative",
+                                                        zIndex: menuState.key === menuKey ? 20 : 1,
+                                                        width: "100%",
+                                                        boxSizing: "border-box",
+                                                        minWidth: 0,
+                                                        overflow: "visible",
+                                                    }}
+                                                >
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                                                            {moduleCodeFallback}
+                                                        </div>
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                            {(standaloneStatus === "in_plan" || standaloneStatus === "done") && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onToggleCourseDone?.(moduleCodeFallback, standaloneStatus !== "done");
+                                                                    }}
+                                                                    style={{ border: `1px solid ${standaloneStatus === "done" ? "#9ca3af" : subjectColor}`, background: standaloneStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: standaloneStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    ✓
+                                                                </button>
+                                                            )}
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (menuState.key === menuKey) closeMenu();
+                                                                    else openMenu(menuKey);
+                                                                }}
+                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                            >
+                                                                ...
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    {menuState.key === menuKey && (
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
+                                                            {menuState.view === "root" && standaloneStatus === "todo" && (
+                                                                <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                            )}
+                                                            {menuState.view === "root" && (standaloneStatus === "in_plan" || standaloneStatus === "done") && (
+                                                                <button onClick={(e) => { e.stopPropagation(); onRemoveCourseFromPlan?.(moduleCodeFallback); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
+                                                            )}
+                                                            {menuState.view === "semesters" && (
+                                                                <>
+                                                                    {visibleSemesters.map((semester) => (
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.(standalonePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
+                                                                    ))}
+                                                                    {canRevealMoreSemesters && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
+                                                                            style={{ border: "1px dashed #9ca3af", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                                                                        >
+                                                                            + Add next semester
+                                                                        </button>
+                                                                    )}
+                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: standaloneStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{mod.name}</div>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
+                                                        <span style={{ color: "#6b7280", whiteSpace: "nowrap" }}>{plannedEntryEcts ? `${plannedEntryEcts} ECTS` : "-"}</span>
+                                                        <span style={{ color: "#6b7280", fontWeight: 700, flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{typeMeta.label}</span>
+                                                        <span style={{ color: style.color, fontWeight: 700, whiteSpace: "nowrap" }}>{statusLabel(standaloneStatus)}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
 
                                         // Case B: single course → drag that one (use the course's code!)
                                         if (courses.length === 1) {
@@ -248,6 +416,7 @@ export default function Sidebar({
                                             return (
                                                 <div
                                                     key={menuKey}
+                                                    data-sidebar-menu-key={menuKey}
                                                     draggable={courseStatus === "todo"}
                                                     onDragStart={(e) => {
                                                         if (courseStatus !== "todo") return;
@@ -273,10 +442,11 @@ export default function Sidebar({
                                                         display: "grid",
                                                         gap: 8,
                                                         position: "relative",
+                                                        zIndex: menuState.key === menuKey ? 20 : 1,
                                                         width: "100%",
                                                         boxSizing: "border-box",
                                                         minWidth: 0,
-                                                        overflow: "hidden",
+                                                        overflow: "visible",
                                                     }}
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -308,7 +478,7 @@ export default function Sidebar({
                                                         </div>
                                                     </div>
                                                     {menuState.key === menuKey && (
-                                                        <div style={{ position: "absolute", top: 34, right: 10, width: 170, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 10 }}>
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
                                                             {menuState.view === "root" && courseStatus === "todo" && (
                                                                 <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
@@ -317,9 +487,17 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {SEMESTERS.map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semester.title}</button>
+                                                                    {visibleSemesters.map((semester) => (
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
+                                                                    {canRevealMoreSemesters && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
+                                                                            style={{ border: "1px dashed #9ca3af", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                                                                        >
+                                                                            + Add next semester
+                                                                        </button>
+                                                                    )}
                                                                     <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                 </>
                                                             )}
@@ -360,6 +538,7 @@ export default function Sidebar({
                                         const groupTypeShadow = layeredTypeShadow(subjectColor, groupTypeMeta.layers, groupStateMeta.background || "transparent");
                                         const groupBorderColor = groupStateMeta.borderColor || subjectColor;
                                         const isGroupDone = groupStatus === "done";
+                                        const moduleMenuKey = `module-${pfIdx}-${mod.code || modIdx}`;
                                         const moduleBlocked = courses
                                             .map((c) => getCourseStatus?.(c?.code) ?? "todo")
                                             .some((s) => isBlockedStatus(s));
@@ -367,11 +546,14 @@ export default function Sidebar({
                                         return (
                                             <div
                                                 key={`pf${pfIdx}-${mod.code || modIdx}`}
+                                                data-sidebar-menu-key={moduleMenuKey}
                                                 style={{
                                                     border: `2px solid ${groupBorderColor}`,
                                                     borderRadius: 12,
                                                     background: "#fff",
-                                                    overflow: "hidden",
+                                                    overflow: "visible",
+                                                    position: "relative",
+                                                    zIndex: menuState.key === moduleMenuKey ? 15 : 1,
                                                 }}
                                             >
                                                 <div
@@ -396,7 +578,9 @@ export default function Sidebar({
                                                         position: "relative",
                                                         boxSizing: "border-box",
                                                         minWidth: 0,
-                                                        overflow: "hidden",
+                                                        overflow: "visible",
+                                                        borderTopLeftRadius: 10,
+                                                        borderTopRightRadius: 10,
                                                     }}
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -416,9 +600,8 @@ export default function Sidebar({
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    const key = `module-${pfIdx}-${mod.code || modIdx}`;
-                                                                    if (menuState.key === key) closeMenu();
-                                                                    else openMenu(key);
+                                                                    if (menuState.key === moduleMenuKey) closeMenu();
+                                                                    else openMenu(moduleMenuKey);
                                                                 }}
                                                                 style={{ border: `1px solid ${isGroupDone ? "#9ca3af" : subjectColor}`, background: "#fff", color: isGroupDone ? "#6b7280" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                             >
@@ -426,20 +609,28 @@ export default function Sidebar({
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    {menuState.key === `module-${pfIdx}-${mod.code || modIdx}` && (
-                                                        <div style={{ position: "absolute", top: 34, right: 10, width: 170, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 10 }}>
+                                                    {menuState.key === moduleMenuKey && (
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
                                                             {menuState.view === "root" && groupStatus === "todo" && (
-                                                                <button onClick={(e) => { e.stopPropagation(); gotoSemesters(`module-${pfIdx}-${mod.code || modIdx}`); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                                <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
                                                             {menuState.view === "root" && (groupStatus === "in_plan" || groupStatus === "done") && (
                                                                 <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {SEMESTERS.map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semester.title}</button>
+                                                                    {visibleSemesters.map((semester) => (
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
-                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(`module-${pfIdx}-${mod.code || modIdx}`); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                    {canRevealMoreSemesters && (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
+                                                                            style={{ border: "1px dashed #9ca3af", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                                                                        >
+                                                                            + Add next semester
+                                                                        </button>
+                                                                    )}
+                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(moduleMenuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                 </>
                                                             )}
                                                         </div>
@@ -477,6 +668,7 @@ export default function Sidebar({
                                                         return (
                                                             <div
                                                                 key={`pf${pfIdx}-${mod.code}-${idx}`}
+                                                                data-sidebar-menu-key={menuKey}
                                                                 title="Course in module"
                                                                 style={{
                                                                     textAlign: "left",
@@ -489,10 +681,11 @@ export default function Sidebar({
                                                                     display: "grid",
                                                                     gap: 8,
                                                                     position: "relative",
+                                                                    zIndex: menuState.key === menuKey ? 20 : 1,
                                                                     width: "100%",
                                                                     boxSizing: "border-box",
                                                                     minWidth: 0,
-                                                                    overflow: "hidden",
+                                                                    overflow: "visible",
                                                                 }}
                                                             >
                                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -522,7 +715,7 @@ export default function Sidebar({
                                                                     </div>
                                                                 </div>
                                                                 {menuState.key === menuKey && (
-                                                                    <div style={{ position: "absolute", top: 34, right: 10, width: 170, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 10 }}>
+                                                                    <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
                                                                         {menuState.view === "root" && courseStatus === "todo" && (
                                                                             <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                                         )}
@@ -531,9 +724,17 @@ export default function Sidebar({
                                                                         )}
                                                                         {menuState.view === "semesters" && (
                                                                             <>
-                                                                                {SEMESTERS.map((semester) => (
-                                                                                    <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semester.title}</button>
+                                                                                {visibleSemesters.map((semester) => (
+                                                                                    <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                                 ))}
+                                                                                {canRevealMoreSemesters && (
+                                                                                    <button
+                                                                                        onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
+                                                                                        style={{ border: "1px dashed #9ca3af", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                                                                                    >
+                                                                                        + Add next semester
+                                                                                    </button>
+                                                                                )}
                                                                                 <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                             </>
                                                                         )}
