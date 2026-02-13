@@ -78,7 +78,6 @@ export default function Sidebar({
         if (isCore) return 1;
         return 2;
     };
-
     return (
         <aside
             style={{

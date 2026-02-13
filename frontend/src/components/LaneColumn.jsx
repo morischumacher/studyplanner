@@ -4,6 +4,7 @@ import { CANVAS_HEIGHT, LANE_WIDTH } from "../utils/constants.js";
 
 /** LaneColumn — background strip for each semester lane. */
 export default function LaneColumn({ data }) {
+    const plannedEcts = Number(data?.ectsPlanned ?? 0);
     return (
         <div
             style={{
@@ -17,7 +18,7 @@ export default function LaneColumn({ data }) {
             }}
         >
             <div style={{ position: "absolute", top: 8, left: 12, fontSize: 14, fontWeight: 600, color: "#4b5563" }}>
-                {data.title}
+                {data.title} · {plannedEcts.toFixed(1)} ECTS
             </div>
         </div>
     );

@@ -415,9 +415,39 @@ export default function App({ currentUser, onSignOut }) {
     // React Flow state
     const initialNodes = useMemo(() => [...laneNodes], [laneNodes]);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const plannedEctsBySemester = useMemo(() => {
+        const out = {};
+        for (const semester of SEMESTERS) {
+            const list = Array.isArray(coursesBySemester?.[semester.id]) ? coursesBySemester[semester.id] : [];
+            out[semester.id] = list.reduce((sum, course) => sum + Number(course?.ects || 0), 0);
+        }
+        return out;
+    }, [coursesBySemester]);
 
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
+
+    useEffect(() => {
+        setNodes((prev) => {
+            let changed = false;
+            const next = prev.map((node) => {
+                if (node.type !== "lane") return node;
+                const semesterId = Number(String(node.id).replace("lane-", ""));
+                const ectsPlanned = Number(plannedEctsBySemester?.[semesterId] ?? 0);
+                const currentEcts = Number(node?.data?.ectsPlanned ?? 0);
+                if (currentEcts === ectsPlanned) return node;
+                changed = true;
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        ectsPlanned,
+                    },
+                };
+            });
+            return changed ? next : prev;
+        });
+    }, [plannedEctsBySemester, setNodes]);
 
     /***********************
      * Sidebar drag & drop *
@@ -631,7 +661,7 @@ export default function App({ currentUser, onSignOut }) {
             getExamSubjectForCode(catalog, modulePayload?.code) ||
             getExamSubjectForCode(catalog, courses?.[0]?.code) ||
             null;
-        const resolvedSubjectColor =
+        const resolvedGroupSubjectColor =
             modulePayload?.subjectColor ||
             (groupExamSubject ? subjectColors?.[groupExamSubject] : null) ||
             "#2563eb";
@@ -654,7 +684,7 @@ export default function App({ currentUser, onSignOut }) {
                 examSubject: groupExamSubject,
                 category: modulePayload?.category ?? "unknown",
                 programCode,
-                subjectColor: resolvedSubjectColor,
+                subjectColor: resolvedGroupSubjectColor,
             },
             position: { x, y },
             draggable: true,
@@ -667,6 +697,9 @@ export default function App({ currentUser, onSignOut }) {
             const baseY = y + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
             const examSubject =
                 getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, modulePayload?.code);
+            const resolvedCourseSubjectColor =
+                (examSubject ? subjectColors?.[examSubject] : null) ||
+                resolvedGroupSubjectColor;
 
             return {
                 id: childId,
@@ -684,7 +717,7 @@ export default function App({ currentUser, onSignOut }) {
                     examSubject,
                     category: modulePayload?.category ?? "unknown",
                     programCode,
-                    subjectColor: resolvedSubjectColor,
+                    subjectColor: resolvedCourseSubjectColor,
                     status: "in_plan",
                 },
                 position: { x, y: baseY },
@@ -993,11 +1026,11 @@ export default function App({ currentUser, onSignOut }) {
         if (node?.type === "moduleBg") {
             setNodes((prev) => {
                 const children = prev.filter((n) => n.type === "course" && n.data?.groupId === node.id);
-                const targetLane = laneIndexFromX(node.position.x);
-                const targetChildX = centerX(targetLane);
                 const avgChildX = children.length
                     ? (children.reduce((sum, c) => sum + Number(c?.position?.x || 0), 0) / children.length)
-                    : targetChildX;
+                    : centerX(laneIndexFromX(node.position.x));
+                const targetLane = laneIndexFromX(avgChildX);
+                const targetChildX = centerX(targetLane);
                 const dxSnap = targetChildX - avgChildX;
                 const dySnap = snappedY - node.position.y;
                 const moved = prev.map((n) => {
@@ -1073,7 +1106,7 @@ export default function App({ currentUser, onSignOut }) {
                     getExamSubjectForCode(catalog, payload.code) ||
                     getExamSubjectForCode(catalog, payload.courses?.[0]?.code) ||
                     null;
-                const resolvedSubjectColor =
+                const resolvedGroupSubjectColor =
                     payload.subjectColor ||
                     (groupExamSubject ? subjectColors?.[groupExamSubject] : null) ||
                     "#2563eb";
@@ -1096,7 +1129,7 @@ export default function App({ currentUser, onSignOut }) {
                         examSubject: groupExamSubject,
                         category: payload.category ?? "unknown",
                         programCode,
-                        subjectColor: resolvedSubjectColor,
+                        subjectColor: resolvedGroupSubjectColor,
                     },
                     position: { x, y }, // preliminary; will be resized by recomputeGroupFromChildren
                     draggable: true,
@@ -1109,6 +1142,9 @@ export default function App({ currentUser, onSignOut }) {
                     const baseY = y + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
                     const examSubject =
                         getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, payload.code);
+                    const resolvedCourseSubjectColor =
+                        (examSubject ? subjectColors?.[examSubject] : null) ||
+                        resolvedGroupSubjectColor;
 
                     return {
                         id: childId,
@@ -1127,7 +1163,7 @@ export default function App({ currentUser, onSignOut }) {
                             examSubject,
                             category: payload.category ?? "unknown",
                             programCode,
-                            subjectColor: resolvedSubjectColor,
+                            subjectColor: resolvedCourseSubjectColor,
                             status: "in_plan",
                         },
                         position: { x, y: baseY },

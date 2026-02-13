@@ -18,6 +18,8 @@ export default function GraphModuleNode({ data }) {
     const stateMeta = stateVisualByStatus(visualStatus);
     const typeMeta = mapTypeForProgram(data?.category, data?.programCode);
     const typeShadow = layeredTypeShadow(color, typeMeta.layers, stateMeta.background || "transparent");
+    const cardBorderColor = isDone ? color : (stateMeta.borderColor || color);
+    const stateShadow = isDone ? "none" : stateMeta.extraShadow;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [menuView, setMenuView] = useState("root");
     const menuRef = useRef(null);
@@ -53,8 +55,8 @@ export default function GraphModuleNode({ data }) {
                 overflow: "visible",
                 background: visualStatus === "todo" ? hexToRgba(color, MODULE_GROUP_COLOR_ALPHA) : stateMeta.background,
                 color: stateMeta.textColor,
-                border: `2px solid ${stateMeta.borderColor || color}`,
-                boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
+                border: `2px solid ${cardBorderColor}`,
+                boxShadow: combinedCardShadow(typeShadow, stateShadow),
                 fontWeight: 600,
                 fontSize: 12,
                 opacity: stateMeta.opacity,

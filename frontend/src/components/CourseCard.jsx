@@ -50,6 +50,8 @@ export default function CourseCard({ data }) {
     const cardBackground = stateMeta.background;
     const typeMeta = mapTypeForProgram(data?.category, data?.programCode);
     const typeShadow = layeredTypeShadow(subjectColor, typeMeta.layers, stateMeta.background || "transparent");
+    const cardBorderColor = isDone ? subjectColor : (stateMeta.borderColor || subjectColor);
+    const stateShadow = isDone ? "none" : stateMeta.extraShadow;
     const codeKey = String(data?.code ?? "").trim().toLowerCase();
     const labelKey = String(data?.label ?? "").trim().toLowerCase();
     const isTransferableSkills =
@@ -71,10 +73,10 @@ export default function CourseCard({ data }) {
                 position: "relative",
                 minHeight: NODE_HEIGHT,
                 background: cardBackground,
-                border: `1px solid ${stateMeta.borderColor || subjectColor}`,
+                border: `1px solid ${cardBorderColor}`,
                 borderRadius: 10,
                 padding: 16,
-                boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
+                boxShadow: combinedCardShadow(typeShadow, stateShadow),
                 opacity: stateMeta.opacity,
                 display: "flex",
                 flexDirection: "column",
