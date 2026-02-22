@@ -100,6 +100,7 @@ function buildCoursesOnlyFromNodes(nodes, programCode) {
             id: n.id,
             code: n?.data?.code ?? null,
             name: n?.data?.name ?? n?.data?.label ?? null,
+            type: n?.data?.type ?? null,
             ects: n?.data?.ects ?? null,
             category: n?.data?.category ?? "unknown",
             examSubject: n?.data?.examSubject ?? null,

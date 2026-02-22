@@ -13,6 +13,7 @@ const SPLIT_MODULES = {
     analysis: true,
     "statistik und wahrscheinlichkeitstheorie": true,
 };
+const COMPUTATIONAL_STATISTICS_MODULE_KEY = "computational statistics";
 
 function detectVariantPart(course) {
     const code = normalizeText(course?.code);
@@ -37,9 +38,80 @@ export function getSplitModuleVariantMeta(moduleName) {
     };
 }
 
+function buildComputationalStatisticsOptions(courses) {
+    const byCode = new Map((courses || []).map((c) => [normalizeText(c?.code), c]));
+    const byName = new Map((courses || []).map((c) => [normalizeText(c?.name), c]));
+    const resolve = (...aliases) => {
+        for (const alias of aliases) {
+            const k = normalizeText(alias);
+            if (byCode.has(k)) return byCode.get(k);
+            if (byName.has(k)) return byName.get(k);
+        }
+        return null;
+    };
+
+    const cstat = resolve("CSTAT-VU", "Computerstatistik");
+    const scomp = resolve("SCOMP-VU", "Statistical Computing");
+    const sim = resolve("SIM-VU", "Statistische Simulation und computerintensive Methoden");
+
+    const variants = [];
+    if (cstat && scomp) variants.push({ id: "cstat_scomp", label: "Computerstatistik + Statistical Computing", courses: [cstat, scomp] });
+    if (cstat && sim) variants.push({ id: "cstat_sim", label: "Computerstatistik + Simulation", courses: [cstat, sim] });
+    if (scomp && sim) variants.push({ id: "scomp_sim", label: "Statistical Computing + Simulation", courses: [scomp, sim] });
+    if (cstat && scomp && sim) {
+        variants.push({
+            id: "all_three",
+            label: "All three courses",
+            courses: [cstat, scomp, sim],
+        });
+    }
+    return variants;
+}
+
+function hasComputationalStatisticsSignature(courses) {
+    const normalizedCodes = (courses || [])
+        .map((c) => normalizeText(c?.code))
+        .filter(Boolean)
+        .map((k) => k.replace(/\s+/g, " "));
+    const signatureCodes = new Set(normalizedCodes);
+    return (
+        signatureCodes.has("cstat vu") ||
+        signatureCodes.has("scomp vu") ||
+        signatureCodes.has("sim vu")
+    );
+}
+
 export function resolveModuleVariantCourses(modulePayload, requestedVariantId = null) {
     const courses = Array.isArray(modulePayload?.courses) ? modulePayload.courses.filter((c) => c?.code) : [];
     const moduleName = modulePayload?.name || "";
+    const moduleKey = normalizeText(moduleName);
+    if (moduleKey === COMPUTATIONAL_STATISTICS_MODULE_KEY || hasComputationalStatisticsSignature(courses)) {
+        const variantOptions = buildComputationalStatisticsOptions(courses);
+        if (!variantOptions.length) {
+            return {
+                isSplitModule: false,
+                activeVariantId: null,
+                selectedCourses: courses,
+                allVariantCourses: courses,
+                variantMeta: null,
+                variantOptions: [],
+            };
+        }
+        const chosen = variantOptions.find((opt) => opt.id === requestedVariantId) || variantOptions[0];
+        const selectedCourses = Array.isArray(chosen?.courses) ? chosen.courses : [];
+        return {
+            isSplitModule: true,
+            activeVariantId: chosen?.id || null,
+            selectedCourses,
+            allVariantCourses: [...new Map(courses.map((c) => [c.code, c])).values()],
+            variantMeta: {
+                moduleKey,
+                variants: variantOptions.map((opt) => ({ id: opt.id, label: opt.label })),
+            },
+            variantOptions: variantOptions.map((opt) => ({ id: opt.id, label: opt.label })),
+        };
+    }
+
     const variantMeta = getSplitModuleVariantMeta(moduleName);
     if (!variantMeta) {
         return {
@@ -72,5 +144,6 @@ export function resolveModuleVariantCourses(modulePayload, requestedVariantId = 
         selectedCourses: fallbackSelected,
         allVariantCourses: [...new Map(courses.map((c) => [c.code, c])).values()],
         variantMeta,
+        variantOptions: variantMeta.variants,
     };
 }

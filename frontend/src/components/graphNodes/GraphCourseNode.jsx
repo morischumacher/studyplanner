@@ -7,6 +7,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
+import { displayCourseHeader } from "../../utils/courseCodeDisplay.js";
 
 export default function GraphCourseNode({ data }) {
     const color = data?.color || "#4b5563";
@@ -39,6 +40,7 @@ export default function GraphCourseNode({ data }) {
         if (status === "in_plan") return { color: "#1d4ed8", label: "in plan" };
         return { color: "#4b5563", label: "todo" };
     })();
+    const headerCode = displayCourseHeader(data?.courseCode, data?.courseName ?? data?.label, data?.courseType);
 
     return (
         <div
@@ -67,7 +69,7 @@ export default function GraphCourseNode({ data }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                    {data?.courseCode}
+                    {headerCode}
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                     {(isInPlan || isDone) && (

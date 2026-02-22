@@ -10,6 +10,7 @@ import {
     stateVisualByStatus,
 } from "../utils/courseVisuals.js";
 import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
+import { displayCourseHeader, displayModuleHeader, displayShortCode } from "../utils/courseCodeDisplay.js";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
@@ -118,7 +119,7 @@ export default function Sidebar({
     return (
         <aside
             style={{
-                width: 280,
+                width: 300,
                 background: "#fff",
                 borderRight: "1px solid #e5e7eb",
                 padding: 16,
@@ -341,10 +342,10 @@ export default function Sidebar({
                                                     }}
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                                                            {moduleCodeFallback}
+                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                            {displayShortCode(moduleCodeFallback, mod?.name)}
                                                         </div>
-                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                             {(standaloneStatus === "in_plan" || standaloneStatus === "done") && (
                                                                 <button
                                                                     onClick={(e) => {
@@ -425,6 +426,7 @@ export default function Sidebar({
                                                             kind: "course",
                                                             code: course.code ?? mod.code,
                                                             name: course.name ?? mod.name,
+                                                            type: course.type ?? null,
                                                             ects: course.ects ?? mod.ects ?? null,
                                                             category: mod?.category ?? null,
                                                             subjectColor,
@@ -451,10 +453,10 @@ export default function Sidebar({
                                                     }}
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                                                            {course.code ?? mod.code}
+                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                            {displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}
                                                         </div>
-                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                             {(courseStatus === "in_plan" || courseStatus === "done") && (
                                                                 <button
                                                                     onClick={(e) => {
@@ -489,7 +491,7 @@ export default function Sidebar({
                                                             {menuState.view === "semesters" && (
                                                                 <>
                                                                     {visibleSemesters.map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, type: course.type ?? null, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
                                                                     {canRevealMoreSemesters && (
                                                                         <button
@@ -544,6 +546,9 @@ export default function Sidebar({
                                                 : { ...modulePayload, courses: moduleVariantResolution.selectedCourses })
                                             : modulePayload;
                                         const hasSplitVariants = Boolean(moduleVariantResolution?.isSplitModule);
+                                        const variantOptions = Array.isArray(moduleVariantResolution?.variantOptions)
+                                            ? moduleVariantResolution.variantOptions
+                                            : [];
                                         const variantDragPayload = (variantId) => {
                                             const resolved = resolveModuleVariantCourses(modulePayload, variantId);
                                             if (!resolved?.isSplitModule) return modulePayload;
@@ -616,8 +621,8 @@ export default function Sidebar({
                                                     }}
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ fontSize: 11, color: isGroupDone ? "#9ca3af" : "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{mod.code}</div>
-                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                        <div style={{ fontSize: 11, color: isGroupDone ? "#9ca3af" : "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayModuleHeader(mod?.code, mod?.name, courses.map((c) => c?.code).filter(Boolean))}</div>
+                                                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                             {(groupStatus === "in_plan" || groupStatus === "done") && (
                                                                 <button
                                                                     onClick={(e) => {
@@ -647,8 +652,15 @@ export default function Sidebar({
                                                                 hasSplitVariants
                                                                     ? (
                                                                         <>
-                                                                            <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey, "vu"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VU</button>
-                                                                            <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey, "vo_ue"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VO + UE</button>
+                                                                            {variantOptions.map((opt) => (
+                                                                                <button
+                                                                                    key={opt.id}
+                                                                                    onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey, opt.id); }}
+                                                                                    style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                                                                >
+                                                                                    {`Add ${opt.label}`}
+                                                                                </button>
+                                                                            ))}
                                                                         </>
                                                                     )
                                                                     : <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
@@ -679,40 +691,26 @@ export default function Sidebar({
                                                     </div>
                                                     {hasSplitVariants && groupStatus === "todo" && (
                                                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                                            <div
-                                                                draggable
-                                                                onDragStart={(e) => { e.stopPropagation(); onDragStart(e, variantDragPayload("vu")); }}
-                                                                style={{
-                                                                    border: "1px dashed #9ca3af",
-                                                                    borderRadius: 6,
-                                                                    padding: "3px 8px",
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    color: "#374151",
-                                                                    background: "#ffffff",
-                                                                    cursor: "grab",
-                                                                    userSelect: "none",
-                                                                }}
-                                                            >
-                                                                Drag VU
-                                                            </div>
-                                                            <div
-                                                                draggable
-                                                                onDragStart={(e) => { e.stopPropagation(); onDragStart(e, variantDragPayload("vo_ue")); }}
-                                                                style={{
-                                                                    border: "1px dashed #9ca3af",
-                                                                    borderRadius: 6,
-                                                                    padding: "3px 8px",
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    color: "#374151",
-                                                                    background: "#ffffff",
-                                                                    cursor: "grab",
-                                                                    userSelect: "none",
-                                                                }}
-                                                            >
-                                                                Drag VO + UE
-                                                            </div>
+                                                            {variantOptions.map((opt) => (
+                                                                <div
+                                                                    key={`drag-${opt.id}`}
+                                                                    draggable
+                                                                    onDragStart={(e) => { e.stopPropagation(); onDragStart(e, variantDragPayload(opt.id)); }}
+                                                                    style={{
+                                                                        border: "1px dashed #9ca3af",
+                                                                        borderRadius: 6,
+                                                                        padding: "3px 8px",
+                                                                        fontSize: 11,
+                                                                        fontWeight: 700,
+                                                                        color: "#374151",
+                                                                        background: "#ffffff",
+                                                                        cursor: "grab",
+                                                                        userSelect: "none",
+                                                                    }}
+                                                                >
+                                                                    {`Drag ${opt.label}`}
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )}
                                                     <div style={{ color: isGroupDone ? "#9ca3af" : "#6b7280", fontSize: 12 }}>
@@ -766,8 +764,8 @@ export default function Sidebar({
                                                                 }}
                                                             >
                                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{course?.code ?? mod.code}</div>
-                                                                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}</div>
+                                                                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                                         {(courseStatus === "in_plan" || courseStatus === "done") && (
                                                                             <button
                                                                                 onClick={(e) => {
@@ -797,8 +795,15 @@ export default function Sidebar({
                                                                             hasSplitVariants
                                                                                 ? (
                                                                                     <>
-                                                                                        <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey, "vu"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VU</button>
-                                                                                        <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey, "vo_ue"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VO + UE</button>
+                                                                                        {variantOptions.map((opt) => (
+                                                                                            <button
+                                                                                                key={opt.id}
+                                                                                                onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey, opt.id); }}
+                                                                                                style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                                                                            >
+                                                                                                {`Add ${opt.label}`}
+                                                                                            </button>
+                                                                                        ))}
                                                                                     </>
                                                                                 )
                                                                                 : <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>

@@ -8,6 +8,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../utils/courseVisuals.js";
+import { displayCourseHeader } from "../utils/courseCodeDisplay.js";
 
 /** CourseCard — React Flow node renderer */
 export default function CourseCard({ data }) {
@@ -64,6 +65,7 @@ export default function CourseCard({ data }) {
         labelKey.includes("extension");
     const ectsOptions = [4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
     const extensionOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const headerCode = displayCourseHeader(data?.code, data?.label, data?.courseType ?? data?.type);
 
     return (
         <div
@@ -106,7 +108,7 @@ export default function CourseCard({ data }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                 <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                    {data.code}
+                    {headerCode}
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                     {data.onToggleDone && (data.status === "in_plan" || data.status === "done") && (

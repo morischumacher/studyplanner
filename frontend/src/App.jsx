@@ -209,6 +209,18 @@ function getExamSubjectForCode(catalog, code) {
     return null;
 }
 
+function getCourseTypeForCode(catalog, code) {
+    if (!code) return null;
+    for (const pf of catalog || []) {
+        for (const mod of pf.modules || []) {
+            for (const c of mod.courses || []) {
+                if (c.code === code) return c.type ?? null;
+            }
+        }
+    }
+    return null;
+}
+
 /***********************************
  * Normalize backend payload → UI  *
  ***********************************/
@@ -729,6 +741,7 @@ export default function App({ currentUser, onSignOut }) {
         const now = Date.now();
         const id = `${courseCode}-${now}-graph`;
         const examSubject = course?.examSubject || getExamSubjectForCode(catalog, courseCode);
+        const courseType = course?.type ?? getCourseTypeForCode(catalog, courseCode);
         const resolvedSubjectColor =
             course?.subjectColor ||
             (examSubject ? subjectColors?.[examSubject] : null) ||
@@ -751,6 +764,7 @@ export default function App({ currentUser, onSignOut }) {
                 data: {
                     label: course?.name || courseCode,
                     code: courseCode,
+                    type: courseType ?? null,
                     ects: course?.ects ?? null,
                     moduleMeta: course?.moduleMeta ?? null,
                     onRemove: removeCourseNode,
@@ -864,6 +878,7 @@ export default function App({ currentUser, onSignOut }) {
                 data: {
                     label: course?.name || course?.code || "Course",
                     code: course?.code,
+                    type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
                     ects: course?.ects ?? null,
                     groupId,
                     baseY,
@@ -1088,6 +1103,7 @@ export default function App({ currentUser, onSignOut }) {
                     data: {
                         label: course?.name || course?.code || "Course",
                         code: course?.code ?? null,
+                        type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
                         ects: course?.ects ?? null,
                         moduleMeta: null,
                         groupId,
@@ -1233,6 +1249,7 @@ export default function App({ currentUser, onSignOut }) {
                     data: {
                         label: course?.name || course?.code || "Course",
                         code: course?.code ?? null,
+                        type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
                         ects: course?.ects ?? null,
                         moduleMeta: null,
                         onRemove: removeCourseNode,
@@ -1599,6 +1616,7 @@ export default function App({ currentUser, onSignOut }) {
                     const singlePayload = {
                         code: single?.code ?? payload?.code,
                         name: single?.name ?? payload?.name,
+                        type: single?.type ?? payload?.type ?? getCourseTypeForCode(catalog, single?.code ?? payload?.code),
                         ects: single?.ects ?? payload?.ects ?? null,
                         category: payload?.category ?? null,
                         subjectColor: payload?.subjectColor ?? null,
@@ -1616,6 +1634,7 @@ export default function App({ currentUser, onSignOut }) {
                             data: {
                                 label: singlePayload.name,
                                 code: singlePayload.code,
+                                type: singlePayload.type ?? null,
                                 ects: singlePayload.ects ?? null,
                                 moduleMeta: null,
                                 onRemove: removeCourseNode,
@@ -1689,6 +1708,7 @@ export default function App({ currentUser, onSignOut }) {
                         data: {
                             label: course.name,
                             code: course.code,
+                            type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
                             ects: course.ects ?? null,
                             groupId,
                             baseY,
@@ -1733,6 +1753,7 @@ export default function App({ currentUser, onSignOut }) {
                     data: {
                         label: payload.name,
                         code: payload.code,
+                        type: payload?.type ?? getCourseTypeForCode(catalog, payload?.code),
                         ects: payload.ects ?? null,
                         moduleMeta: payload?.moduleMeta ?? null,
                         onRemove: removeCourseNode,
@@ -1759,6 +1780,7 @@ export default function App({ currentUser, onSignOut }) {
 
     useEffect(() => {
         if (!plannerHydrated) return;
+        if (!Array.isArray(catalog) || catalog.length === 0) return;
         if (hydratedProgramRef.current === programCode) return;
 
         const doneSet = new Set(doneCourseCodes || []);
@@ -1836,6 +1858,7 @@ export default function App({ currentUser, onSignOut }) {
                     data: {
                         label: course?.name || course?.code || "Course",
                         code: course?.code ?? null,
+                        type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
                         ects: course?.ects ?? null,
                         groupId,
                         onRemove: removeCourseNode,
@@ -1870,6 +1893,7 @@ export default function App({ currentUser, onSignOut }) {
                 data: {
                     label: course?.name || course?.code || "Course",
                     code: course?.code ?? null,
+                    type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
                     ects: course?.ects ?? null,
                     moduleMeta: course?.module ?? null,
                     onRemove: removeCourseNode,
@@ -1901,6 +1925,7 @@ export default function App({ currentUser, onSignOut }) {
     }, [
         plannerHydrated,
         programCode,
+        catalog,
         coursesBySemester,
         doneCourseCodes,
         laneNodes,
@@ -1908,6 +1933,7 @@ export default function App({ currentUser, onSignOut }) {
         removeCourseNode,
         removeModuleGroup,
         semesterIdsFromPlan,
+        subjectColors,
         toggleCourseDone,
         toggleModuleDoneCodes,
         updateCourseEcts,

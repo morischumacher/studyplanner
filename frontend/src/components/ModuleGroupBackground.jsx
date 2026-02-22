@@ -7,6 +7,7 @@ import {
 import { colorForType } from "../utils/constants.js";
 import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../utils/examSubjectColors.js";
 import { mapTypeForProgram, stateVisualByStatus } from "../utils/courseVisuals.js";
+import { displayModuleHeader } from "../utils/courseCodeDisplay.js";
 
 /** ModuleGroupBackground — soft panel wrapping a set of course nodes. */
 export default function ModuleGroupBackground({ data }) {
@@ -39,6 +40,7 @@ export default function ModuleGroupBackground({ data }) {
     const statusTextColor = status === "done" ? "#166534" : (status === "in_plan" ? "#1d4ed8" : "#4b5563");
     const panelFill = visualStatus === "todo" ? moduleColor : stateMeta.background;
     const isDone = status === "done";
+    const headerCode = displayModuleHeader(moduleCode, title, moduleCourseCodes);
 
     useEffect(() => {
         if (!isMenuOpen) return;
@@ -102,7 +104,7 @@ export default function ModuleGroupBackground({ data }) {
             >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ fontSize: 11, color: isDone ? "#9ca3af" : "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                        {moduleCode || ""}
+                        {headerCode}
                     </div>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                         {onToggleModuleDone && (status === "in_plan" || status === "done") && (
