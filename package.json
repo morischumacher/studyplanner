@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "backend:reset": "docker compose -f backend/docker-compose.yml down -v --remove-orphans && docker compose -f backend/docker-compose.yml up -d --build"
+  },
   "devDependencies": {
     "baseline-browser-mapping": "^2.8.32"
   }

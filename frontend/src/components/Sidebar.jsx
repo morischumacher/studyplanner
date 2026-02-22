@@ -9,6 +9,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../utils/courseVisuals.js";
+import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
@@ -35,21 +36,21 @@ export default function Sidebar({
     onRemoveModuleFromPlan,
     semesterOptions,
 }) {
-    const [menuState, setMenuState] = useState({ key: null, view: "root" });
+    const [menuState, setMenuState] = useState({ key: null, view: "root", variantId: null });
     const [plusRevealCount, setPlusRevealCount] = useState(0);
     const semesters = Array.isArray(semesterOptions) ? semesterOptions : [];
 
     const openMenu = (key) => {
         setPlusRevealCount(0);
-        setMenuState({ key, view: "root" });
+        setMenuState({ key, view: "root", variantId: null });
     };
     const closeMenu = () => {
         setPlusRevealCount(0);
-        setMenuState({ key: null, view: "root" });
+        setMenuState({ key: null, view: "root", variantId: null });
     };
-    const gotoSemesters = (key) => {
+    const gotoSemesters = (key, variantId = null) => {
         setPlusRevealCount(0);
-        setMenuState({ key, view: "semesters" });
+        setMenuState({ key, view: "semesters", variantId });
     };
     const semesterButtonLabel = (semester) => (semester?.isPlus ? `+ ${semester.title}` : semester?.title);
     const baseSemesters = semesters.filter((s) => !s?.isPlus);
@@ -528,7 +529,38 @@ export default function Sidebar({
                                             name: mod.name,
                                             category: mod?.category ?? null,
                                             subjectColor,
-                                            courses: courses.map((c) => ({ code: c.code, name: c.name, ects: c.ects ?? null })),
+                                            courses: courses.map((c) => ({ code: c.code, name: c.name, ects: c.ects ?? null, type: c.type ?? null })),
+                                        };
+                                        const moduleVariantResolution = resolveModuleVariantCourses(modulePayload);
+                                        const defaultModuleDragPayload = moduleVariantResolution?.isSplitModule
+                                            ? (moduleVariantResolution.selectedCourses.length === 1
+                                                ? {
+                                                    code: moduleVariantResolution.selectedCourses[0]?.code,
+                                                    name: moduleVariantResolution.selectedCourses[0]?.name ?? mod.name,
+                                                    ects: moduleVariantResolution.selectedCourses[0]?.ects ?? null,
+                                                    category: mod?.category ?? null,
+                                                    subjectColor,
+                                                }
+                                                : { ...modulePayload, courses: moduleVariantResolution.selectedCourses })
+                                            : modulePayload;
+                                        const hasSplitVariants = Boolean(moduleVariantResolution?.isSplitModule);
+                                        const variantDragPayload = (variantId) => {
+                                            const resolved = resolveModuleVariantCourses(modulePayload, variantId);
+                                            if (!resolved?.isSplitModule) return modulePayload;
+                                            if (resolved.selectedCourses.length === 1) {
+                                                return {
+                                                    code: resolved.selectedCourses[0]?.code,
+                                                    name: resolved.selectedCourses[0]?.name ?? mod.name,
+                                                    ects: resolved.selectedCourses[0]?.ects ?? null,
+                                                    category: mod?.category ?? null,
+                                                    subjectColor,
+                                                };
+                                            }
+                                            return {
+                                                ...modulePayload,
+                                                variantId,
+                                                courses: resolved.selectedCourses,
+                                            };
                                         };
                                         const groupStatus = moduleStatus(courses.map((c) => c?.code).filter(Boolean));
                                         const groupVisualStatus = groupStatus === "done" ? "done" : "todo";
@@ -557,10 +589,10 @@ export default function Sidebar({
                                                 }}
                                             >
                                                 <div
-                                                    draggable={groupStatus === "todo" && !moduleBlocked}
+                                                    draggable={groupStatus === "todo" && !moduleBlocked && !hasSplitVariants}
                                                     onDragStart={(e) => {
-                                                        if (groupStatus !== "todo" || moduleBlocked) return;
-                                                        onDragStart(e, modulePayload);
+                                                        if (groupStatus !== "todo" || moduleBlocked || hasSplitVariants) return;
+                                                        onDragStart(e, defaultModuleDragPayload);
                                                     }}
                                                     title="Drag the whole module"
                                                     style={{
@@ -612,7 +644,14 @@ export default function Sidebar({
                                                     {menuState.key === moduleMenuKey && (
                                                         <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
                                                             {menuState.view === "root" && groupStatus === "todo" && (
-                                                                <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                                hasSplitVariants
+                                                                    ? (
+                                                                        <>
+                                                                            <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey, "vu"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VU</button>
+                                                                            <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey, "vo_ue"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VO + UE</button>
+                                                                        </>
+                                                                    )
+                                                                    : <button onClick={(e) => { e.stopPropagation(); gotoSemesters(moduleMenuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
                                                             {menuState.view === "root" && (groupStatus === "in_plan" || groupStatus === "done") && (
                                                                 <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
@@ -620,7 +659,7 @@ export default function Sidebar({
                                                             {menuState.view === "semesters" && (
                                                                 <>
                                                                     {visibleSemesters.map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
+                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
                                                                     {canRevealMoreSemesters && (
                                                                         <button
@@ -638,6 +677,44 @@ export default function Sidebar({
                                                     <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: isGroupDone ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                                                         {mod.name}
                                                     </div>
+                                                    {hasSplitVariants && groupStatus === "todo" && (
+                                                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                                            <div
+                                                                draggable
+                                                                onDragStart={(e) => { e.stopPropagation(); onDragStart(e, variantDragPayload("vu")); }}
+                                                                style={{
+                                                                    border: "1px dashed #9ca3af",
+                                                                    borderRadius: 6,
+                                                                    padding: "3px 8px",
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    color: "#374151",
+                                                                    background: "#ffffff",
+                                                                    cursor: "grab",
+                                                                    userSelect: "none",
+                                                                }}
+                                                            >
+                                                                Drag VU
+                                                            </div>
+                                                            <div
+                                                                draggable
+                                                                onDragStart={(e) => { e.stopPropagation(); onDragStart(e, variantDragPayload("vo_ue")); }}
+                                                                style={{
+                                                                    border: "1px dashed #9ca3af",
+                                                                    borderRadius: 6,
+                                                                    padding: "3px 8px",
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    color: "#374151",
+                                                                    background: "#ffffff",
+                                                                    cursor: "grab",
+                                                                    userSelect: "none",
+                                                                }}
+                                                            >
+                                                                Drag VO + UE
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                     <div style={{ color: isGroupDone ? "#9ca3af" : "#6b7280", fontSize: 12 }}>
                                                         {courses.length} Kurse
                                                     </div>
@@ -717,7 +794,14 @@ export default function Sidebar({
                                                                 {menuState.key === menuKey && (
                                                                     <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
                                                                         {menuState.view === "root" && courseStatus === "todo" && (
-                                                                            <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
+                                                                            hasSplitVariants
+                                                                                ? (
+                                                                                    <>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey, "vu"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VU</button>
+                                                                                        <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey, "vo_ue"); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add VO + UE</button>
+                                                                                    </>
+                                                                                )
+                                                                                : <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                                         )}
                                                                         {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
                                                                             <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
@@ -725,7 +809,7 @@ export default function Sidebar({
                                                                         {menuState.view === "semesters" && (
                                                                             <>
                                                                                 {visibleSemesters.map((semester) => (
-                                                                                    <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
+                                                                                    <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                                 ))}
                                                                                 {canRevealMoreSemesters && (
                                                                                     <button

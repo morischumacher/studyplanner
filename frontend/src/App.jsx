@@ -45,6 +45,9 @@ import {
 import { centerX, laneIndexFromX, laneX, projectToLaneAndSnap } from "./utils/geometry.js";
 import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
 import { buildSemesterList, semesterBoundsForProgram } from "./utils/semesters.js";
+import { buildBachelorPrefillPlan } from "./utils/bachelorPrefillPlan.js";
+import { buildMasterPrefillPlan } from "./utils/masterPrefillPlan.js";
+import { resolveModuleVariantCourses } from "./utils/bachelorCourseVariants.js";
 
 /*********************************
  * React Flow node type registry *
@@ -59,6 +62,7 @@ const PROGRAM_OPTIONS = [
     { code: "066 937", label: "Master Software Engineering" },
     { code: "033 521", label: "Bachelor Informatics" },
 ];
+const MASTER_PROGRAM_CODE = "066 937";
 const BACHELOR_PROGRAM_CODE = "033 521";
 const BACHELOR_FOCUS_OPTIONS = [
     "Artificial Intelligence und Machine Learning",
@@ -241,6 +245,8 @@ const normalizeCatalog = (raw) => {
  * Main component
  ****************/
 export default function App({ currentUser, onSignOut }) {
+    const MIN_MODULE_GROUP_TOP_Y = 108;
+    const MIN_GROUP_CHILD_Y = MIN_MODULE_GROUP_TOP_Y + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT;
     const {
         programCode,
         setProgramCode,
@@ -273,7 +279,7 @@ export default function App({ currentUser, onSignOut }) {
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isSteopInfoOpen, setIsSteopInfoOpen] = useState(false);
     const [isFocusInfoOpen, setIsFocusInfoOpen] = useState(false);
-    const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0 });
+    const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0, tone: "" });
     const subjectColors = useMemo(
         () => createExamSubjectColorMap((catalog || []).map((pf) => pf?.pruefungsfach).filter(Boolean)),
         [catalog]
@@ -292,6 +298,9 @@ export default function App({ currentUser, onSignOut }) {
     const [plannerHydrated, setPlannerHydrated] = useState(false);
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [focusPrefillPrompt, setFocusPrefillPrompt] = useState(null);
+    const [dismissedInitialPrefillPrompt, setDismissedInitialPrefillPrompt] = useState(false);
+    const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
 
     const buildPersistSnapshot = useCallback(() => {
         const snapshot = exportPlannerStateSnapshot?.() || {};
@@ -452,20 +461,34 @@ export default function App({ currentUser, onSignOut }) {
         [activeSemesterCount, maxSemesterCount]
     );
 
+    const plannedEctsBySemester = useMemo(() => {
+        const out = {};
+        for (const semester of semesters) {
+            const list = Array.isArray(coursesBySemester?.[semester.id]) ? coursesBySemester[semester.id] : [];
+            out[semester.id] = list.reduce((sum, course) => sum + Number(course?.ects || 0), 0);
+        }
+        return out;
+    }, [coursesBySemester, semesters]);
+
     // Lane background columns
     const laneNodes = useMemo(
         () =>
             semesters.map((s, i) => ({
                 id: `lane-${s.id}`,
                 type: "lane",
-                data: { title: s.title, even: i % 2 === 0, height: CANVAS_HEIGHT },
+                data: {
+                    title: s.title,
+                    even: i % 2 === 0,
+                    height: CANVAS_HEIGHT,
+                    ectsPlanned: Number(plannedEctsBySemester?.[s.id] ?? 0),
+                },
                 position: { x: laneX(i), y: 0 },
                 draggable: false,
                 selectable: false,
                 zIndex: 0,
                 style: { height: CANVAS_HEIGHT },
             })),
-        [semesters]
+        [plannedEctsBySemester, semesters]
     );
 
     // React Flow state
@@ -489,15 +512,6 @@ export default function App({ currentUser, onSignOut }) {
         const padded = Math.max(CANVAS_HEIGHT, maxBottom + 220);
         return Math.ceil(padded / GRID_SIZE) * GRID_SIZE;
     }, [nodes]);
-    const plannedEctsBySemester = useMemo(() => {
-        const out = {};
-        for (const semester of semesters) {
-            const list = Array.isArray(coursesBySemester?.[semester.id]) ? coursesBySemester[semester.id] : [];
-            out[semester.id] = list.reduce((sum, course) => sum + Number(course?.ects || 0), 0);
-        }
-        return out;
-    }, [coursesBySemester, semesters]);
-
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
 
@@ -672,12 +686,17 @@ export default function App({ currentUser, onSignOut }) {
         }
         const uniqueCodes = [...new Set(codes)];
         if (!uniqueCodes.length) return;
-        for (const code of uniqueCodes) {
+        const allowedCodes = uniqueCodes.filter((code) => {
+            const status = getCourseStatus(code);
+            return status === "in_plan" || status === "done";
+        });
+        if (!allowedCodes.length) return;
+        for (const code of allowedCodes) {
             setCourseDone(code, Boolean(nextDone));
         }
         setNodes((prev) => {
             const patched = prev.map((n) => {
-                if (n.type !== "course" || !uniqueCodes.includes(n?.data?.code)) return n;
+                if (n.type !== "course" || !allowedCodes.includes(n?.data?.code)) return n;
                 return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
             });
             if (groupId) {
@@ -688,7 +707,7 @@ export default function App({ currentUser, onSignOut }) {
                             data: {
                                 ...n.data,
                                 status: nextDone ? "done" : "in_plan",
-                                moduleCourseCodes: uniqueCodes,
+                                moduleCourseCodes: allowedCodes,
                             },
                         }
                         : n
@@ -696,7 +715,7 @@ export default function App({ currentUser, onSignOut }) {
             }
             return patched;
         });
-    }, [nodes, setCourseDone, setNodes]);
+    }, [getCourseStatus, nodes, setCourseDone, setNodes]);
 
     const addGraphCourseToPlan = useCallback((course, requestedLaneIndex, options = null) => {
         const courseCode = course?.code;
@@ -766,18 +785,32 @@ export default function App({ currentUser, onSignOut }) {
     }, [catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
 
     const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex, options = null) => {
-        const courses = Array.isArray(modulePayload?.courses) ? modulePayload.courses : [];
+        const variantResolution = resolveModuleVariantCourses(modulePayload, options?.variantId ?? null);
+        const courses = Array.isArray(variantResolution?.selectedCourses)
+            ? variantResolution.selectedCourses
+            : (Array.isArray(modulePayload?.courses) ? modulePayload.courses : []);
+        const allVariantCourses = Array.isArray(variantResolution?.allVariantCourses) ? variantResolution.allVariantCourses : courses;
+        if (courses.length === 1) {
+            return addGraphCourseToPlan({
+                ...courses[0],
+                category: modulePayload?.category ?? courses?.[0]?.category ?? "unknown",
+                subjectColor: modulePayload?.subjectColor ?? courses?.[0]?.subjectColor ?? null,
+            }, requestedLaneIndex, options);
+        }
         if (courses.length < 2) return false;
         const codes = courses.map((c) => c?.code).filter(Boolean);
         if (!codes.length) return false;
         if (codes.some((code) => getCourseStatus(code) !== "todo")) return false;
+        const conflictingVariantCodes = allVariantCourses
+            .map((c) => c?.code)
+            .filter((code) => code && !codes.includes(code));
 
         const allowDirect = Boolean(options?.allowDirectLaneSelection);
         const laneIndex = allowDirect
             ? Math.max(0, Math.min(Number(requestedLaneIndex) || 0, maxSemesterCount - 1))
             : clampPlacementLane(requestedLaneIndex);
         const x = centerX(laneIndex);
-        const y = 144;
+        const y = Math.max(144, MIN_GROUP_CHILD_Y);
         const now = Date.now();
         const groupId = `mod-${now}-graph`;
         const groupExamSubject =
@@ -854,8 +887,21 @@ export default function App({ currentUser, onSignOut }) {
         let persistedNodes = null;
         let added = false;
         setNodes((prev) => {
-            if (codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code))) return prev;
-            const withAll = prev.concat(groupNode, ...childCourseNodes);
+            const hasSelectedAlready = codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code));
+            if (hasSelectedAlready) return prev;
+
+            const removeSet = new Set(conflictingVariantCodes);
+            const affectedGroupIds = new Set(
+                prev
+                    .filter((n) => n.type === "course" && removeSet.has(n?.data?.code) && n?.data?.groupId)
+                    .map((n) => n.data.groupId)
+            );
+            let next = prev.filter((n) => !(n.type === "course" && removeSet.has(n?.data?.code)));
+            for (const oldGroupId of affectedGroupIds) {
+                next = recomputeGroupFromChildren(next, oldGroupId);
+            }
+
+            const withAll = next.concat(groupNode, ...childCourseNodes);
             const sized = recomputeGroupFromChildren(withAll, groupId);
             const resolved = resolveLaneCollisions(sized);
             persistedNodes = resolved.filter((n) => n.type !== "lane");
@@ -870,7 +916,7 @@ export default function App({ currentUser, onSignOut }) {
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
+    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
 
     const toggleGraphCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
@@ -946,6 +992,304 @@ export default function App({ currentUser, onSignOut }) {
         if (!codes.length) return false;
         return removeGraphCoursesFromPlan(codes);
     }, [removeGraphCoursesFromPlan]);
+
+    const applyBachelorPrefilledPlan = useCallback((focusName) => {
+        if (programCode !== BACHELOR_PROGRAM_CODE) return false;
+        const { plannedCourses, missingAliases } = buildBachelorPrefillPlan(catalog, focusName);
+        if (!plannedCourses.length) {
+            setStickyViolation({
+                message: "Prebuilt bachelor plan could not be applied (no matching catalog courses found).",
+                until: Date.now() + 5000,
+                tone: "error",
+            });
+            return false;
+        }
+
+        const doneSet = new Set(doneCourseCodes || []);
+        const groupedByModule = new Map();
+        for (const course of plannedCourses) {
+            const moduleKey = course?.module?.key || "";
+            if (!moduleKey) continue;
+            if (!groupedByModule.has(moduleKey)) groupedByModule.set(moduleKey, []);
+            groupedByModule.get(moduleKey).push(course);
+        }
+        const groupedModuleKeys = new Set(
+            [...groupedByModule.entries()]
+                .filter(([, list]) => Array.isArray(list) && list.length >= 2)
+                .map(([key]) => key)
+        );
+        const groupedModuleEntries = [...groupedByModule.entries()]
+            .filter(([key]) => groupedModuleKeys.has(key))
+            .sort((a, b) => {
+                const aFirstSem = Math.min(...(a[1] || []).map((c) => Number(c?.semester) || 99));
+                const bFirstSem = Math.min(...(b[1] || []).map((c) => Number(c?.semester) || 99));
+                if (aFirstSem !== bFirstSem) return aFirstSem - bFirstSem;
+                const aTitle = String(a?.[1]?.[0]?.module?.title || "").toLowerCase();
+                const bTitle = String(b?.[1]?.[0]?.module?.title || "").toLowerCase();
+                return aTitle.localeCompare(bTitle);
+            });
+        const moduleRowYByKey = new Map();
+        groupedModuleEntries.forEach(([moduleKey], rowIdx) => {
+            moduleRowYByKey.set(moduleKey, MIN_GROUP_CHILD_Y + rowIdx * (COURSE_LAYOUT_HEIGHT + 32));
+        });
+
+        const bySemester = new Map();
+        for (const item of plannedCourses) {
+            const semester = Number(item?.semester);
+            if (!Number.isInteger(semester) || semester < 1 || semester > maxSemesterCount) continue;
+            if (!bySemester.has(semester)) bySemester.set(semester, []);
+            bySemester.get(semester).push(item);
+        }
+
+        const now = Date.now();
+        const rebuilt = [...laneNodes];
+        const groupNodeMetaByModuleKey = new Map();
+        const groupedModuleSemesterOffset = new Map();
+        let sequence = 0;
+        for (let semesterId = 1; semesterId <= maxSemesterCount; semesterId += 1) {
+            const laneIndex = semesterId - 1;
+            const list = bySemester.get(semesterId) || [];
+            list.forEach((course, idx) => {
+                const examSubject = course?.examSubject ?? getExamSubjectForCode(catalog, course?.code);
+                const subjectColor =
+                    (examSubject ? subjectColors?.[examSubject] : null) ||
+                    "#2563eb";
+                const moduleKey = course?.module?.key || "";
+                const isGroupedModuleCourse = groupedModuleKeys.has(moduleKey);
+                const moduleRowY = moduleRowYByKey.get(moduleKey);
+                let groupId = null;
+                if (isGroupedModuleCourse) {
+                    const existing = groupNodeMetaByModuleKey.get(moduleKey);
+                    if (existing?.groupId) {
+                        groupId = existing.groupId;
+                    } else {
+                        groupId = `mod-prefill-${now}-${groupNodeMetaByModuleKey.size}`;
+                        groupNodeMetaByModuleKey.set(moduleKey, {
+                            groupId,
+                            module: course?.module ?? null,
+                            examSubject,
+                            subjectColor,
+                            category: course?.module?.category ?? course?.category ?? "unknown",
+                        });
+                    }
+                }
+                let targetY = 96 + idx * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP);
+                if (isGroupedModuleCourse && Number.isFinite(moduleRowY)) {
+                    const semesterOffsetKey = `${moduleKey}::${semesterId}`;
+                    const duplicateOffset = groupedModuleSemesterOffset.get(semesterOffsetKey) || 0;
+                    groupedModuleSemesterOffset.set(semesterOffsetKey, duplicateOffset + 1);
+                    targetY = moduleRowY + duplicateOffset * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
+                }
+                const id = `${course?.code || "course"}-prefill-${now}-${sequence}`;
+                sequence += 1;
+                rebuilt.push({
+                    id,
+                    type: "course",
+                    data: {
+                        label: course?.name || course?.code || "Course",
+                        code: course?.code ?? null,
+                        ects: course?.ects ?? null,
+                        moduleMeta: null,
+                        groupId,
+                        baseY: targetY,
+                        onRemove: removeCourseNode,
+                        onRemoveModuleGroup: removeModuleGroup,
+                        onToggleDone: toggleCourseDone,
+                        onUpdateEcts: updateCourseEcts,
+                        nodeId: id,
+                        examSubject,
+                        category: course?.category ?? "unknown",
+                        programCode,
+                        subjectColor,
+                        status: doneSet.has(course?.code) ? "done" : "in_plan",
+                    },
+                    position: {
+                        x: centerX(laneIndex),
+                        y: targetY,
+                    },
+                    sourcePosition: "right",
+                    targetPosition: "left",
+                    zIndex: 1,
+                });
+            });
+        }
+
+        for (const [, groupMeta] of groupNodeMetaByModuleKey.entries()) {
+            const groupId = groupMeta?.groupId;
+            if (!groupId) continue;
+            const children = rebuilt.filter((n) => n.type === "course" && n?.data?.groupId === groupId);
+            if (children.length < 2) continue;
+            const moduleTitle = groupMeta?.module?.title || "Module";
+            const moduleCode = groupMeta?.module?.code ?? null;
+            const moduleEcts = groupMeta?.module?.ects ?? null;
+            const moduleCourseCodes = children.map((n) => n?.data?.code).filter(Boolean);
+            rebuilt.push({
+                id: groupId,
+                type: "moduleBg",
+                data: {
+                    title: moduleTitle,
+                    code: null,
+                    moduleCode,
+                    moduleEcts,
+                    moduleCourseCount: children.length,
+                    moduleCourseCodes,
+                    status: "in_plan",
+                    groupId,
+                    onRemoveGroup: removeModuleGroup,
+                    onRemove: () => removeModuleGroup(groupId),
+                    onToggleModuleDone: toggleModuleDoneCodes,
+                    examSubject: groupMeta?.examSubject ?? null,
+                    category: groupMeta?.category ?? "unknown",
+                    programCode,
+                    subjectColor: groupMeta?.subjectColor ?? "#2563eb",
+                },
+                position: { x: children[0].position.x, y: children[0].position.y },
+                draggable: true,
+                selectable: false,
+                zIndex: 0,
+            });
+        }
+
+        let withGroups = rebuilt;
+        for (const [, groupMeta] of groupNodeMetaByModuleKey.entries()) {
+            if (!groupMeta?.groupId) continue;
+            withGroups = recomputeGroupFromChildren(withGroups, groupMeta.groupId);
+        }
+        const resolved = resolveLaneCollisions(withGroups);
+        const compacted = resolveLaneCollisions(compactPrefillLayout(resolved));
+        setNodes(compacted);
+        setCoursesFromNodes(compacted.filter((n) => n.type !== "lane"));
+        setNeedsPersist(false);
+        setDragPreviewSemesterCount(null);
+
+        if (missingAliases.length > 0) {
+            setStickyViolation({
+                message: `Prebuilt plan applied with missing courses: ${missingAliases.join(", ")}`,
+                until: Date.now() + 7000,
+                tone: "success",
+            });
+        } else {
+            setStickyViolation({
+                message: "Prebuilt bachelor plan applied.",
+                until: Date.now() + 3500,
+                tone: "success",
+            });
+        }
+        return true;
+    }, [
+        MIN_GROUP_CHILD_Y,
+        catalog,
+        doneCourseCodes,
+        laneNodes,
+        maxSemesterCount,
+        programCode,
+        removeModuleGroup,
+        removeCourseNode,
+        setCoursesFromNodes,
+        setNodes,
+        subjectColors,
+        toggleCourseDone,
+        toggleModuleDoneCodes,
+        updateCourseEcts,
+    ]);
+
+    const applyMasterPrefilledPlan = useCallback(() => {
+        if (programCode !== MASTER_PROGRAM_CODE) return false;
+        const { plannedCourses, missingAliases } = buildMasterPrefillPlan(catalog);
+        if (!plannedCourses.length) {
+            setStickyViolation({
+                message: "Prebuilt master plan could not be applied (no matching catalog courses found).",
+                until: Date.now() + 5000,
+                tone: "error",
+            });
+            return false;
+        }
+
+        const doneSet = new Set(doneCourseCodes || []);
+        const bySemester = new Map();
+        for (const item of plannedCourses) {
+            const semester = Number(item?.semester);
+            if (!Number.isInteger(semester) || semester < 1 || semester > maxSemesterCount) continue;
+            if (!bySemester.has(semester)) bySemester.set(semester, []);
+            bySemester.get(semester).push(item);
+        }
+
+        const now = Date.now();
+        const rebuilt = [...laneNodes];
+        let sequence = 0;
+        for (let semesterId = 1; semesterId <= maxSemesterCount; semesterId += 1) {
+            const laneIndex = semesterId - 1;
+            const list = bySemester.get(semesterId) || [];
+            list.forEach((course, idx) => {
+                const examSubject = course?.examSubject ?? getExamSubjectForCode(catalog, course?.code);
+                const subjectColor =
+                    (examSubject ? subjectColors?.[examSubject] : null) ||
+                    "#2563eb";
+                const id = `${course?.code || "course"}-prefill-master-${now}-${sequence}`;
+                sequence += 1;
+                rebuilt.push({
+                    id,
+                    type: "course",
+                    data: {
+                        label: course?.name || course?.code || "Course",
+                        code: course?.code ?? null,
+                        ects: course?.ects ?? null,
+                        moduleMeta: null,
+                        onRemove: removeCourseNode,
+                        onToggleDone: toggleCourseDone,
+                        onUpdateEcts: updateCourseEcts,
+                        nodeId: id,
+                        examSubject,
+                        category: course?.category ?? "unknown",
+                        programCode,
+                        subjectColor,
+                        status: doneSet.has(course?.code) ? "done" : "in_plan",
+                    },
+                    position: {
+                        x: centerX(laneIndex),
+                        y: 96 + idx * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP),
+                    },
+                    sourcePosition: "right",
+                    targetPosition: "left",
+                    zIndex: 1,
+                });
+            });
+        }
+
+        const resolved = resolveLaneCollisions(rebuilt);
+        const compacted = resolveLaneCollisions(compactPrefillLayout(resolved));
+        setNodes(compacted);
+        setCoursesFromNodes(compacted.filter((n) => n.type !== "lane"));
+        setNeedsPersist(false);
+        setDragPreviewSemesterCount(null);
+
+        if (missingAliases.length > 0) {
+            setStickyViolation({
+                message: `Prebuilt master plan applied with missing courses: ${missingAliases.join(", ")}`,
+                until: Date.now() + 7000,
+                tone: "success",
+            });
+        } else {
+            setStickyViolation({
+                message: "Prebuilt master plan applied.",
+                until: Date.now() + 3500,
+                tone: "success",
+            });
+        }
+        return true;
+    }, [
+        catalog,
+        doneCourseCodes,
+        laneNodes,
+        maxSemesterCount,
+        programCode,
+        removeCourseNode,
+        setCoursesFromNodes,
+        setNodes,
+        subjectColors,
+        toggleCourseDone,
+        updateCourseEcts,
+    ]);
 
     /************************
      * Group drag mechanics *
@@ -1070,6 +1414,7 @@ export default function App({ currentUser, onSignOut }) {
                     setStickyViolation({
                         message: response?.message || "Rule violation: change rejected.",
                         until: Date.now() + 5000,
+                        tone: "error",
                     });
                     rollbackAddedCourses(changeSnapshot);
                 }
@@ -1078,6 +1423,7 @@ export default function App({ currentUser, onSignOut }) {
                     setStickyViolation({
                         message: response?.message || "Rule violation: change rejected.",
                         until: Date.now() + 5000,
+                        tone: "error",
                     });
                     rollbackCourseStatusToggle(changeSnapshot);
                 }
@@ -1088,6 +1434,7 @@ export default function App({ currentUser, onSignOut }) {
                 setStickyViolation({
                     message: String(err?.message || err),
                     until: Date.now() + 5000,
+                    tone: "error",
                 });
                 setRuleCheckState((prev) => ({
                     ...prev,
@@ -1141,7 +1488,7 @@ export default function App({ currentUser, onSignOut }) {
         if (!stickyViolation?.message) return;
         const waitMs = Math.max(0, (stickyViolation.until || 0) - Date.now());
         const t = window.setTimeout(() => {
-            setStickyViolation({ message: "", until: 0 });
+            setStickyViolation({ message: "", until: 0, tone: "" });
         }, waitMs);
         return () => window.clearTimeout(t);
     }, [stickyViolation]);
@@ -1151,23 +1498,26 @@ export default function App({ currentUser, onSignOut }) {
      ***************************/
     const onNodeDragStop = useCallback((_, node) => {
         setDragPreviewSemesterCount(null);
-        const snappedY = Math.max(0, Math.round(node.position.y / GRID_SIZE) * GRID_SIZE);
+        const snappedYRaw = Math.round(node.position.y / GRID_SIZE) * GRID_SIZE;
+        const snappedY = Math.max(0, snappedYRaw);
 
         // If a whole module group was dragged: shift children by the snap delta, snap the group,
         // then recompute the group bbox, and resolve collisions.
         if (node?.type === "moduleBg") {
             setNodes((prev) => {
                 const children = prev.filter((n) => n.type === "course" && n.data?.groupId === node.id);
-                const avgChildX = children.length
-                    ? (children.reduce((sum, c) => sum + Number(c?.position?.x || 0), 0) / children.length)
-                    : centerX(clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1)));
-                const targetLane = clampPlacementLane(laneIndexFromX(avgChildX, maxSemesterCount - 1));
-                const targetChildX = centerX(targetLane);
-                const dxSnap = targetChildX - avgChildX;
-                const dySnap = snappedY - node.position.y;
+                const clampedGroupY = Math.max(MIN_MODULE_GROUP_TOP_Y, snappedY);
+                const dySnap = clampedGroupY - node.position.y;
                 const moved = prev.map((n) => {
                     if (n.type === "course" && n.data?.groupId === node.id) {
-                        return { ...n, position: { x: n.position.x + dxSnap, y: n.position.y + dySnap } };
+                        const targetLane = clampPlacementLane(laneIndexFromX(n.position.x, maxSemesterCount - 1));
+                        return {
+                            ...n,
+                            position: {
+                                x: centerX(targetLane),
+                                y: n.position.y + dySnap,
+                            },
+                        };
                     }
                     return n;
                 });
@@ -1184,8 +1534,9 @@ export default function App({ currentUser, onSignOut }) {
             setNodes((prev) => {
                 const targetLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
                 const targetLaneX = centerX(targetLane);
+                const snappedGroupChildY = Math.max(MIN_GROUP_CHILD_Y, snappedY);
                 const updated = prev.map((n) =>
-                    n.id === node.id ? { ...n, position: { x: targetLaneX, y: snappedY } } : n
+                    n.id === node.id ? { ...n, position: { x: targetLaneX, y: snappedGroupChildY } } : n
                 );
                 const stacked = resolveGroupCourseOverlaps(updated, groupId);
                 return resolveLaneCollisions(recomputeGroupFromChildren(stacked, groupId));
@@ -1200,7 +1551,7 @@ export default function App({ currentUser, onSignOut }) {
             const next = prev.map((n) => (n.id === node.id ? { ...n, position: { x: snappedX, y: snappedY } } : n));
             return resolveLaneCollisions(next);
         });
-    }, [clampPlacementLane, maxSemesterCount, setNodes]);
+    }, [MIN_GROUP_CHILD_Y, MIN_MODULE_GROUP_TOP_Y, clampPlacementLane, maxSemesterCount, setNodes]);
 
     // Merge: run drag-stop logic, then schedule a persist
     const onNodeDragStopMerged = useCallback((evt, node) => {
@@ -1239,10 +1590,58 @@ export default function App({ currentUser, onSignOut }) {
 
             // A) Module with >= 2 courses → create group + children
             if (payload?.kind === "module" && Array.isArray(payload.courses) && payload.courses.length >= 2) {
+                const groupChildBaseY = Math.max(y, MIN_GROUP_CHILD_Y);
+                const variantResolution = resolveModuleVariantCourses(payload, payload?.variantId ?? null);
+                const moduleCourses = Array.isArray(variantResolution?.selectedCourses) ? variantResolution.selectedCourses : payload.courses;
+                if (!moduleCourses.length) return;
+                if (moduleCourses.length === 1) {
+                    const single = moduleCourses[0];
+                    const singlePayload = {
+                        code: single?.code ?? payload?.code,
+                        name: single?.name ?? payload?.name,
+                        ects: single?.ects ?? payload?.ects ?? null,
+                        category: payload?.category ?? null,
+                        subjectColor: payload?.subjectColor ?? null,
+                    };
+                    const id = `${singlePayload.code}-${now}`;
+                    const examSubject = getExamSubjectForCode(catalog, singlePayload.code);
+                    const resolvedSubjectColor =
+                        singlePayload.subjectColor ||
+                        (examSubject ? subjectColors?.[examSubject] : null) ||
+                        "#2563eb";
+                    setNodes((prev) => {
+                        const next = prev.concat({
+                            id,
+                            type: "course",
+                            data: {
+                                label: singlePayload.name,
+                                code: singlePayload.code,
+                                ects: singlePayload.ects ?? null,
+                                moduleMeta: null,
+                                onRemove: removeCourseNode,
+                                onToggleDone: toggleCourseDone,
+                                onUpdateEcts: updateCourseEcts,
+                                nodeId: id,
+                                examSubject,
+                                category: singlePayload.category ?? "unknown",
+                                programCode,
+                                subjectColor: resolvedSubjectColor,
+                                status: "in_plan",
+                            },
+                            position: { x, y: groupChildBaseY },
+                            sourcePosition: "right",
+                            targetPosition: "left",
+                            zIndex: 1,
+                        });
+                        return resolveLaneCollisions(next);
+                    });
+                    schedulePersist();
+                    return;
+                }
                 const groupId = `mod-${now}`;
                 const groupExamSubject =
                     getExamSubjectForCode(catalog, payload.code) ||
-                    getExamSubjectForCode(catalog, payload.courses?.[0]?.code) ||
+                    getExamSubjectForCode(catalog, moduleCourses?.[0]?.code) ||
                     null;
                 const resolvedGroupSubjectColor =
                     payload.subjectColor ||
@@ -1257,8 +1656,8 @@ export default function App({ currentUser, onSignOut }) {
                         code: null,
                         moduleCode: payload?.code ?? null,
                         moduleEcts: payload?.ects ?? null,
-                        moduleCourseCount: payload?.courses?.length ?? 0,
-                        moduleCourseCodes: payload?.courses?.map((c) => c?.code).filter(Boolean) ?? [],
+                        moduleCourseCount: moduleCourses?.length ?? 0,
+                        moduleCourseCodes: moduleCourses?.map((c) => c?.code).filter(Boolean) ?? [],
                         status: "in_plan",
                         groupId,
                         onRemoveGroup: removeModuleGroup,
@@ -1269,15 +1668,15 @@ export default function App({ currentUser, onSignOut }) {
                         programCode,
                         subjectColor: resolvedGroupSubjectColor,
                     },
-                    position: { x, y }, // preliminary; will be resized by recomputeGroupFromChildren
+                    position: { x, y: groupChildBaseY }, // preliminary; will be resized by recomputeGroupFromChildren
                     draggable: true,
                     selectable: false,
                     zIndex: 0,
                 };
 
-                const childCourseNodes = payload.courses.map((course, idx) => {
+                const childCourseNodes = moduleCourses.map((course, idx) => {
                     const childId = `${course.code}-${now}-${idx}`;
-                    const baseY = y + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
+                    const baseY = groupChildBaseY + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
                     const examSubject =
                         getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, payload.code);
                     const resolvedCourseSubjectColor =
@@ -1355,7 +1754,7 @@ export default function App({ currentUser, onSignOut }) {
             });
             schedulePersist();
         },
-        [activeSemesterCount, catalog, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
+        [MIN_GROUP_CHILD_Y, activeSemesterCount, catalog, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
     );
 
     useEffect(() => {
@@ -1579,13 +1978,115 @@ export default function App({ currentUser, onSignOut }) {
         );
     }
 
+    function enforceModuleHeaderClearance(allNodes) {
+        let nodes = allNodes.slice();
+        const groups = nodes.filter((n) => n?.type === "moduleBg");
+        for (const group of groups) {
+            const groupTop = Number(group?.position?.y || 0);
+            if (groupTop >= MIN_MODULE_GROUP_TOP_Y) continue;
+            const dy = MIN_MODULE_GROUP_TOP_Y - groupTop;
+            nodes = nodes.map((n) =>
+                n.id === group.id
+                    ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
+                    : n
+            );
+            nodes = applyDeltaToGroupChildren(nodes, group.id, 0, dy);
+        }
+        return nodes;
+    }
+
+    function pushStandaloneCoursesBelowModuleBackgrounds(allNodes) {
+        let nodes = allNodes.slice();
+        const maxPasses = 8;
+        for (let pass = 0; pass < maxPasses; pass += 1) {
+            let changed = false;
+            const moduleNodes = nodes.filter((n) => n?.type === "moduleBg");
+            const standaloneCourses = nodes.filter((n) => n?.type === "course" && !n?.data?.groupId);
+
+            for (const courseNode of standaloneCourses) {
+                const currentCourse = nodes.find((n) => n.id === courseNode.id) || courseNode;
+                const cBox = nodeBBox(currentCourse);
+                let minAllowedY = cBox.y1;
+
+                for (const moduleNode of moduleNodes) {
+                    const mBox = nodeBBox(moduleNode);
+                    const xOverlap = cBox.x1 < mBox.x2 && cBox.x2 > mBox.x1;
+                    if (!xOverlap) continue;
+                    const yOverlap = cBox.y1 < (mBox.y2 + COLLISION_GAP) && cBox.y2 > (mBox.y1 - COLLISION_GAP);
+                    if (!yOverlap) continue;
+                    minAllowedY = Math.max(minAllowedY, mBox.y2 + COLLISION_GAP);
+                }
+
+                if (minAllowedY > cBox.y1) {
+                    changed = true;
+                    nodes = nodes.map((n) => (
+                        n.id === currentCourse.id
+                            ? { ...n, position: { x: n.position.x, y: minAllowedY } }
+                            : n
+                    ));
+                }
+            }
+
+            if (!changed) break;
+        }
+        return nodes;
+    }
+
+    function compactPrefillLayout(allNodes) {
+        let nodes = enforceModuleHeaderClearance(allNodes);
+        const candidates = nodes
+            .filter((n) => isRelevantForCollision(n))
+            .sort((a, b) => {
+                const ay = Number(a?.position?.y || 0);
+                const by = Number(b?.position?.y || 0);
+                if (ay !== by) return ay - by;
+                const ax = Number(a?.position?.x || 0);
+                const bx = Number(b?.position?.x || 0);
+                return ax - bx;
+            });
+
+        const placed = [];
+        for (const candidate of candidates) {
+            const current = nodes.find((n) => n.id === candidate.id);
+            if (!current) continue;
+            const cBox = nodeBBox(current);
+            let minAllowedY = current.type === "moduleBg" ? MIN_MODULE_GROUP_TOP_Y : 96;
+
+            for (const placedId of placed) {
+                const prior = nodes.find((n) => n.id === placedId);
+                if (!prior) continue;
+                const pBox = nodeBBox(prior);
+                const xOverlap =
+                    cBox.x1 < pBox.x2 + COLLISION_GAP &&
+                    cBox.x2 + COLLISION_GAP > pBox.x1;
+                if (!xOverlap) continue;
+                minAllowedY = Math.max(minAllowedY, pBox.y2 + COLLISION_GAP);
+            }
+
+            if (cBox.y1 > minAllowedY) {
+                const dy = minAllowedY - cBox.y1;
+                nodes = nodes.map((n) =>
+                    n.id === current.id
+                        ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
+                        : n
+                );
+                if (current.type === "moduleBg") {
+                    nodes = applyDeltaToGroupChildren(nodes, current.id, 0, dy);
+                }
+            }
+            placed.push(candidate.id);
+        }
+
+        return enforceModuleHeaderClearance(nodes);
+    }
+
     /**
      * Resolve vertical overlaps per lane among module groups and un-grouped course nodes.
      * Strategy: sort by Y, then push each down if it touches the previous (with COLLISION_GAP).
      * If a moduleBg is moved, shift its children by the same delta.
      */
     function resolveLaneCollisions(allNodes) {
-        let nodes = allNodes.slice(); // defensive copy
+        let nodes = enforceModuleHeaderClearance(allNodes); // keep module headers clear
 
         // Group by lane index
         const lanes = new Map();
@@ -1624,7 +2125,8 @@ export default function App({ currentUser, onSignOut }) {
                 prev = laneNodes.find((ln) => ln.id === curr.id) || curr;
             }
         }
-        return nodes;
+        const headerSafe = enforceModuleHeaderClearance(nodes);
+        return pushStandaloneCoursesBelowModuleBackgrounds(headerSafe);
     }
 
     /***********
@@ -1635,6 +2137,17 @@ export default function App({ currentUser, onSignOut }) {
     const isBachelorDashboard = programCode === BACHELOR_PROGRAM_CODE;
     const ectsStats = ruleStats?.ects ?? {};
     const allPlannedCourses = Object.values(coursesBySemester || {}).flat();
+    const hasAnyPlannedOrDoneCourses = allPlannedCourses.length > 0 || (doneCourseCodes || []).length > 0;
+    const shouldOfferInitialBachelorPrefill =
+        plannerHydrated &&
+        programCode === BACHELOR_PROGRAM_CODE &&
+        !hasAnyPlannedOrDoneCourses &&
+        !dismissedInitialPrefillPrompt;
+    const shouldOfferInitialMasterPrefill =
+        plannerHydrated &&
+        programCode === MASTER_PROGRAM_CODE &&
+        !hasAnyPlannedOrDoneCourses &&
+        !dismissedInitialPrefillPrompt;
     const doneCodesSet = new Set(doneCourseCodes || []);
     const doneEctsKpi = allPlannedCourses
         .filter((c) => c?.code && doneCodesSet.has(c.code))
@@ -1763,18 +2276,154 @@ export default function App({ currentUser, onSignOut }) {
                 ? (ruleCheckState.response?.message ?? "Rule check updated")
                 : "No rule check response yet")));
     const feedbackBg = stickyActive
-        ? "#fee2e2"
+        ? (stickyViolation?.tone === "success" ? "#dcfce7" : "#fee2e2")
         : (ruleCheckState.sending ? "#dbeafe" : (ruleCheckState.error ? "#fee2e2" : (ruleOk ? "#dcfce7" : "#f3f4f6")));
     const feedbackBorder = stickyActive
-        ? "#fca5a5"
+        ? (stickyViolation?.tone === "success" ? "#86efac" : "#fca5a5")
         : (ruleCheckState.sending ? "#93c5fd" : (ruleCheckState.error ? "#fca5a5" : (ruleOk ? "#86efac" : "#d1d5db")));
     const feedbackColor = stickyActive
-        ? "#991b1b"
+        ? (stickyViolation?.tone === "success" ? "#166534" : "#991b1b")
         : (ruleCheckState.sending ? "#1d4ed8" : (ruleCheckState.error ? "#991b1b" : (ruleOk ? "#166534" : "#374151")));
+
+    useEffect(() => {
+        setFocusPrefillPrompt(null);
+        setDismissedInitialPrefillPrompt(false);
+    }, [programCode]);
+
+    useEffect(() => {
+        const previous = focusSelectionTrackerRef.current;
+        const programChanged = previous?.programCode !== programCode;
+        const focusChanged = previous?.selectedFocus !== selectedFocus;
+        focusSelectionTrackerRef.current = { programCode, selectedFocus };
+        if (!plannerHydrated) return;
+        if (programChanged || !focusChanged) return;
+        if (programCode !== BACHELOR_PROGRAM_CODE) return;
+        if (!hasAnyPlannedOrDoneCourses) return;
+        setFocusPrefillPrompt({ focus: selectedFocus || "" });
+    }, [hasAnyPlannedOrDoneCourses, plannerHydrated, programCode, selectedFocus]);
+
+    const prefillPromptNode = focusPrefillPrompt ? (
+        <div
+            style={{
+                position: "fixed",
+                top: 64,
+                right: 12,
+                zIndex: 35,
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+                borderRadius: 10,
+                padding: 12,
+                width: 360,
+                display: "grid",
+                gap: 8,
+            }}
+        >
+            <div style={{ fontSize: 13, color: "#1e3a8a", fontWeight: 700 }}>
+                Focus changed to "{focusPrefillPrompt.focus || "No focus area"}".
+            </div>
+            <div style={{ fontSize: 12, color: "#1e40af" }}>
+                Apply the prebuilt bachelor plan for this focus area?
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+                <button
+                    onClick={() => {
+                        applyBachelorPrefilledPlan(focusPrefillPrompt.focus);
+                        setFocusPrefillPrompt(null);
+                    }}
+                    style={{
+                        border: "1px solid #60a5fa",
+                        background: "#dbeafe",
+                        color: "#1e3a8a",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                    }}
+                >
+                    Apply prebuilt plan
+                </button>
+                <button
+                    onClick={() => setFocusPrefillPrompt(null)}
+                    style={{
+                        border: "1px solid #93c5fd",
+                        background: "#ffffff",
+                        color: "#1e3a8a",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    Keep current plan
+                </button>
+            </div>
+        </div>
+    ) : ((shouldOfferInitialBachelorPrefill || shouldOfferInitialMasterPrefill) ? (
+        <div
+            style={{
+                position: "fixed",
+                top: 64,
+                right: 12,
+                zIndex: 35,
+                border: "1px solid #bbf7d0",
+                background: "#f0fdf4",
+                borderRadius: 10,
+                padding: 12,
+                width: 360,
+                display: "grid",
+                gap: 8,
+            }}
+        >
+            <div style={{ fontSize: 13, color: "#14532d", fontWeight: 700 }}>
+                {programCode === BACHELOR_PROGRAM_CODE ? "No bachelor courses are planned yet." : "No master courses are planned yet."}
+            </div>
+            <div style={{ fontSize: 12, color: "#166534" }}>
+                {programCode === BACHELOR_PROGRAM_CODE
+                    ? "Do you want to fill the table with the prebuilt bachelor plan?"
+                    : "Do you want to fill the table with the prebuilt master plan?"}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+                <button
+                    onClick={() => {
+                        const applied = programCode === BACHELOR_PROGRAM_CODE
+                            ? applyBachelorPrefilledPlan(selectedFocus)
+                            : applyMasterPrefilledPlan();
+                        if (applied) setDismissedInitialPrefillPrompt(true);
+                    }}
+                    style={{
+                        border: "1px solid #86efac",
+                        background: "#dcfce7",
+                        color: "#166534",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                    }}
+                >
+                    Fill with prebuilt plan
+                </button>
+                <button
+                    onClick={() => setDismissedInitialPrefillPrompt(true)}
+                    style={{
+                        border: "1px solid #86efac",
+                        background: "#ffffff",
+                        color: "#166534",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    Not now
+                </button>
+            </div>
+        </div>
+    ) : null);
 
     if (viewMode === "graph") {
         return (
             <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+                {prefillPromptNode}
                 <button
                     onClick={handleSignOut}
                     disabled={isSigningOut}
@@ -1926,6 +2575,7 @@ export default function App({ currentUser, onSignOut }) {
 
     return (
         <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+            {prefillPromptNode}
             <button
                 onClick={handleSignOut}
                 disabled={isSigningOut}

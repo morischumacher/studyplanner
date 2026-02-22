@@ -33,6 +33,12 @@ docker compose up -d --build
 
 This removes backend containers, networks, and volumes (database data), then starts fresh containers again.
 
+Or run this from the project root as a single command:
+
+```bash
+npm run backend:reset
+```
+
 ## What it does
 
 - Semester lanes are React Flow nodes, so they pan and zoom with the viewport.

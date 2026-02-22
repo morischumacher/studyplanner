@@ -220,8 +220,28 @@ class RuleChecker:
         map_course_to_module("DWI-VU", "Denkweisen der Informatik")
 
         # Algebra/Analysis variants
+        for c in [
+            "Algebra und Diskrete Mathematik",
+            "Algebra und Diskrete Mathematik (VO)",
+            "Algebra und Diskrete Mathematik (UE)",
+            "Algebra und Diskrete Mathematik (VU)",
+            "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik",
+            "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (UE)",
+            "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (VU)",
+        ]:
+            map_course_to_module(c, "Algebra und Diskrete Mathematik")
         for c in ["ADM-VO", "ADM-UE", "ADM-VU"]:
             map_course_to_module(c, "Algebra und Diskrete Mathematik")
+        for c in [
+            "Analysis",
+            "Analysis (VO)",
+            "Analysis (UE)",
+            "Analysis (VU)",
+            "Analysis für Informatik und Wirtschaftsinformatik",
+            "Analysis für Informatik und Wirtschaftsinformatik (UE)",
+            "Analysis für Informatik und Wirtschaftsinformatik (VU)",
+        ]:
+            map_course_to_module(c, "Analysis")
         for c in ["ANL-VO", "ANL-UE", "ANL-VU"]:
             map_course_to_module(c, "Analysis")
         for c in ["SWT-VO", "SWT-UE", "SWT-VU"]:
@@ -419,6 +439,11 @@ class RuleChecker:
             ("Einführung in die Programmierung 1", "Einführung in die Programmierung 2"),
             ("Software Engineering", "Software Engineering Projekt"),
         ]
+        self.split_variant_module_keys: Set[str] = {
+            self._norm("Algebra und Diskrete Mathematik"),
+            self._norm("Analysis"),
+            self._norm("Statistik und Wahrscheinlichkeitstheorie"),
+        }
 
     # ----------------------------
     # Internal: canonicalization
@@ -552,6 +577,18 @@ class RuleChecker:
             return True
         return self._norm(module_title) == self._norm("Freie Wahlfächer und Transferable Skills")
 
+    def _variant_part_for_course(self, course: dict[str, Any]) -> Optional[str]:
+        code_key = self._norm(self._course_code(course))
+        name_key = self._norm(course.get("name") or course.get("title") or "")
+        merged = f"{code_key} {name_key}".strip()
+        if " vu " in f" {merged} " or code_key.endswith(" vu") or "-vu" in code_key:
+            return "vu"
+        if " vo " in f" {merged} " or code_key.endswith(" vo") or "-vo" in code_key:
+            return "vo"
+        if " ue " in f" {merged} " or code_key.endswith(" ue") or "-ue" in code_key:
+            return "ue"
+        return None
+
     # ----------------------------
     # Evaluate
     # ----------------------------
@@ -591,6 +628,7 @@ class RuleChecker:
         # Store per-course canonical category (used later for StEOP pre-check)
         per_course_canonical_cat: Dict[str, str] = {}
         per_course_module_title: Dict[str, str] = {}
+        split_module_parts: Dict[str, Set[str]] = {}
 
         # Parse all courses
         for course, status in items:
@@ -621,6 +659,12 @@ class RuleChecker:
             module_title = self._infer_module_title(course)
             module_key = self._norm(module_title)
             per_course_module_title[code_key] = module_title
+            if module_key in self.split_variant_module_keys:
+                part = self._variant_part_for_course(course)
+                if part:
+                    if module_key not in split_module_parts:
+                        split_module_parts[module_key] = set()
+                    split_module_parts[module_key].add(part)
 
             canonical_cat = self._canonical_category(course, module_title, warnings)
             per_course_canonical_cat[code_key] = canonical_cat
@@ -648,6 +692,13 @@ class RuleChecker:
             for li, s in lane_ects.items():
                 if s > self.MAX_ECTS_PER_SEMESTER + 1e-6:
                     errors.append(f"rejected: semester {li+1} exceeds max load ({s:.1f} ECTS > {self.MAX_ECTS_PER_SEMESTER:.1f}).")
+
+        for module_key, parts in split_module_parts.items():
+            if "vu" in parts and ("vo" in parts or "ue" in parts):
+                module_title = self.modules.get(module_key, {}).get("title") or module_key
+                errors.append(
+                    f"rejected: {module_title} mixes variants. Use either VU or VO+UE, not both."
+                )
 
         # -----------------------------------------
         # StEOP: compute DONE (for gating) AND DONE+PLANNED (for progress)
