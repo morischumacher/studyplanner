@@ -509,6 +509,15 @@ class RuleChecker:
         if kind is None:
             return incoming
 
+        # FWTS accepts both free-choice and transferable-skills tagging.
+        # Keep explicit transferable_skills assignments, and also treat
+        # legacy FWTS payload categories (e.g. "elective") as transferable
+        # so existing plans are counted correctly for the TS minimum.
+        if kind == "fwts":
+            if incoming in ("free", "transferable_skills"):
+                return incoming
+            return "transferable_skills"
+
         expected = {
             "mandatory": "mandatory",
             "narrow_elective": "narrow_elective",
@@ -936,27 +945,69 @@ class RuleChecker:
                 def count_completed(from_list: List[str]) -> int:
                     return sum(1 for t in from_list if self._norm(t) in completed_modules)
 
+                focus_checklist: List[Dict[str, Any]] = []
+
                 req_list = f.get("required", [])
                 for t in req_list:
+                    done = self._norm(t) in completed_modules
+                    focus_checklist.append({
+                        "label": t,
+                        "done": done,
+                        "kind": "required",
+                    })
                     if self._norm(t) not in completed_modules:
                         focus_missing.append(f"Vertiefung: Pflichtmodul fehlt: {t}")
 
                 if "choose" in f:
                     choose = f["choose"]
+                    choose_from = choose.get("from", [])
+                    for t in choose_from:
+                        done = self._norm(t) in completed_modules
+                        focus_checklist.append({
+                            "label": t,
+                            "done": done,
+                            "kind": "choose",
+                        })
                     got = count_completed(choose["from"])
                     need = int(choose["min"])
                     if got < need:
                         focus_missing.append(f"Vertiefung: es fehlen {need - got} weitere Module aus der Vertiefungsliste.")
+                    focus_stats["choose"] = {
+                        "min": need,
+                        "done": got,
+                        "total": len(choose_from),
+                    }
 
                 if "choose_groups" in f:
+                    choose_groups_stats: List[Dict[str, Any]] = []
                     for grp in f["choose_groups"]:
+                        grp_from = grp.get("from", [])
+                        group_label = ", ".join(grp_from)
+                        for t in grp_from:
+                            done = self._norm(t) in completed_modules
+                            focus_checklist.append({
+                                "label": t,
+                                "done": done,
+                                "kind": "choose_group",
+                                "group": group_label,
+                            })
                         got = count_completed(grp["from"])
                         need = int(grp["min"])
                         if got < need:
                             focus_missing.append(f"Vertiefung: es fehlen {need - got} Module aus der Gruppe: {', '.join(grp['from'])}")
+                        choose_groups_stats.append({
+                            "label": group_label,
+                            "min": need,
+                            "done": got,
+                            "total": len(grp_from),
+                        })
+                    focus_stats["chooseGroups"] = choose_groups_stats
 
                 focus_stats["missingCount"] = len(focus_missing)
                 focus_stats["missing"] = focus_missing[:]
+                focus_stats["checklist"] = focus_checklist
+                focus_stats["checklistDoneCount"] = sum(1 for item in focus_checklist if item.get("done"))
+                focus_stats["checklistTotalCount"] = len(focus_checklist)
             else:
                 warnings.append(f"Vertiefung-Hinweis: selectedFocus '{focus_raw}' ist unbekannt (nicht in der curricularen Liste/Aliases).")
 
