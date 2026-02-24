@@ -45,20 +45,26 @@ function buildTree(catalog, subjectColors) {
         const subjectColor = subjectColors?.[subjectName] ?? "#4b5563";
         const sourceModules = pf?.modules || [];
         const modules = sourceModules.flatMap((mod, modIdx) => {
-            const courses = mod?.courses || [];
+            const rawCourses = Array.isArray(mod?.courses) ? mod.courses : [];
+            const hasNoCourses = rawCourses.length === 0;
+            const courses = rawCourses;
 
             // Match table behavior: module wrapper only if module has multiple courses.
-            if (courses.length === 1) {
+            // For modules without explicit child courses (e.g. FWTS), also render as
+            // direct course node like table/sidebar.
+            if (hasNoCourses || courses.length === 1) {
                 const course = courses[0];
                 return [{
                     id: `course-${pfIdx}-${modIdx}-single-${course?.code || mod?.code || "course"}`,
-                    label: `${course?.name || mod?.name || "Course"}`,
+                    label: `${hasNoCourses ? (mod?.name || "Course") : (course?.name || mod?.name || "Course")}`,
                     level: "courseDirect",
                     color: subjectColor,
-                    courseCode: course?.code ?? mod?.code ?? "",
-                    courseName: course?.name ?? mod?.name ?? "Course",
-                    ects: course?.ects ?? mod?.ects ?? null,
-                    courseType: GraphFilterEngine.normalizeCourseType(course?.type, course?.code ?? mod?.code),
+                    courseCode: hasNoCourses ? (mod?.code ?? "") : (course?.code ?? mod?.code ?? ""),
+                    courseName: hasNoCourses ? (mod?.name ?? "Course") : (course?.name ?? mod?.name ?? "Course"),
+                    ects: hasNoCourses ? (mod?.ects ?? null) : (course?.ects ?? mod?.ects ?? null),
+                    courseType: hasNoCourses
+                        ? GraphFilterEngine.normalizeCourseType(null, mod?.code)
+                        : GraphFilterEngine.normalizeCourseType(course?.type, course?.code ?? mod?.code),
                     category: mod?.category ?? null,
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     isMandatory: Boolean(mod?.is_mandatory),
@@ -142,6 +148,183 @@ function collectCollapsibleIds(node, out = new Set()) {
     if (node?.level !== "root" && children.length > 0) out.add(node.id);
     for (const child of children) collectCollapsibleIds(child, out);
     return out;
+}
+
+function findTreeNodeById(node, targetId) {
+    if (!node) return null;
+    if (node.id === targetId) return node;
+    const children = Array.isArray(node.children) ? node.children : [];
+    for (const child of children) {
+        const found = findTreeNodeById(child, targetId);
+        if (found) return found;
+    }
+    return null;
+}
+
+function collectDescendants(node, out = []) {
+    const children = Array.isArray(node?.children) ? node.children : [];
+    for (const child of children) {
+        out.push(child);
+        collectDescendants(child, out);
+    }
+    return out;
+}
+
+function computeTreeNodeStatus(node, getCourseStatus) {
+    if (!node) return null;
+    if (node.level === "course" || node.level === "courseDirect") {
+        return getCourseStatus?.(node?.courseCode) ?? "todo";
+    }
+    if (node.level === "module") {
+        const codes = Array.isArray(node?.moduleCourseCodes)
+            ? node.moduleCourseCodes
+            : (Array.isArray(node?.children) ? node.children.map((c) => c?.courseCode).filter(Boolean) : []);
+        const statuses = codes.map((code) => getCourseStatus?.(code) ?? "todo");
+        if (statuses.length === 0) return "todo";
+        if (statuses.every((s) => s === "done")) return "done";
+        if (statuses.some((s) => s === "in_plan" || s === "done")) return "in_plan";
+        return "todo";
+    }
+    return null;
+}
+
+function toFilterCandidateNode(treeNode, getCourseStatus) {
+    return {
+        data: {
+            level: treeNode?.level,
+            label: treeNode?.label,
+            subjectName: treeNode?.level === "subject" ? treeNode?.label : null,
+            courseCode: treeNode?.courseCode ?? null,
+            courseType: treeNode?.courseType ?? null,
+            ects: treeNode?.ects ?? null,
+            moduleEcts: treeNode?.moduleEcts ?? null,
+            moduleCourseTypes: treeNode?.moduleCourseTypes ?? [],
+            moduleCourseEcts: treeNode?.moduleCourseEcts ?? [],
+            category: treeNode?.category ?? null,
+            examSubject: treeNode?.examSubject ?? (treeNode?.level === "subject" ? treeNode?.label : null),
+            isMandatory: Boolean(treeNode?.isMandatory),
+            status: computeTreeNodeStatus(treeNode, getCourseStatus),
+        },
+    };
+}
+
+function relaxFiltersForExpandedSubtree({
+    root,
+    expandedNodeId,
+    currentFilters,
+    ectsBounds,
+    programCode,
+    getCourseStatus,
+}) {
+    const subtreeRoot = findTreeNodeById(root, expandedNodeId);
+    if (!subtreeRoot) return currentFilters;
+    const descendants = collectDescendants(subtreeRoot, []);
+    if (descendants.length === 0) return currentFilters;
+    const descendantNodes = descendants.map((treeNode) => toFilterCandidateNode(treeNode, getCourseStatus));
+
+    let next = GraphFilterEngine.normalizeFilters(currentFilters, ectsBounds, programCode);
+    const addUnique = (key, value) => {
+        if (!value) return false;
+        const list = Array.isArray(next?.[key]) ? next[key] : [];
+        if (list.includes(value)) return false;
+        next = { ...next, [key]: [...list, value] };
+        return true;
+    };
+
+    for (let pass = 0; pass < 3; pass += 1) {
+        const hiddenCandidates = descendantNodes
+            .filter((node) => !GraphFilterEngine.nodeMatchesFilters(node, next, programCode));
+        if (hiddenCandidates.length === 0) break;
+
+        let changed = false;
+        for (const node of hiddenCandidates) {
+            const data = node?.data || {};
+
+            if (Array.isArray(next?.examSubjects) && next.examSubjects.length > 0) {
+                const subject = data?.examSubject ?? data?.subjectName ?? null;
+                changed = addUnique("examSubjects", subject) || changed;
+            }
+
+            if (Array.isArray(next?.obligationTypes) && next.obligationTypes.length > 0) {
+                const obligation = GraphFilterEngine.obligationForNodeData(data, programCode);
+                changed = addUnique("obligationTypes", obligation) || changed;
+            }
+
+            if (Array.isArray(next?.progressStates) && next.progressStates.length > 0) {
+                const status = String(data?.status || "");
+                changed = addUnique("progressStates", status) || changed;
+            }
+
+            if (Array.isArray(next?.courseTypes)) {
+                if (data?.level === "module") {
+                    const types = Array.isArray(data?.moduleCourseTypes) ? data.moduleCourseTypes : [];
+                    for (const type of types) {
+                        changed = addUnique("courseTypes", type) || changed;
+                    }
+                } else if (data?.level === "course" || data?.level === "courseDirect") {
+                    const type = GraphFilterEngine.normalizeCourseType(data?.courseType, data?.courseCode);
+                    changed = addUnique("courseTypes", type) || changed;
+                }
+            }
+
+            const range = next?.ectsRange;
+            if (range && Number.isFinite(Number(range.min)) && Number.isFinite(Number(range.max))) {
+                const currentMin = Number(range.min);
+                const currentMax = Number(range.max);
+                const ectsValues = data?.level === "module"
+                    ? (Array.isArray(data?.moduleCourseEcts) ? data.moduleCourseEcts : [])
+                    : [data?.ects ?? data?.moduleEcts];
+                const finiteValues = ectsValues
+                    .map((x) => Number(x))
+                    .filter((x) => Number.isFinite(x));
+                if (finiteValues.length > 0) {
+                    const minValue = Math.min(...finiteValues);
+                    const maxValue = Math.max(...finiteValues);
+                    const nextMin = Math.min(currentMin, minValue);
+                    const nextMax = Math.max(currentMax, maxValue);
+                    if (nextMin !== currentMin || nextMax !== currentMax) {
+                        next = {
+                            ...next,
+                            ectsRange: { min: nextMin, max: nextMax },
+                        };
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        if (!changed) break;
+    }
+
+    // Force-unblock progress/obligation for manually expanded subtree.
+    // This avoids a dead-end where strict empty selections hide all children.
+    const stillHidden = descendantNodes
+        .filter((node) => !GraphFilterEngine.nodeMatchesFilters(node, next, programCode));
+    if (stillHidden.length > 0) {
+        if (Array.isArray(next?.progressStates) && next.progressStates.length === 0) {
+            const statuses = new Set(
+                stillHidden
+                    .map((node) => String(node?.data?.status || ""))
+                    .filter(Boolean)
+            );
+            const safeStatuses = statuses.size > 0 ? Array.from(statuses) : ["todo", "in_plan", "done"];
+            next = { ...next, progressStates: safeStatuses };
+        }
+
+        if (Array.isArray(next?.obligationTypes) && next.obligationTypes.length === 0) {
+            const obligations = new Set();
+            for (const node of stillHidden) {
+                const obligation = GraphFilterEngine.obligationForNodeData(node?.data || {}, programCode);
+                if (obligation) obligations.add(obligation);
+            }
+            const safeObligations = obligations.size > 0
+                ? Array.from(obligations)
+                : GraphFilterEngine.obligationOptionsForProgram(programCode).map((x) => x.value).filter(Boolean);
+            next = { ...next, obligationTypes: safeObligations };
+        }
+    }
+
+    return next;
 }
 
 function layoutTree(root, collapsedIds, options = {}) {
@@ -671,9 +854,24 @@ export default function CurriculumGraphView({
     const onNodeClick = useCallback((_, node) => {
         if (node?.data?.level === "root" || !node?.data?.hasChildren) return;
         const wasForced = hierarchyMode !== "normal";
+        const wasCollapsed = effectiveCollapsedIds.has(node.id);
         if (wasForced) {
             setHierarchyMode("normal");
             collapsedBeforeForceHierarchyRef.current = null;
+        }
+        if (wasCollapsed) {
+            markFiltersConfigured();
+            filtersDirtyRef.current = true;
+            setGraphFilters((prev) => {
+                return relaxFiltersForExpandedSubtree({
+                    root,
+                    expandedNodeId: node.id,
+                    currentFilters: prev,
+                    ectsBounds: filterOptions?.ectsBounds,
+                    programCode,
+                    getCourseStatus,
+                });
+            });
         }
         setCollapsedIds((prev) => {
             const next = wasForced ? new Set(effectiveCollapsedIds) : new Set(prev);
@@ -681,7 +879,15 @@ export default function CurriculumGraphView({
             else next.add(node.id);
             return next;
         });
-    }, [hierarchyMode, effectiveCollapsedIds]);
+    }, [
+        hierarchyMode,
+        effectiveCollapsedIds,
+        root,
+        getCourseStatus,
+        filterOptions?.ectsBounds,
+        markFiltersConfigured,
+        programCode,
+    ]);
 
     const dragStartPosById = useRef(new Map());
     const dragLeaderIdRef = useRef(null);
@@ -963,18 +1169,28 @@ export default function CurriculumGraphView({
                         </button>
                         <button
                             onClick={() => {
+                                markFiltersConfigured();
+                                filtersDirtyRef.current = true;
+                                setGraphFilters((prev) => {
+                                    const normalized = GraphFilterEngine.normalizeFilters(
+                                        prev,
+                                        filterOptions?.ectsBounds,
+                                        programCode
+                                    );
+                                    const reset = buildDefaultFilters(normalized);
+                                    return {
+                                        ...reset,
+                                        examSubjects: Array.isArray(normalized?.examSubjects)
+                                            ? normalized.examSubjects
+                                            : [],
+                                    };
+                                });
                                 setHierarchyMode("force_expanded");
-                                const next = new Set();
-                                setCollapsedIds(next);
-                                setGraphViewState?.((prev) => ({ ...prev, collapsedIds: [] }));
                                 scheduleFitToGraph();
                             }}
                             style={{
                                 border: "1px solid #d1d5db",
-                                background: (
-                                    hierarchyMode === "force_expanded" ||
-                                    (allCollapsibleIds.size > 0 && collapsedIds.size === 0)
-                                ) ? "#dbeafe" : "#ffffff",
+                                background: hierarchyMode === "force_expanded" ? "#dbeafe" : "#ffffff",
                                 borderRadius: 6,
                                 padding: "4px 8px",
                                 fontSize: 11,
@@ -986,18 +1202,30 @@ export default function CurriculumGraphView({
                         </button>
                         <button
                             onClick={() => {
-                                setHierarchyMode("normal");
-                                const next = new Set(allCollapsibleIds);
-                                setCollapsedIds(next);
-                                setGraphViewState?.((prev) => ({ ...prev, collapsedIds: Array.from(next) }));
+                                markFiltersConfigured();
+                                filtersDirtyRef.current = true;
+                                setGraphFilters((prev) => {
+                                    const normalized = GraphFilterEngine.normalizeFilters(
+                                        prev,
+                                        filterOptions?.ectsBounds,
+                                        programCode
+                                    );
+                                    return {
+                                        ...normalized,
+                                        obligationTypes: [],
+                                        courseTypes: [],
+                                        examSubjects: Array.isArray(normalized?.examSubjects)
+                                            ? normalized.examSubjects
+                                            : [],
+                                        progressStates: [],
+                                    };
+                                });
+                                setHierarchyMode("force_collapsed");
                                 scheduleFitToGraph();
                             }}
                             style={{
                                 border: "1px solid #d1d5db",
-                                background: (
-                                    allCollapsibleIds.size > 0 &&
-                                    collapsedIds.size === allCollapsibleIds.size
-                                ) ? "#dbeafe" : "#ffffff",
+                                background: hierarchyMode === "force_collapsed" ? "#dbeafe" : "#ffffff",
                                 borderRadius: 6,
                                 padding: "4px 8px",
                                 fontSize: 11,

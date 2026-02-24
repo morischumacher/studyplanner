@@ -114,13 +114,19 @@ export default class GraphFilterEngine {
         }
 
         const selectedObligationTypes = Array.isArray(filters.obligationTypes) ? filters.obligationTypes : [];
-        if (selectedObligationTypes.length > 0) {
+        if (Array.isArray(filters.obligationTypes)) {
+            // Obligation type selection is strict:
+            // all selected -> all visible, none selected -> none visible.
+            if (selectedObligationTypes.length === 0) return false;
             const obligation = this.obligationForNodeData(data, programCode);
             // Keep nodes with unknown obligation metadata visible.
             if (obligation && !selectedObligationTypes.includes(obligation)) return false;
         }
 
-        if (Array.isArray(filters.progressStates) && filters.progressStates.length > 0) {
+        if (Array.isArray(filters.progressStates)) {
+            // Progress state selection is strict:
+            // all selected -> all visible, none selected -> none visible.
+            if (filters.progressStates.length === 0) return false;
             const status = String(data?.status || "todo");
             if (!filters.progressStates.includes(status)) return false;
         }
@@ -149,7 +155,9 @@ export default class GraphFilterEngine {
                 if (!moduleTypes.some((t) => filters.courseTypes.includes(t))) return false;
             } else {
                 const courseType = this.normalizeCourseType(data?.courseType, data?.courseCode);
-                if (!courseType || !filters.courseTypes.includes(courseType)) return false;
+                // Keep nodes with unknown/unclear type visible to avoid hiding synthetic or
+                // catalog-incomplete entries (e.g. FWTS standalone items).
+                if (courseType && !filters.courseTypes.includes(courseType)) return false;
             }
         }
 
