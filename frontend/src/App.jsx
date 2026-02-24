@@ -27,15 +27,13 @@ import {
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
+import PlannerNotifications from "./components/app/PlannerNotifications.jsx";
 import {
     CANVAS_HEIGHT,
-    CARD_WIDTH,
     COLLISION_GAP,
     GRID_SIZE,
     LANE_GAP,
     LANE_WIDTH,
-    GROUP_EXTRA_RIGHT,
-    GROUP_PADDING_X,
     GROUP_PADDING_Y,
     COURSE_VERTICAL_GAP,
     COURSE_LAYOUT_HEIGHT,
@@ -48,6 +46,34 @@ import { buildSemesterList, semesterBoundsForProgram } from "./utils/semesters.j
 import { buildBachelorPrefillPlan } from "./utils/bachelorPrefillPlan.js";
 import { buildMasterPrefillPlan } from "./utils/masterPrefillPlan.js";
 import { resolveModuleVariantCourses } from "./utils/bachelorCourseVariants.js";
+import {
+    BACHELOR_FOCUS_OPTIONS,
+    BACHELOR_PROGRAM_CODE,
+    DEFAULT_DONE_SECTION_ORDER,
+    DEFAULT_PLANNED_SECTION_ORDER,
+    EMPTY_RULE_CHECK_STATE,
+    FOCUS_INFO_TEXT,
+    MASTER_PROGRAM_CODE,
+    PROGRAM_OPTIONS,
+    STEOP_RULES_TEXT,
+    sanitizeSectionOrder,
+} from "./app/constants.js";
+import {
+    getCourseTypeForCode,
+    getExamSubjectForCode,
+    normalizeCatalog,
+    normalizeRulecheckCategoryForProgram,
+    resolveDashboardCategoryForProgram,
+} from "./app/catalogUtils.js";
+import {
+    compactPrefillLayout as compactPrefillLayoutBase,
+    laneIdx,
+    recomputeGroupFromChildren,
+    resolveGroupCourseOverlaps,
+    resolveLaneCollisions as resolveLaneCollisionsBase,
+} from "./lib/flowLayout.js";
+import { useDashboardSectionOrdering } from "./hooks/useDashboardSectionOrdering.js";
+import { useDashboardMetrics } from "./hooks/useDashboardMetrics.jsx";
 
 /*********************************
  * React Flow node type registry *
@@ -56,201 +82,6 @@ const NODE_TYPES = {
     course: CourseCard,
     lane: LaneColumn,
     moduleBg: ModuleGroupBackground,
-};
-
-const PROGRAM_OPTIONS = [
-    { code: "066 937", label: "Master Software Engineering" },
-    { code: "033 521", label: "Bachelor Informatics" },
-];
-const MASTER_PROGRAM_CODE = "066 937";
-const BACHELOR_PROGRAM_CODE = "033 521";
-const BACHELOR_FOCUS_OPTIONS = [
-    "Artificial Intelligence und Machine Learning",
-    "Cybersecurity",
-    "Digital Health",
-    "Human-Centered Computing",
-    "Software Engineering",
-    "Theoretische Informatik und Logik",
-    "Visual Computing",
-];
-const STEOP_RULES_TEXT = `Die Studieneingangs- und Orientierungsphase des Bachelorstudiums Informatik umfasst die Lehrveranstaltungen
-5,5 VU Einfuehrung in die Programmierung 1
-2,0 VU Mathematisches Arbeiten fuer Informatik und Wirtschaftsinformatik
-1,0 VU Orientierung Informatik und Wirtschaftsinformatik
-sowie mindestens 8 ECTS aus dem Pool folgender Lehrveranstaltungen:
-4,0 VO Algebra und Diskrete Mathematik fuer Informatik und Wirtschaftsinformatik
-5,0 UE Algebra und Diskrete Mathematik fuer Informatik und Wirtschaftsinformatik
-9,0 VU Algebra und Diskrete Mathematik fuer Informatik und Wirtschaftsinformatik
-2,0 VO Analysis fuer Informatik und Wirtschaftsinformatik
-4,0 UE Analysis fuer Informatik und Wirtschaftsinformatik
-6,0 VU Analysis fuer Informatik und Wirtschaftsinformatik
-5,5 VU Denkweisen der Informatik
-6,0 VU Grundzuege digitaler Systeme
-Vor positiver Absolvierung der StEOP duerfen weitere Lehrveranstaltungen im Umfang von 22 ECTS absolviert werden, die aus den oben genannten Lehrveranstaltungen und den folgenden gewaehlt werden koennen:
-8,0 VU Algorithmen und Datenstrukturen
-6,0 VU Datenbanksysteme
-6,0 VU Daten- und Informatikrecht
-4,0 VU Einfuehrung in die Programmierung 2
-6,0 VU Einfuehrung in Visual Computing
-Weiters koennen Lehrveranstaltungen im Rahmen des Moduls Freie Wahlfaecher und Transferable Skills gewaehlt werden, sofern deren Absolvierung nicht anderweitig beschraenkt ist.`;
-const FOCUS_INFO_TEXT = `Die Vertiefung (Focus Area) wird nur ausgewertet, wenn sie ausgewaehlt ist.
-Der Rulechecker meldet dann:
-- ob die Vertiefung erkannt wurde,
-- wie viele Vertiefungsanforderungen noch fehlen.
-Die Detailhinweise findest du in "Missing Requirements".`;
-
-/** Return lane index for a node (based on its X). */
-function laneIdx(node) {
-    const span = LANE_WIDTH + LANE_GAP;
-    const idx = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
-    return Math.max(0, idx);
-}
-
-/***********************
- * Module group background (size/position) calc *
- ***********************************************/
-/**
- * Recompute a group background node's size and position from its child course nodes.
- * If the group has no children, remove the group node.
- */
-function recomputeGroupFromChildren(nodes, groupId) {
-    const children = nodes.filter((n) => n.type === "course" && n.data?.groupId === groupId);
-    const group = nodes.find((n) => n.type === "moduleBg" && n.id === groupId);
-    if (!group) return nodes;
-
-    // No children → remove the group background.
-    if (children.length === 0) return nodes.filter((n) => n.id !== groupId);
-
-    // Compute bounding box around children (spanning multiple lanes if needed).
-    const minX = Math.min(...children.map((c) => c.position.x));
-    const minY = Math.min(...children.map((c) => c.position.y));
-    const maxX = Math.max(...children.map((c) => c.position.x + CARD_WIDTH));
-    const maxY = Math.max(...children.map((c) => c.position.y + COURSE_LAYOUT_HEIGHT));
-
-    // Keep module groups visually centered while still reserving slightly more room on the right.
-    const extraLeft = GROUP_EXTRA_RIGHT * 0.35;
-    const width = maxX - minX + GROUP_PADDING_X * 2 + GROUP_EXTRA_RIGHT;
-    const statuses = children.map((c) => c?.data?.status ?? "in_plan");
-    const groupStatus = statuses.every((s) => s === "done")
-        ? "done"
-        : (statuses.some((s) => s === "in_plan" || s === "done") ? "in_plan" : "todo");
-    const moduleEctsFromChildren = children.reduce((sum, c) => sum + Number(c?.data?.ects || 0), 0);
-    const moduleCourseCodes = children.map((c) => c?.data?.code).filter(Boolean);
-    const height = maxY - minY + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT + MODULE_BOTTOM_PADDING;
-
-    return nodes.map((n) =>
-        n.id === groupId
-            ? {
-                ...n,
-                position: {
-                    x: minX - GROUP_PADDING_X - extraLeft,
-                    y: minY - GROUP_PADDING_Y - MODULE_HEADER_HEIGHT,
-                },
-                data: {
-                    ...n.data,
-                    width,
-                    height,
-                    moduleCourseCount: children.length,
-                    moduleEcts: Number(n?.data?.moduleEcts ?? 0) || moduleEctsFromChildren || null,
-                    moduleCourseCodes,
-                    status: groupStatus,
-                },
-            }
-            : n
-    );
-}
-
-function resolveGroupCourseOverlaps(nodes, groupId) {
-    const children = nodes
-        .filter((n) => n.type === "course" && n.data?.groupId === groupId)
-        .sort((a, b) => a.position.y - b.position.y);
-    if (children.length <= 1) return nodes;
-
-    let next = nodes.slice();
-    const placed = [];
-    for (const child of children) {
-        const current = next.find((n) => n.id === child.id) || child;
-        let minY = current.position.y;
-        for (const prior of placed) {
-            const xOverlap =
-                current.position.x < prior.position.x + CARD_WIDTH + COLLISION_GAP &&
-                current.position.x + CARD_WIDTH + COLLISION_GAP > prior.position.x;
-            if (!xOverlap) continue;
-            minY = Math.max(minY, prior.position.y + COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
-        }
-        if (current.position.y < minY) {
-            next = next.map((n) => (
-                n.id === child.id ? { ...n, position: { x: n.position.x, y: minY } } : n
-            ));
-        }
-        placed.push(next.find((n) => n.id === child.id) || current);
-    }
-    return next;
-}
-
-/****************************************
- * Catalog → exam subject lookup helpers *
- ****************************************/
-/**
- * Walk a normalized catalog to find the exam subject tied to a module or course code.
- * Returns the closest module exam subject; falls back to parent subject.
- */
-function getExamSubjectForCode(catalog, code) {
-    if (!code) return null;
-    for (const pf of catalog || []) {
-        const pfName = pf.pruefungsfach ?? null;
-        for (const mod of pf.modules || []) {
-            if (mod.code === code) return mod.module_exam_subject || pfName || null; // module by code
-            for (const c of mod.courses || []) {
-                if (c.code === code) return mod.module_exam_subject || pfName || null; // child course by code
-            }
-        }
-    }
-    return null;
-}
-
-function getCourseTypeForCode(catalog, code) {
-    if (!code) return null;
-    for (const pf of catalog || []) {
-        for (const mod of pf.modules || []) {
-            for (const c of mod.courses || []) {
-                if (c.code === code) return c.type ?? null;
-            }
-        }
-    }
-    return null;
-}
-
-/***********************************
- * Normalize backend payload → UI  *
- ***********************************/
-const normalizeCatalog = (raw) => {
-    const subjects = Array.isArray(raw) ? raw : [];
-    if (!subjects.length) return [];
-
-    return subjects.map((s, sIdx) => {
-        const modules = Array.isArray(s.modules) ? s.modules : [];
-        return {
-            pruefungsfach: s.exam_subject ?? `Prüfungsfach ${sIdx + 1}`,
-            modules: modules.map((m) => {
-                const courses = Array.isArray(m.courses) ? m.courses : [];
-                return {
-                    code: courses[0]?.code ?? m.code ?? `M-${sIdx}`,
-                    name: m.name ?? "Ohne Titel",
-                    ects: Number(m.ects) || 0,
-                    category: m.category ?? null,
-                    is_mandatory: !!m.is_mandatory,
-                    module_exam_subject: m.module_exam_subject ?? s.exam_subject ?? null,
-                    courses: courses.map((c) => ({
-                        name: c.title ?? c.name ?? "",
-                        code: c.code ?? "",
-                        ects: Number(c.ects) || null,
-                        type: c.type ?? null,
-                    })),
-                };
-            }),
-        };
-    });
 };
 
 /****************
@@ -281,17 +112,26 @@ export default function App({ currentUser, onSignOut }) {
     const [catalog, setCatalog] = useState([]);
     const [loadingCatalog, setLoadingCatalog] = useState(false);
     const [catalogError, setCatalogError] = useState("");
-    const [ruleCheckState, setRuleCheckState] = useState({
-        sending: false,
-        error: "",
-        response: null,
-        lastUpdatedAt: null,
-    });
+    const [ruleCheckStateByProgram, setRuleCheckStateByProgram] = useState({});
     const [isRuleDashboardOpen, setIsRuleDashboardOpen] = useState(false);
+    const [dashboardViewMode, setDashboardViewMode] = useState("planning");
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isSteopInfoOpen, setIsSteopInfoOpen] = useState(false);
+    const [isSteopChecklistOpen, setIsSteopChecklistOpen] = useState(false);
     const [isFocusInfoOpen, setIsFocusInfoOpen] = useState(false);
+    const [isFocusChecklistOpen, setIsFocusChecklistOpen] = useState(false);
+    const [isExamSubjectProgressOpen, setIsExamSubjectProgressOpen] = useState(false);
+    const [isPerSemesterEctsOpen, setIsPerSemesterEctsOpen] = useState(false);
+    const [isDonePerSemesterEctsOpen, setIsDonePerSemesterEctsOpen] = useState(false);
+    const [isPlannedExamSubjectOpen, setIsPlannedExamSubjectOpen] = useState(false);
+    const [isByCategoryOpen, setIsByCategoryOpen] = useState(false);
+    const [isDoneByCategoryOpen, setIsDoneByCategoryOpen] = useState(false);
+    const [isMissingRequirementsOpen, setIsMissingRequirementsOpen] = useState(false);
+    const [isWarningsOpen, setIsWarningsOpen] = useState(false);
+    const [plannedDashboardSectionOrder, setPlannedDashboardSectionOrder] = useState(DEFAULT_PLANNED_SECTION_ORDER);
+    const [doneDashboardSectionOrder, setDoneDashboardSectionOrder] = useState(DEFAULT_DONE_SECTION_ORDER);
     const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0, tone: "" });
+    const [progressMilestone, setProgressMilestone] = useState({ text: "", until: 0 });
     const subjectColors = useMemo(
         () => createExamSubjectColorMap((catalog || []).map((pf) => pf?.pruefungsfach).filter(Boolean)),
         [catalog]
@@ -301,18 +141,32 @@ export default function App({ currentUser, onSignOut }) {
     const wrapperRef = useRef(null);
     const rfRef = useRef(null);
     const groupDragRef = useRef(new Map()); // Map<groupId, { lastX, lastY }>
-    const latestRuleCheckChangeIdRef = useRef(null);
+    const latestRuleCheckChangeIdRef = useRef({});
     const pendingInitialSyncProgramRef = useRef(programCode);
     const pendingDragPayloadRef = useRef(null);
     const savePlannerTimerRef = useRef(null);
     const hydratedProgramRef = useRef(null);
     const latestGraphSnapshotRef = useRef(null);
+    const loadedDashboardUiRef = useRef({ byProgram: {}, global: {} });
+    const progressMilestoneRef = useRef({ programCode: null, pct: 0 });
     const [plannerHydrated, setPlannerHydrated] = useState(false);
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [focusPrefillPrompt, setFocusPrefillPrompt] = useState(null);
     const [dismissedInitialPrefillPrompt, setDismissedInitialPrefillPrompt] = useState(false);
     const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
+    const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
+    const setProgramRuleCheckState = useCallback((targetProgramCode, updater) => {
+        if (!targetProgramCode) return;
+        setRuleCheckStateByProgram((prev) => {
+            const current = prev?.[targetProgramCode] ?? EMPTY_RULE_CHECK_STATE;
+            const next = typeof updater === "function" ? updater(current) : updater;
+            return {
+                ...(prev || {}),
+                [targetProgramCode]: next,
+            };
+        });
+    }, []);
 
     const buildPersistSnapshot = useCallback(() => {
         const snapshot = exportPlannerStateSnapshot?.() || {};
@@ -326,11 +180,60 @@ export default function App({ currentUser, onSignOut }) {
                 },
             };
         }
+        snapshot.dashboardUiByProgram = {
+            ...(snapshot.dashboardUiByProgram || {}),
+            [programCode]: {
+                dashboardViewMode,
+                isSteopInfoOpen,
+                isSteopChecklistOpen,
+                isFocusInfoOpen,
+                isFocusChecklistOpen,
+                isExamSubjectProgressOpen,
+                isPerSemesterEctsOpen,
+                isDonePerSemesterEctsOpen,
+                isPlannedExamSubjectOpen,
+                isByCategoryOpen,
+                isDoneByCategoryOpen,
+                isMissingRequirementsOpen,
+                isWarningsOpen,
+                plannedDashboardSectionOrder: sanitizeSectionOrder(plannedDashboardSectionOrder, DEFAULT_PLANNED_SECTION_ORDER),
+                doneDashboardSectionOrder: sanitizeSectionOrder(doneDashboardSectionOrder, DEFAULT_DONE_SECTION_ORDER),
+            },
+        };
+        snapshot.dashboardUiGlobal = {
+            ...(snapshot.dashboardUiGlobal || {}),
+            isRuleDashboardOpen,
+            isLegendOpen,
+        };
         return snapshot;
-    }, [exportPlannerStateSnapshot, programCode]);
+    }, [
+        exportPlannerStateSnapshot,
+        programCode,
+        dashboardViewMode,
+        isSteopInfoOpen,
+        isSteopChecklistOpen,
+        isFocusInfoOpen,
+        isFocusChecklistOpen,
+        isExamSubjectProgressOpen,
+        isPerSemesterEctsOpen,
+        isDonePerSemesterEctsOpen,
+        isPlannedExamSubjectOpen,
+        isByCategoryOpen,
+        isDoneByCategoryOpen,
+        isMissingRequirementsOpen,
+        isWarningsOpen,
+        plannedDashboardSectionOrder,
+        doneDashboardSectionOrder,
+        isRuleDashboardOpen,
+        isLegendOpen,
+    ]);
 
     useEffect(() => {
         latestGraphSnapshotRef.current = null;
+    }, [programCode]);
+
+    useEffect(() => {
+        pendingInitialSyncProgramRef.current = programCode;
     }, [programCode]);
 
     useEffect(() => {
@@ -370,7 +273,35 @@ export default function App({ currentUser, onSignOut }) {
             try {
                 const payload = await fetchPlannerState();
                 if (cancelled) return;
-                importPlannerStateSnapshot(payload?.state ?? {});
+                const state = payload?.state ?? {};
+                importPlannerStateSnapshot(state);
+                loadedDashboardUiRef.current = {
+                    byProgram: state?.dashboardUiByProgram && typeof state.dashboardUiByProgram === "object" ? state.dashboardUiByProgram : {},
+                    global: state?.dashboardUiGlobal && typeof state.dashboardUiGlobal === "object" ? state.dashboardUiGlobal : {},
+                };
+                const dashboardUi = loadedDashboardUiRef.current.byProgram?.[programCode] || {};
+                const dashboardUiGlobal = loadedDashboardUiRef.current.global || {};
+                if (typeof dashboardUi?.dashboardViewMode === "string") setDashboardViewMode(dashboardUi.dashboardViewMode);
+                if (typeof dashboardUi?.isSteopInfoOpen === "boolean") setIsSteopInfoOpen(dashboardUi.isSteopInfoOpen);
+                if (typeof dashboardUi?.isSteopChecklistOpen === "boolean") setIsSteopChecklistOpen(dashboardUi.isSteopChecklistOpen);
+                if (typeof dashboardUi?.isFocusInfoOpen === "boolean") setIsFocusInfoOpen(dashboardUi.isFocusInfoOpen);
+                if (typeof dashboardUi?.isFocusChecklistOpen === "boolean") setIsFocusChecklistOpen(dashboardUi.isFocusChecklistOpen);
+                if (typeof dashboardUi?.isExamSubjectProgressOpen === "boolean") setIsExamSubjectProgressOpen(dashboardUi.isExamSubjectProgressOpen);
+                if (typeof dashboardUi?.isPerSemesterEctsOpen === "boolean") setIsPerSemesterEctsOpen(dashboardUi.isPerSemesterEctsOpen);
+                if (typeof dashboardUi?.isDonePerSemesterEctsOpen === "boolean") setIsDonePerSemesterEctsOpen(dashboardUi.isDonePerSemesterEctsOpen);
+                if (typeof dashboardUi?.isPlannedExamSubjectOpen === "boolean") setIsPlannedExamSubjectOpen(dashboardUi.isPlannedExamSubjectOpen);
+                if (typeof dashboardUi?.isByCategoryOpen === "boolean") setIsByCategoryOpen(dashboardUi.isByCategoryOpen);
+                if (typeof dashboardUi?.isDoneByCategoryOpen === "boolean") setIsDoneByCategoryOpen(dashboardUi.isDoneByCategoryOpen);
+                if (typeof dashboardUi?.isMissingRequirementsOpen === "boolean") setIsMissingRequirementsOpen(dashboardUi.isMissingRequirementsOpen);
+                if (typeof dashboardUi?.isWarningsOpen === "boolean") setIsWarningsOpen(dashboardUi.isWarningsOpen);
+                setPlannedDashboardSectionOrder(
+                    sanitizeSectionOrder(dashboardUi?.plannedDashboardSectionOrder, DEFAULT_PLANNED_SECTION_ORDER)
+                );
+                setDoneDashboardSectionOrder(
+                    sanitizeSectionOrder(dashboardUi?.doneDashboardSectionOrder, DEFAULT_DONE_SECTION_ORDER)
+                );
+                if (typeof dashboardUiGlobal?.isRuleDashboardOpen === "boolean") setIsRuleDashboardOpen(dashboardUiGlobal.isRuleDashboardOpen);
+                if (typeof dashboardUiGlobal?.isLegendOpen === "boolean") setIsLegendOpen(dashboardUiGlobal.isLegendOpen);
                 setPlannerLoadOk(true);
             } catch (e) {
                 if (cancelled) return;
@@ -384,6 +315,30 @@ export default function App({ currentUser, onSignOut }) {
             cancelled = true;
         };
     }, [importPlannerStateSnapshot]);
+
+    useEffect(() => {
+        const dashboardUi = loadedDashboardUiRef.current?.byProgram?.[programCode] || null;
+        if (!dashboardUi || typeof dashboardUi !== "object") return;
+        if (typeof dashboardUi?.dashboardViewMode === "string") setDashboardViewMode(dashboardUi.dashboardViewMode);
+        if (typeof dashboardUi?.isSteopInfoOpen === "boolean") setIsSteopInfoOpen(dashboardUi.isSteopInfoOpen);
+        if (typeof dashboardUi?.isSteopChecklistOpen === "boolean") setIsSteopChecklistOpen(dashboardUi.isSteopChecklistOpen);
+        if (typeof dashboardUi?.isFocusInfoOpen === "boolean") setIsFocusInfoOpen(dashboardUi.isFocusInfoOpen);
+        if (typeof dashboardUi?.isFocusChecklistOpen === "boolean") setIsFocusChecklistOpen(dashboardUi.isFocusChecklistOpen);
+        if (typeof dashboardUi?.isExamSubjectProgressOpen === "boolean") setIsExamSubjectProgressOpen(dashboardUi.isExamSubjectProgressOpen);
+        if (typeof dashboardUi?.isPerSemesterEctsOpen === "boolean") setIsPerSemesterEctsOpen(dashboardUi.isPerSemesterEctsOpen);
+        if (typeof dashboardUi?.isDonePerSemesterEctsOpen === "boolean") setIsDonePerSemesterEctsOpen(dashboardUi.isDonePerSemesterEctsOpen);
+        if (typeof dashboardUi?.isPlannedExamSubjectOpen === "boolean") setIsPlannedExamSubjectOpen(dashboardUi.isPlannedExamSubjectOpen);
+        if (typeof dashboardUi?.isByCategoryOpen === "boolean") setIsByCategoryOpen(dashboardUi.isByCategoryOpen);
+        if (typeof dashboardUi?.isDoneByCategoryOpen === "boolean") setIsDoneByCategoryOpen(dashboardUi.isDoneByCategoryOpen);
+        if (typeof dashboardUi?.isMissingRequirementsOpen === "boolean") setIsMissingRequirementsOpen(dashboardUi.isMissingRequirementsOpen);
+        if (typeof dashboardUi?.isWarningsOpen === "boolean") setIsWarningsOpen(dashboardUi.isWarningsOpen);
+        setPlannedDashboardSectionOrder(
+            sanitizeSectionOrder(dashboardUi?.plannedDashboardSectionOrder, DEFAULT_PLANNED_SECTION_ORDER)
+        );
+        setDoneDashboardSectionOrder(
+            sanitizeSectionOrder(dashboardUi?.doneDashboardSectionOrder, DEFAULT_DONE_SECTION_ORDER)
+        );
+    }, [programCode]);
 
     useEffect(() => {
         if (!plannerHydrated || !plannerLoadOk) return;
@@ -527,6 +482,24 @@ export default function App({ currentUser, onSignOut }) {
     // Persist scheduling flag – set to true to persist after the next commit
     const [needsPersist, setNeedsPersist] = useState(false);
 
+    const {
+        handlePlannedSectionDragStart,
+        handlePlannedSectionDragOver,
+        handlePlannedSectionDrop,
+        handlePlannedSectionDragEnd,
+        handleDoneSectionDragStart,
+        handleDoneSectionDragOver,
+        handleDoneSectionDrop,
+        handleDoneSectionDragEnd,
+        plannedSectionStyle,
+        doneSectionStyle,
+    } = useDashboardSectionOrdering({
+        plannedDashboardSectionOrder,
+        setPlannedDashboardSectionOrder,
+        doneDashboardSectionOrder,
+        setDoneDashboardSectionOrder,
+    });
+
     useEffect(() => {
         setNodes((prev) => {
             const nonLane = prev.filter((n) => n.type !== "lane");
@@ -612,6 +585,21 @@ export default function App({ currentUser, onSignOut }) {
     const onDragLeave = useCallback(() => {
         setDragPreviewSemesterCount(null);
     }, []);
+
+    const flowLayoutOptions = useMemo(() => ({
+        maxSemesterCount,
+        minModuleGroupTopY: MIN_MODULE_GROUP_TOP_Y,
+    }), [maxSemesterCount, MIN_MODULE_GROUP_TOP_Y]);
+
+    const compactPrefillLayout = useCallback(
+        (allNodes) => compactPrefillLayoutBase(allNodes, flowLayoutOptions),
+        [flowLayoutOptions]
+    );
+
+    const resolveLaneCollisions = useCallback(
+        (allNodes) => resolveLaneCollisionsBase(allNodes, flowLayoutOptions),
+        [flowLayoutOptions]
+    );
 
     /***********************
      * Node remove helpers *
@@ -1398,25 +1386,31 @@ export default function App({ currentUser, onSignOut }) {
     // Notify backend rule-check endpoint on each plan/status change.
     useEffect(() => {
         if (!lastPlanChange) return;
-        latestRuleCheckChangeIdRef.current = lastPlanChange.id ?? null;
+        const requestProgramCode = programCode;
+        latestRuleCheckChangeIdRef.current = {
+            ...(latestRuleCheckChangeIdRef.current || {}),
+            [requestProgramCode]: lastPlanChange.id ?? null,
+        };
         const doneSet = new Set(doneCourseCodes || []);
-        const allCourses = Object.values(coursesBySemester || {}).flat();
+        const allCourses = Object.values(coursesBySemester || {})
+            .flat()
+            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
         const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
         const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
         const changeSnapshot = lastPlanChange;
         const changeIdSnapshot = changeSnapshot.id ?? null;
 
-        setRuleCheckState((prev) => ({ ...prev, sending: true, error: "" }));
+        setProgramRuleCheckState(requestProgramCode, (prev) => ({ ...prev, sending: true, error: "" }));
         sendRuleCheckUpdate({
-            programCode,
+            programCode: requestProgramCode,
             plannedCourses,
             doneCourses,
             change: changeSnapshot,
-            selectedFocus: programCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
+            selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
         })
             .then((response) => {
-                if (latestRuleCheckChangeIdRef.current !== changeIdSnapshot) return;
-                setRuleCheckState({
+                if ((latestRuleCheckChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
+                setProgramRuleCheckState(requestProgramCode, {
                     sending: false,
                     error: "",
                     response,
@@ -1446,43 +1440,45 @@ export default function App({ currentUser, onSignOut }) {
                 }
             })
             .catch((err) => {
-                if (latestRuleCheckChangeIdRef.current !== changeIdSnapshot) return;
+                if ((latestRuleCheckChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
                 console.error("Failed to send rulecheck update", err);
                 setStickyViolation({
                     message: String(err?.message || err),
                     until: Date.now() + 5000,
                     tone: "error",
                 });
-                setRuleCheckState((prev) => ({
+                setProgramRuleCheckState(requestProgramCode, (prev) => ({
                     ...prev,
                     sending: false,
                     error: String(err?.message || err),
                     lastUpdatedAt: Date.now(),
                 }));
             });
-    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackCourseStatusToggle, selectedFocus]);
+    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackCourseStatusToggle, selectedFocus, setProgramRuleCheckState]);
 
     // Initial sync for current program so dashboard has data before first edit.
     useEffect(() => {
+        if (!plannerHydrated) return;
         if (pendingInitialSyncProgramRef.current !== programCode) return;
-        const allCourses = Object.values(coursesBySemester || {}).flat();
-        // Wait until program switch reset has cleared previous-plan courses.
-        if (allCourses.length > 0) return;
+        const requestProgramCode = programCode;
+        const allCourses = Object.values(coursesBySemester || {})
+            .flat()
+            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
 
         const doneSet = new Set(doneCourseCodes || []);
         const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
         const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
 
-        setRuleCheckState((prev) => ({ ...prev, sending: true, error: "" }));
+        setProgramRuleCheckState(requestProgramCode, (prev) => ({ ...prev, sending: true, error: "" }));
         sendRuleCheckUpdate({
-            programCode,
+            programCode: requestProgramCode,
             plannedCourses,
             doneCourses,
             change: { type: "initial_sync" },
-            selectedFocus: programCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
+            selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
         })
             .then((response) => {
-                setRuleCheckState({
+                setProgramRuleCheckState(requestProgramCode, {
                     sending: false,
                     error: "",
                     response,
@@ -1491,7 +1487,7 @@ export default function App({ currentUser, onSignOut }) {
                 pendingInitialSyncProgramRef.current = null;
             })
             .catch((err) => {
-                setRuleCheckState((prev) => ({
+                setProgramRuleCheckState(requestProgramCode, (prev) => ({
                     ...prev,
                     sending: false,
                     error: String(err?.message || err),
@@ -1499,7 +1495,7 @@ export default function App({ currentUser, onSignOut }) {
                 }));
                 pendingInitialSyncProgramRef.current = null;
             });
-    }, [coursesBySemester, doneCourseCodes, programCode, selectedFocus]);
+    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, setProgramRuleCheckState]);
 
     useEffect(() => {
         if (!stickyViolation?.message) return;
@@ -1953,363 +1949,192 @@ export default function App({ currentUser, onSignOut }) {
         });
     }, []);
 
-    /****************************
-     * Collision avoidance utils *
-     ****************************/
-    function nodeBBox(n) {
-        if (n.type === "course") {
-            return {
-                x1: n.position.x,
-                y1: n.position.y,
-                x2: n.position.x + CARD_WIDTH,
-                y2: n.position.y + COURSE_LAYOUT_HEIGHT,
-                h: COURSE_LAYOUT_HEIGHT,
-            };
-        }
-        if (n.type === "moduleBg") {
-            const w = Number(n?.data?.width) || CARD_WIDTH + 2 * GROUP_PADDING_X;
-            const h = Number(n?.data?.height) || COURSE_LAYOUT_HEIGHT + MODULE_HEADER_HEIGHT + 2 * GROUP_PADDING_Y;
-            return { x1: n.position.x, y1: n.position.y, x2: n.position.x + w, y2: n.position.y + h, h };
-        }
-        return { x1: n.position.x, y1: n.position.y, x2: n.position.x, y2: n.position.y, h: 0 };
-    }
-
-    function isRelevantForCollision(n) {
-        // Avoid collisions between: single courses (not in a group) and module groups.
-        // Courses inside groups are handled by the group's own layout.
-        return n.type === "moduleBg" || (n.type === "course" && !n.data?.groupId);
-    }
-
-    function coveredLaneIndicesForNode(n) {
-        if (n?.type !== "moduleBg") return [laneIdx(n)];
-        const box = nodeBBox(n);
-        const laneFromX = (x) => {
-            const span = LANE_WIDTH + LANE_GAP;
-            const idx = Math.floor((Number(x) + LANE_GAP * 0.5) / span);
-            return Math.max(0, Math.min(maxSemesterCount - 1, idx));
-        };
-        const start = laneFromX(box.x1);
-        const end = laneFromX(Math.max(box.x1, box.x2 - 1));
-        const out = [];
-        for (let li = start; li <= end; li += 1) out.push(li);
-        return out.length ? out : [start];
-    }
-
-    function applyDeltaToGroupChildren(nodes, groupId, dx, dy) {
-        if (!groupId || (dx === 0 && dy === 0)) return nodes;
-        return nodes.map((n) =>
-            n.type === "course" && n.data?.groupId === groupId
-                ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
-                : n
-        );
-    }
-
-    function enforceModuleHeaderClearance(allNodes) {
-        let nodes = allNodes.slice();
-        const groups = nodes.filter((n) => n?.type === "moduleBg");
-        for (const group of groups) {
-            const groupTop = Number(group?.position?.y || 0);
-            if (groupTop >= MIN_MODULE_GROUP_TOP_Y) continue;
-            const dy = MIN_MODULE_GROUP_TOP_Y - groupTop;
-            nodes = nodes.map((n) =>
-                n.id === group.id
-                    ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
-                    : n
-            );
-            nodes = applyDeltaToGroupChildren(nodes, group.id, 0, dy);
-        }
-        return nodes;
-    }
-
-    function pushStandaloneCoursesBelowModuleBackgrounds(allNodes) {
-        let nodes = allNodes.slice();
-        const maxPasses = 8;
-        for (let pass = 0; pass < maxPasses; pass += 1) {
-            let changed = false;
-            const moduleNodes = nodes.filter((n) => n?.type === "moduleBg");
-            const standaloneCourses = nodes.filter((n) => n?.type === "course" && !n?.data?.groupId);
-
-            for (const courseNode of standaloneCourses) {
-                const currentCourse = nodes.find((n) => n.id === courseNode.id) || courseNode;
-                const cBox = nodeBBox(currentCourse);
-                let minAllowedY = cBox.y1;
-
-                for (const moduleNode of moduleNodes) {
-                    const mBox = nodeBBox(moduleNode);
-                    const xOverlap = cBox.x1 < mBox.x2 && cBox.x2 > mBox.x1;
-                    if (!xOverlap) continue;
-                    const yOverlap = cBox.y1 < (mBox.y2 + COLLISION_GAP) && cBox.y2 > (mBox.y1 - COLLISION_GAP);
-                    if (!yOverlap) continue;
-                    minAllowedY = Math.max(minAllowedY, mBox.y2 + COLLISION_GAP);
-                }
-
-                if (minAllowedY > cBox.y1) {
-                    changed = true;
-                    nodes = nodes.map((n) => (
-                        n.id === currentCourse.id
-                            ? { ...n, position: { x: n.position.x, y: minAllowedY } }
-                            : n
-                    ));
-                }
-            }
-
-            if (!changed) break;
-        }
-        return nodes;
-    }
-
-    function compactPrefillLayout(allNodes) {
-        let nodes = enforceModuleHeaderClearance(allNodes);
-        const candidates = nodes
-            .filter((n) => isRelevantForCollision(n))
-            .sort((a, b) => {
-                const ay = Number(a?.position?.y || 0);
-                const by = Number(b?.position?.y || 0);
-                if (ay !== by) return ay - by;
-                const ax = Number(a?.position?.x || 0);
-                const bx = Number(b?.position?.x || 0);
-                return ax - bx;
-            });
-
-        const placed = [];
-        for (const candidate of candidates) {
-            const current = nodes.find((n) => n.id === candidate.id);
-            if (!current) continue;
-            const cBox = nodeBBox(current);
-            let minAllowedY = current.type === "moduleBg" ? MIN_MODULE_GROUP_TOP_Y : 96;
-
-            for (const placedId of placed) {
-                const prior = nodes.find((n) => n.id === placedId);
-                if (!prior) continue;
-                const pBox = nodeBBox(prior);
-                const xOverlap =
-                    cBox.x1 < pBox.x2 + COLLISION_GAP &&
-                    cBox.x2 + COLLISION_GAP > pBox.x1;
-                if (!xOverlap) continue;
-                minAllowedY = Math.max(minAllowedY, pBox.y2 + COLLISION_GAP);
-            }
-
-            if (cBox.y1 > minAllowedY) {
-                const dy = minAllowedY - cBox.y1;
-                nodes = nodes.map((n) =>
-                    n.id === current.id
-                        ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
-                        : n
-                );
-                if (current.type === "moduleBg") {
-                    nodes = applyDeltaToGroupChildren(nodes, current.id, 0, dy);
-                }
-            }
-            placed.push(candidate.id);
-        }
-
-        return enforceModuleHeaderClearance(nodes);
-    }
-
-    /**
-     * Resolve vertical overlaps per lane among module groups and un-grouped course nodes.
-     * Strategy: sort by Y, then push each down if it touches the previous (with COLLISION_GAP).
-     * If a moduleBg is moved, shift its children by the same delta.
-     */
-    function resolveLaneCollisions(allNodes) {
-        let nodes = enforceModuleHeaderClearance(allNodes); // keep module headers clear
-
-        // Group by lane index
-        const lanes = new Map();
-        for (const n of nodes) {
-            if (!isRelevantForCollision(n)) continue;
-            const laneIndices = coveredLaneIndicesForNode(n);
-            for (const li of laneIndices) {
-                if (!lanes.has(li)) lanes.set(li, []);
-                lanes.get(li).push(n.id);
-            }
-        }
-
-        for (const ids of lanes.values()) {
-            const laneNodes = ids
-                .map((id) => nodes.find((n) => n.id === id))
-                .filter(Boolean)
-                .sort((a, b) => a.position.y - b.position.y);
-
-            let prev = null;
-            for (const curr of laneNodes) {
-                if (!prev) {
-                    prev = curr;
-                    continue;
-                }
-                const prevB = nodeBBox(prev);
-                const curB = nodeBBox(curr);
-                const minY = prevB.y2 + COLLISION_GAP; // previous bottom + gap
-                if (curB.y1 < minY) {
-                    const dy = minY - curB.y1;
-                    nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: n.position.y + dy } } : n));
-                    if (curr.type === "moduleBg") nodes = applyDeltaToGroupChildren(nodes, curr.id, 0, dy);
-                    // update working copy for subsequent comparisons
-                    const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
-                    if (idx !== -1) laneNodes[idx] = { ...curr, position: { x: curr.position.x, y: curr.position.y + dy } };
-                }
-                prev = laneNodes.find((ln) => ln.id === curr.id) || curr;
-            }
-        }
-        const headerSafe = enforceModuleHeaderClearance(nodes);
-        return pushStandaloneCoursesBelowModuleBackgrounds(headerSafe);
-    }
-
     /***********
      * Render  *
      ***********/
-    const ruleOk = Boolean(ruleCheckState.response?.ok);
-    const ruleStats = ruleCheckState.response?.stats ?? {};
-    const isBachelorDashboard = programCode === BACHELOR_PROGRAM_CODE;
-    const ectsStats = ruleStats?.ects ?? {};
-    const allPlannedCourses = Object.values(coursesBySemester || {}).flat();
-    const hasAnyPlannedOrDoneCourses = allPlannedCourses.length > 0 || (doneCourseCodes || []).length > 0;
-    const shouldOfferInitialBachelorPrefill =
-        plannerHydrated &&
-        programCode === BACHELOR_PROGRAM_CODE &&
-        !hasAnyPlannedOrDoneCourses &&
-        !dismissedInitialPrefillPrompt;
-    const shouldOfferInitialMasterPrefill =
-        plannerHydrated &&
-        programCode === MASTER_PROGRAM_CODE &&
-        !hasAnyPlannedOrDoneCourses &&
-        !dismissedInitialPrefillPrompt;
-    const doneCodesSet = new Set(doneCourseCodes || []);
-    const doneEctsKpi = allPlannedCourses
-        .filter((c) => c?.code && doneCodesSet.has(c.code))
-        .reduce((sum, c) => sum + Number(c?.ects || 0), 0);
-    const plannedEctsKpi = allPlannedCourses
-        .filter((c) => c?.code && !doneCodesSet.has(c.code))
-        .reduce((sum, c) => sum + Number(c?.ects || 0), 0);
-    const totalEctsKpi = doneEctsKpi + plannedEctsKpi;
-    const targetEctsKpi = isBachelorDashboard ? 180 : Number(ectsStats?.target_total ?? 120);
-    const buckets = ruleStats?.buckets ?? {};
-    const perSemester = isBachelorDashboard ? (ruleStats?.ectsPerSemester ?? {}) : (ruleStats?.per_semester ?? {});
-    const byCategory = isBachelorDashboard ? (ruleStats?.ectsByCategory ?? {}) : (ruleStats?.by_category ?? {});
-    const byExamSubject = isBachelorDashboard ? (ruleStats?.ectsByExamSubject ?? {}) : (ruleStats?.by_exam_subject ?? {});
-    const bachelorTotalEcts = Number(ruleStats?.totalEcts ?? 0);
-    const bachelorMissingTo180 = Number(ruleStats?.ectsMissingTo180 ?? 0);
-    const bachelorNarrow = ruleStats?.narrowElectives ?? {};
-    const bachelorFocus = ruleStats?.focus ?? {};
-    const bachelorTransferableEcts = Number(byCategory?.transferable_skills ?? 0);
-    const bachelorNarrowCompleted = Number(bachelorNarrow?.completedCount ?? 0);
-    const bachelorNarrowRequired = Number(bachelorNarrow?.requiredCount ?? 7);
-    const normalizeSteopKey = (value) =>
-        String(value || "")
-            .normalize("NFKD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .toLowerCase()
-            .replace(/[^a-z0-9\s]/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-    const steopMandatoryTagByKey = {
-        [normalizeSteopKey("Einführung in die Programmierung 1")]: "eidi1",
-        [normalizeSteopKey("EIDI1-VU")]: "eidi1",
-        [normalizeSteopKey("Mathematisches Arbeiten")]: "ma",
-        [normalizeSteopKey("MA-VU")]: "ma",
-        [normalizeSteopKey("Orientierung Informatik und Wirtschaftsinformatik")]: "ori",
-        [normalizeSteopKey("ORI-VU")]: "ori",
-    };
-    const steopPoolKeys = new Set([
-        "Algebra und Diskrete Mathematik",
-        "Analysis",
-        "Denkweisen der Informatik",
-        "Grundzüge digitaler Systeme",
-        "ADM-VO",
-        "ADM-UE",
-        "ADM-VU",
-        "ANL-VO",
-        "ANL-UE",
-        "ANL-VU",
-        "DWI-VU",
-        "GDS-VU",
-    ].map(normalizeSteopKey));
-    const steopMandatoryEctsByTag = { eidi1: 5.5, ma: 2.0, ori: 1.0 };
-    const steopMandatoryRequiredEcts = 8.5;
-    const steopPoolRequiredEcts = 8.0;
-    const steopRequiredEcts = steopMandatoryRequiredEcts + steopPoolRequiredEcts;
-    const steopTagOfCourse = (course) => {
-        const codeKey = normalizeSteopKey(course?.code || course?.name);
-        const moduleKey = normalizeSteopKey(course?.module?.title);
-        return steopMandatoryTagByKey[codeKey] || steopMandatoryTagByKey[moduleKey] || null;
-    };
-    const isSteopPoolCourse = (course) => {
-        const codeKey = normalizeSteopKey(course?.code || course?.name);
-        const moduleKey = normalizeSteopKey(course?.module?.title);
-        return steopPoolKeys.has(codeKey) || steopPoolKeys.has(moduleKey);
-    };
-    const computeSteopProgress = (courses) => {
-        const tags = new Set();
-        let pool = 0;
-        for (const c of courses || []) {
-            const tag = steopTagOfCourse(c);
-            if (tag) tags.add(tag);
-            if (isSteopPoolCourse(c)) pool += Number(c?.ects || 0);
+    const {
+        ruleOk,
+        ruleStats,
+        isBachelorDashboard,
+        ectsStats,
+        allPlannedCourses,
+        hasAnyPlannedOrDoneCourses,
+        shouldOfferInitialBachelorPrefill,
+        shouldOfferInitialMasterPrefill,
+        doneCodesSet,
+        doneEctsKpi,
+        plannedEctsKpi,
+        totalEctsKpi,
+        targetEctsKpi,
+        buckets,
+        perSemester,
+        byCategory,
+        byExamSubject,
+        bachelorTotalEcts,
+        bachelorMissingTo180,
+        bachelorNarrow,
+        bachelorFocus,
+        bachelorTransferableEcts,
+        bachelorNarrowCompleted,
+        bachelorNarrowRequired,
+        donePctKpi,
+        totalPctKpi,
+        renderKpiProgress,
+        steopMandatoryRequiredEcts,
+        steopPoolRequiredEcts,
+        steopRequiredEcts,
+        doneCoursesLocal,
+        steopDoneProgress,
+        steopMandatoryDoneEcts,
+        steopPoolDoneEcts,
+        steopDoneEcts,
+        steopDonePct,
+        steopMandatoryPlannedEcts,
+        steopPoolPlannedEcts,
+        steopPlannedEcts,
+        steopPlannedPct,
+        bachelorSteopComplete,
+        bachelorSteopPlannedComplete,
+        steopMandatoryChecklist,
+        steopPoolChecklist,
+        steopMandatoryChecklistPlanned,
+        steopPoolChecklistPlanned,
+        bachelorSteopLane,
+        bachelorSteopPlannedLane,
+        examSubjectProgress,
+        examSubjectDoneEctsTotal,
+        examSubjectTotalEctsTotal,
+        examSubjectTotalDoneCount,
+        examSubjectTotalCourseCount,
+        examSubjectAggregatePct,
+        perSemesterRows,
+        donePerSemesterRows,
+        donePerSemesterTotal,
+        perSemesterPlannedTotal,
+        workloadTargetPerSemester,
+        perSemesterWithinDesiredWorkload,
+        baselineWorkloadScale,
+        maxSemesterWorkloadForScale,
+        donePerSemesterWithinDesiredWorkload,
+        maxDoneSemesterWorkloadForScale,
+        byCategoryRows,
+        byCategoryTotalEcts,
+        topByCategoryRow,
+        donePerCategoryProgressRows,
+        donePerCategoryPlannedTotalEcts,
+        donePerCategoryDoneTotalEcts,
+        donePerCategoryCompleteCount,
+        warnings,
+        bachelorFocusMissingCount,
+        bachelorFocusComplete,
+        bachelorFocusMissingCountPlanned,
+        bachelorFocusCompletePlanned,
+        focusChecklist,
+        focusChecklistPlanned,
+        focusChecklistDoneCount,
+        focusChecklistTotalCount,
+        focusRequiredItems,
+        focusChooseItems,
+        focusChooseSummary,
+        focusChooseGroupsSummary,
+        focusChooseGroupRows,
+        focusRequiredItemsPlanned,
+        focusChooseItemsPlanned,
+        focusChooseSummaryPlanned,
+        focusChooseGroupsSummaryPlanned,
+        focusChooseGroupRowsPlanned,
+        focusRequiredDoneCount,
+        focusRequiredNeedCount,
+        focusChooseNeedCount,
+        focusChooseDoneCount,
+        focusChooseGroupsNeedCount,
+        focusChooseGroupsDoneCount,
+        focusRequiredDoneCountPlanned,
+        focusRequiredNeedCountPlanned,
+        focusChooseNeedCountPlanned,
+        focusChooseDoneCountPlanned,
+        focusChooseGroupsNeedCountPlanned,
+        focusChooseGroupsDoneCountPlanned,
+        focusRequirementDoneCount,
+        focusRequirementTotalCount,
+        focusChecklistPct,
+        focusRequirementDoneCountPlanned,
+        focusRequirementTotalCountPlanned,
+        focusChecklistPctPlanned,
+        bachelorModuleProgress,
+        bachelorThesisHave,
+        masterModuleProgress,
+        moduleProgressForDashboard,
+        requirementItems,
+        fulfilledRequirementsCount,
+        totalRequirementsCount,
+        requirementsPct,
+        plannedEctsByExamSubjectRows,
+        plannedEctsByExamSubjectTotal,
+        violations,
+        missingItems,
+        hasMissingRequirements,
+        hasWarnings,
+        plannedChecklistComplete,
+        doneChecklistComplete,
+        getDashboardModeButtonStyle,
+        stickyActive,
+        feedbackText,
+        feedbackBg,
+        feedbackBorder,
+        feedbackColor,
+    } = useDashboardMetrics({
+        ruleCheckState,
+        programCode,
+        bachelorProgramCode: BACHELOR_PROGRAM_CODE,
+        masterProgramCode: MASTER_PROGRAM_CODE,
+        coursesBySemester,
+        doneCourseCodes,
+        plannerHydrated,
+        dismissedInitialPrefillPrompt,
+        minSemesterCount,
+        selectedFocus,
+        catalog,
+        dashboardViewMode,
+        stickyViolation,
+        resolveDashboardCategoryForProgram,
+        getExamSubjectForCode,
+    });
+    const hasSelectedFocusArea = Boolean(String(selectedFocus || bachelorFocus?.selected || "").trim());
+    useEffect(() => {
+        if (!hasMissingRequirements && isMissingRequirementsOpen) setIsMissingRequirementsOpen(false);
+    }, [hasMissingRequirements, isMissingRequirementsOpen]);
+
+    useEffect(() => {
+        if (!hasWarnings && isWarningsOpen) setIsWarningsOpen(false);
+    }, [hasWarnings, isWarningsOpen]);
+
+    useEffect(() => {
+        if (!plannerHydrated) return;
+        const last = progressMilestoneRef.current;
+        const roundedPct = Math.round(totalPctKpi);
+        if (last?.programCode !== programCode) {
+            progressMilestoneRef.current = { programCode, pct: roundedPct };
+            return;
         }
-        const mandatoryEcts = [...tags].reduce((sum, tag) => sum + Number(steopMandatoryEctsByTag[tag] ?? 0), 0);
-        return {
-            mandatoryEcts,
-            poolEcts: pool,
-            totalEcts: mandatoryEcts + pool,
-            tags,
-        };
-    };
-    const doneCoursesLocal = allPlannedCourses.filter((c) => c?.code && doneCodesSet.has(c.code));
-    const steopDoneProgress = computeSteopProgress(doneCoursesLocal);
-    const steopMandatoryDoneEcts = steopDoneProgress.mandatoryEcts;
-    const steopPoolDoneEcts = steopDoneProgress.poolEcts;
-    const steopDoneEcts = steopMandatoryDoneEcts + steopPoolDoneEcts;
-    const bachelorSteopComplete =
-        steopDoneProgress.tags.has("eidi1") &&
-        steopDoneProgress.tags.has("ma") &&
-        steopDoneProgress.tags.has("ori") &&
-        steopPoolDoneEcts >= steopPoolRequiredEcts - 1e-6;
-    let bachelorSteopLane = null;
-    if (doneCoursesLocal.length > 0) {
-        const doneByLane = new Map();
-        for (const c of doneCoursesLocal) {
-            const li = Number.isFinite(c?.laneIndex) ? c.laneIndex : 0;
-            if (!doneByLane.has(li)) doneByLane.set(li, []);
-            doneByLane.get(li).push(c);
-        }
-        const cumTags = new Set();
-        let cumPool = 0;
-        for (const li of [...doneByLane.keys()].sort((a, b) => a - b)) {
-            for (const c of doneByLane.get(li)) {
-                const tag = steopTagOfCourse(c);
-                if (tag) cumTags.add(tag);
-                if (isSteopPoolCourse(c)) cumPool += Number(c?.ects || 0);
-            }
-            if (cumTags.has("eidi1") && cumTags.has("ma") && cumTags.has("ori") && cumPool >= steopPoolRequiredEcts - 1e-6) {
-                bachelorSteopLane = li;
-                break;
-            }
-        }
-    }
-    const warnings = Array.isArray(ruleStats?.warnings) ? ruleStats.warnings : [];
-    const bachelorFocusMissingCount = Number(bachelorFocus?.missingCount ?? 0);
-    const bachelorFocusComplete = selectedFocus && bachelorFocus?.recognized && bachelorFocusMissingCount === 0;
-    const violations = Array.isArray(ruleStats?.violations) ? ruleStats.violations : [];
-    const missingItems = Array.isArray(ruleCheckState.response?.missing) ? ruleCheckState.response.missing : [];
-    const stickyActive = Boolean(stickyViolation?.message) && Date.now() < (stickyViolation?.until || 0);
-    const feedbackText = stickyActive
-        ? stickyViolation.message
-        : (ruleCheckState.sending
-        ? "Checking rules..."
-        : (ruleCheckState.error
-            ? `Rule check error: ${ruleCheckState.error}`
-            : (ruleCheckState.response
-                ? (ruleCheckState.response?.message ?? "Rule check updated")
-                : "No rule check response yet")));
-    const feedbackBg = stickyActive
-        ? (stickyViolation?.tone === "success" ? "#dcfce7" : "#fee2e2")
-        : (ruleCheckState.sending ? "#dbeafe" : (ruleCheckState.error ? "#fee2e2" : (ruleOk ? "#dcfce7" : "#f3f4f6")));
-    const feedbackBorder = stickyActive
-        ? (stickyViolation?.tone === "success" ? "#86efac" : "#fca5a5")
-        : (ruleCheckState.sending ? "#93c5fd" : (ruleCheckState.error ? "#fca5a5" : (ruleOk ? "#86efac" : "#d1d5db")));
-    const feedbackColor = stickyActive
-        ? (stickyViolation?.tone === "success" ? "#166534" : "#991b1b")
-        : (ruleCheckState.sending ? "#1d4ed8" : (ruleCheckState.error ? "#991b1b" : (ruleOk ? "#166534" : "#374151")));
+        const milestones = [25, 50, 75, 100];
+        const crossed = milestones.find((m) => last.pct < m && roundedPct >= m);
+        progressMilestoneRef.current = { programCode, pct: roundedPct };
+        if (!crossed) return;
+        setProgressMilestone({
+            text: `Milestone reached: ${crossed}% completion (${totalEctsKpi.toFixed(1)}/${targetEctsKpi.toFixed(1)} ECTS).`,
+            until: Date.now() + 3000,
+        });
+    }, [plannerHydrated, programCode, targetEctsKpi, totalEctsKpi, totalPctKpi]);
+
+    useEffect(() => {
+        if (!progressMilestone?.text) return;
+        const waitMs = Math.max(0, (progressMilestone.until || 0) - Date.now());
+        const t = window.setTimeout(() => {
+            setProgressMilestone({ text: "", until: 0 });
+        }, waitMs);
+        return () => window.clearTimeout(t);
+    }, [progressMilestone]);
 
     useEffect(() => {
         setFocusPrefillPrompt(null);
@@ -2328,128 +2153,1110 @@ export default function App({ currentUser, onSignOut }) {
         setFocusPrefillPrompt({ focus: selectedFocus || "" });
     }, [hasAnyPlannedOrDoneCourses, plannerHydrated, programCode, selectedFocus]);
 
-    const prefillPromptNode = focusPrefillPrompt ? (
-        <div
-            style={{
-                position: "fixed",
-                top: 64,
-                right: 12,
-                zIndex: 35,
-                border: "1px solid #bfdbfe",
-                background: "#eff6ff",
-                borderRadius: 10,
-                padding: 12,
-                width: 360,
-                display: "grid",
-                gap: 8,
+    const plannerNotificationsNode = (
+        <PlannerNotifications
+            focusPrefillPrompt={focusPrefillPrompt}
+            onApplyFocusPrefill={(focus) => {
+                applyBachelorPrefilledPlan(focus);
+                setFocusPrefillPrompt(null);
             }}
-        >
-            <div style={{ fontSize: 13, color: "#1e3a8a", fontWeight: 700 }}>
-                Focus changed to "{focusPrefillPrompt.focus || "No focus area"}".
-            </div>
-            <div style={{ fontSize: 12, color: "#1e40af" }}>
-                Apply the prebuilt bachelor plan for this focus area?
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-                <button
-                    onClick={() => {
-                        applyBachelorPrefilledPlan(focusPrefillPrompt.focus);
-                        setFocusPrefillPrompt(null);
-                    }}
-                    style={{
-                        border: "1px solid #60a5fa",
-                        background: "#dbeafe",
-                        color: "#1e3a8a",
-                        borderRadius: 8,
-                        padding: "6px 10px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                    }}
-                >
-                    Apply prebuilt plan
-                </button>
-                <button
-                    onClick={() => setFocusPrefillPrompt(null)}
-                    style={{
-                        border: "1px solid #93c5fd",
-                        background: "#ffffff",
-                        color: "#1e3a8a",
-                        borderRadius: 8,
-                        padding: "6px 10px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                    }}
-                >
-                    Keep current plan
-                </button>
-            </div>
-        </div>
-    ) : ((shouldOfferInitialBachelorPrefill || shouldOfferInitialMasterPrefill) ? (
-        <div
-            style={{
-                position: "fixed",
-                top: 64,
-                right: 12,
-                zIndex: 35,
-                border: "1px solid #bbf7d0",
-                background: "#f0fdf4",
-                borderRadius: 10,
-                padding: 12,
-                width: 360,
-                display: "grid",
-                gap: 8,
+            onDismissFocusPrefill={() => setFocusPrefillPrompt(null)}
+            shouldOfferInitialBachelorPrefill={shouldOfferInitialBachelorPrefill}
+            shouldOfferInitialMasterPrefill={shouldOfferInitialMasterPrefill}
+            programCode={programCode}
+            bachelorProgramCode={BACHELOR_PROGRAM_CODE}
+            selectedFocus={selectedFocus}
+            onApplyInitialPrefill={(focus) => {
+                const applied = programCode === BACHELOR_PROGRAM_CODE
+                    ? applyBachelorPrefilledPlan(focus)
+                    : applyMasterPrefilledPlan();
+                if (applied) setDismissedInitialPrefillPrompt(true);
             }}
-        >
-            <div style={{ fontSize: 13, color: "#14532d", fontWeight: 700 }}>
-                {programCode === BACHELOR_PROGRAM_CODE ? "No bachelor courses are planned yet." : "No master courses are planned yet."}
-            </div>
-            <div style={{ fontSize: 12, color: "#166534" }}>
-                {programCode === BACHELOR_PROGRAM_CODE
-                    ? "Do you want to fill the table with the prebuilt bachelor plan?"
-                    : "Do you want to fill the table with the prebuilt master plan?"}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-                <button
-                    onClick={() => {
-                        const applied = programCode === BACHELOR_PROGRAM_CODE
-                            ? applyBachelorPrefilledPlan(selectedFocus)
-                            : applyMasterPrefilledPlan();
-                        if (applied) setDismissedInitialPrefillPrompt(true);
-                    }}
-                    style={{
-                        border: "1px solid #86efac",
-                        background: "#dcfce7",
-                        color: "#166534",
-                        borderRadius: 8,
-                        padding: "6px 10px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                    }}
-                >
-                    Fill with prebuilt plan
-                </button>
-                <button
-                    onClick={() => setDismissedInitialPrefillPrompt(true)}
-                    style={{
-                        border: "1px solid #86efac",
-                        background: "#ffffff",
-                        color: "#166534",
-                        borderRadius: 8,
-                        padding: "6px 10px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                    }}
-                >
-                    Not now
-                </button>
-            </div>
-        </div>
-    ) : null);
+            onDismissInitialPrefill={() => setDismissedInitialPrefillPrompt(true)}
+            progressMilestoneText={progressMilestone?.text || ""}
+        />
+    );
+
+    const ruleDashboardAside = isRuleDashboardOpen && (
+                    <aside
+                        style={{
+                            width: 420,
+                            borderLeft: "1px solid #e5e7eb",
+                            background: "#ffffff",
+                            padding: 12,
+                            overflow: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
+                            <button
+                                onClick={() => setIsRuleDashboardOpen(false)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "6px 10px",
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Close
+                            </button>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+                            <div>Program: {programCode}</div>
+                            {programCode === BACHELOR_PROGRAM_CODE && <div>Focus: {selectedFocus || "-"}</div>}
+                        </div>
+                        <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", minWidth: 118 }}>
+                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Target ECTS</div>
+                                    <div style={{ fontSize: 18, fontWeight: 700 }}>{targetEctsKpi.toFixed(1)}</div>
+                                </div>
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Planned ECTS</div>
+                                    <div style={{ fontSize: 18, fontWeight: 700, color: plannedChecklistComplete ? "#166534" : "#111827" }}>{totalEctsKpi.toFixed(1)}</div>
+                                    {renderKpiProgress(totalPctKpi, plannedChecklistComplete ? "#16a34a" : "#2563eb")}
+                                </div>
+                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Done ECTS</div>
+                                    <div style={{ fontSize: 18, fontWeight: 700, color: donePctKpi >= 100 - 1e-6 ? "#166534" : "#111827" }}>{doneEctsKpi.toFixed(1)}</div>
+                                    {renderKpiProgress(donePctKpi, donePctKpi >= 100 - 1e-6 ? "#16a34a" : "#2563eb")}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ display: "inline-flex", gap: 6, marginBottom: 12 }}>
+                            <button
+                                onClick={() => setDashboardViewMode("planning")}
+                                style={getDashboardModeButtonStyle("planning")}
+                            >
+                                Planned
+                            </button>
+                            <button
+                                onClick={() => setDashboardViewMode("progress")}
+                                style={getDashboardModeButtonStyle("progress")}
+                            >
+                                Done
+                            </button>
+                        </div>
+
+                        {isBachelorDashboard && dashboardViewMode === "planning" && (
+                            <div
+                                draggable
+                                onDragStart={() => handlePlannedSectionDragStart("steop")}
+                                onDragOver={(event) => handlePlannedSectionDragOver(event, "steop")}
+                                onDrop={() => handlePlannedSectionDrop("steop")}
+                                onDragEnd={handlePlannedSectionDragEnd}
+                                style={plannedSectionStyle("steop", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
+                                    <button
+                                        onClick={() => setIsSteopInfoOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                        title="Show StEOP rules"
+                                    >
+                                        i
+                                    </button>
+                                </div>
+                                {isSteopInfoOpen && (
+                                    <div
+                                        style={{
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: 8,
+                                            background: "#f9fafb",
+                                            padding: 8,
+                                            marginBottom: 8,
+                                            fontSize: 11,
+                                            color: "#374151",
+                                            whiteSpace: "pre-line",
+                                        }}
+                                    >
+                                        {STEOP_RULES_TEXT}
+                                    </div>
+                                )}
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ fontSize: 12 }}>
+                                        Status: <strong style={{ color: bachelorSteopPlannedComplete ? "#166534" : "#991b1b" }}>
+                                            {bachelorSteopPlannedComplete ? "completed" : "not completed"}
+                                        </strong>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Complete in semester: <strong>{bachelorSteopPlannedLane == null ? "-" : bachelorSteopPlannedLane + 1}</strong>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Planned progress: <strong>{steopPlannedEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
+                                        {" "}(
+                                        mandatory {steopMandatoryPlannedEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
+                                        {" "}pool {steopPoolPlannedEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
+                                        )
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                        <div style={{ width: `${steopPlannedPct}%`, height: "100%", background: bachelorSteopPlannedComplete ? "#16a34a" : "#2563eb" }} />
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required courses</div>
+                                        <button
+                                            onClick={() => setIsSteopChecklistOpen((v) => !v)}
+                                            style={{
+                                                border: "1px solid #d1d5db",
+                                                background: "#ffffff",
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            {isSteopChecklistOpen ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                    {isSteopChecklistOpen && (
+                                        <>
+                                            {steopMandatoryChecklistPlanned
+                                                .filter((row) => !bachelorSteopPlannedComplete || row.done)
+                                                .map((row, idx) => (
+                                                <div key={`steop-man-planned-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                                    {row.done ? "✓" : "○"} {row.label}
+                                                </div>
+                                            ))}
+                                            <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
+                                                Pool requirement (need at least {steopPoolRequiredEcts.toFixed(1)} ECTS):
+                                            </div>
+                                            {steopPoolChecklistPlanned
+                                                .filter((row) => !bachelorSteopPlannedComplete || row.done)
+                                                .map((row, idx) => (
+                                                <div key={`steop-pool-planned-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                                    {row.done ? "✓" : "○"} {row.label}
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {isBachelorDashboard && hasSelectedFocusArea && dashboardViewMode === "planning" && (
+                            <div
+                                draggable
+                                onDragStart={() => handlePlannedSectionDragStart("focus")}
+                                onDragOver={(event) => handlePlannedSectionDragOver(event, "focus")}
+                                onDrop={() => handlePlannedSectionDrop("focus")}
+                                onDragEnd={handlePlannedSectionDragEnd}
+                                style={plannedSectionStyle("focus", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
+                                    <button
+                                        onClick={() => setIsFocusInfoOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                        title="Show Focus Area info"
+                                    >
+                                        i
+                                    </button>
+                                </div>
+                                {isFocusInfoOpen && (
+                                    <div
+                                        style={{
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: 8,
+                                            background: "#f9fafb",
+                                            padding: 8,
+                                            marginBottom: 8,
+                                            fontSize: 11,
+                                            color: "#374151",
+                                            whiteSpace: "pre-line",
+                                        }}
+                                    >
+                                        {FOCUS_INFO_TEXT}
+                                    </div>
+                                )}
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus || "-"}</strong></div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Status: <strong style={{ color: bachelorFocusCompletePlanned ? "#166534" : "#991b1b" }}>
+                                            {bachelorFocusCompletePlanned ? "completed" : "not completed"}
+                                        </strong>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Checklist progress: <strong>{focusRequirementDoneCountPlanned}</strong> / {focusRequirementTotalCountPlanned}
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                        <div style={{ width: `${focusChecklistPctPlanned}%`, height: "100%", background: bachelorFocusCompletePlanned ? "#16a34a" : "#2563eb" }} />
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required modules</div>
+                                        <button
+                                            onClick={() => setIsFocusChecklistOpen((v) => !v)}
+                                            style={{
+                                                border: "1px solid #d1d5db",
+                                                background: "#ffffff",
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            {isFocusChecklistOpen ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                    {isFocusChecklistOpen && (
+                                        <>
+                                            {focusChecklistPlanned.length === 0 && (
+                                                <div style={{ fontSize: 12, color: "#6b7280" }}>No detailed focus checklist available.</div>
+                                            )}
+                                            {focusRequiredItemsPlanned.length > 0 && (
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 2 }}>Mandatory modules</div>
+                                            )}
+                                            {focusRequiredItemsPlanned
+                                                .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
+                                                .map((item, idx) => (
+                                                <div key={`focus-req-planned-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                    {item?.done ? "✓" : "○"} {item?.label}
+                                                </div>
+                                            ))}
+                                            {focusChooseItemsPlanned.length > 0 && (
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                                    Choose {Number(focusChooseSummaryPlanned?.min || 0)} from {focusChooseItemsPlanned.length} modules
+                                                    {focusChooseSummaryPlanned ? ` (${Number(focusChooseSummaryPlanned?.done || 0)} done)` : ""}
+                                                </div>
+                                            )}
+                                            {focusChooseItemsPlanned
+                                                .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
+                                                .map((item, idx) => (
+                                                <div key={`focus-choose-planned-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                    {item?.done ? "✓" : "○"} {item?.label}
+                                                </div>
+                                            ))}
+                                            {focusChooseGroupRowsPlanned.map((group, gIdx) => (
+                                                <div key={`focus-group-planned-${gIdx}`} style={{ display: "grid", gap: 4 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                                        Choose {Number(group?.summary?.min || 0)} from {group.items.length} modules
+                                                        {group?.summary ? ` (${Number(group.summary?.done || 0)} done)` : ""}
+                                                    </div>
+                                                    {group.items
+                                                        .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
+                                                        .map((item, idx) => (
+                                                        <div key={`focus-group-item-planned-${gIdx}-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                            {item?.done ? "✓" : "○"} {item?.label}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "planning" && (
+                            <div
+                                draggable
+                                onDragStart={() => handlePlannedSectionDragStart("planned_exam_subject")}
+                                onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_exam_subject")}
+                                onDrop={() => handlePlannedSectionDrop("planned_exam_subject")}
+                                onDragEnd={handlePlannedSectionDragEnd}
+                                style={plannedSectionStyle("planned_exam_subject", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Planned per Exam Subject (ECTS)</div>
+                                    <button
+                                        onClick={() => setIsPlannedExamSubjectOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        {isPlannedExamSubjectOpen ? "Collapse" : "Expand"}
+                                    </button>
+                                </div>
+                                <div style={{ display: "grid", gap: 4, marginBottom: isPlannedExamSubjectOpen ? 6 : 0 }}>
+                                    <div style={{ fontSize: 12, color: "#374151" }}>
+                                        Planned <strong>{plannedEctsByExamSubjectTotal.toFixed(1)} ECTS</strong> across <strong>{plannedEctsByExamSubjectRows.length}</strong> exam subject{plannedEctsByExamSubjectRows.length === 1 ? "" : "s"}
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", display: "flex" }}>
+                                        {plannedEctsByExamSubjectRows.length === 0 && <div style={{ width: "100%", height: "100%", background: "#d1d5db" }} />}
+                                        {plannedEctsByExamSubjectRows.map((row, idx) => {
+                                            const pct = plannedEctsByExamSubjectTotal > 0
+                                                ? Math.max(0, Math.min(100, (Number(row?.ects || 0) / plannedEctsByExamSubjectTotal) * 100))
+                                                : 0;
+                                            const color = subjectColors?.[row?.subject] || "#9ca3af";
+                                            return (
+                                                <div
+                                                    key={`planned-exam-segment-${idx}`}
+                                                    title={`${row?.subject}: ${Number(row?.ects || 0).toFixed(1)} ECTS`}
+                                                    style={{ width: `${pct}%`, height: "100%", background: color }}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                                {isPlannedExamSubjectOpen && (
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                        {plannedEctsByExamSubjectRows.length === 0 && (
+                                            <div style={{ fontSize: 12, color: "#6b7280" }}>No planned exam-subject ECTS yet.</div>
+                                        )}
+                                        {plannedEctsByExamSubjectRows.map((row, idx) => {
+                                            const pct = plannedEctsByExamSubjectTotal > 0
+                                                ? Math.max(0, Math.min(100, (Number(row?.ects || 0) / plannedEctsByExamSubjectTotal) * 100))
+                                                : 0;
+                                            const color = subjectColors?.[row?.subject] || "#9ca3af";
+                                            return (
+                                                <div key={`${row?.subject}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{row?.subject}</div>
+                                                    <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                                                        {Number(row?.ects || 0).toFixed(1)} ECTS planned ({pct.toFixed(1)}%)
+                                                    </div>
+                                                    <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                                        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "planning" && !isBachelorDashboard && (
+                            <div
+                                draggable
+                                onDragStart={() => handlePlannedSectionDragStart("key_buckets")}
+                                onDragOver={(event) => handlePlannedSectionDragOver(event, "key_buckets")}
+                                onDrop={() => handlePlannedSectionDrop("key_buckets")}
+                                onDragEnd={handlePlannedSectionDragEnd}
+                                style={plannedSectionStyle("key_buckets", { marginBottom: 12 })}
+                            >
+                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Key Buckets</div>
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ fontSize: 12 }}>Subject modules (excl. free): <strong>{buckets.subject_modules_excl_free ?? 0}</strong></div>
+                                    <div style={{ fontSize: 12 }}>Free choice + TS: <strong>{buckets.free_choice_and_ts ?? 0}</strong></div>
+                                    <div style={{ fontSize: 12 }}>Transferable skills: <strong>{buckets.transferable_skills ?? 0}</strong></div>
+                                    <div style={{ fontSize: 12 }}>Diploma total: <strong>{buckets.diploma_total ?? 0}</strong></div>
+                                    <div style={{ fontSize: 12 }}>Needed free to hit 120: <strong>{buckets.needed_free_to_hit_120 ?? 0}</strong></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "planning" && (
+                        <div
+                            draggable
+                            onDragStart={() => handlePlannedSectionDragStart("planned_semester")}
+                            onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_semester")}
+                            onDrop={() => handlePlannedSectionDrop("planned_semester")}
+                            onDragEnd={handlePlannedSectionDragEnd}
+                            style={plannedSectionStyle("planned_semester", { marginBottom: 12 })}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700 }}>Planned per Semester (ECTS)</div>
+                                <button
+                                    onClick={() => setIsPerSemesterEctsOpen((v) => !v)}
+                                    style={{
+                                        border: "1px solid #d1d5db",
+                                        background: "#ffffff",
+                                        borderRadius: 999,
+                                        padding: "2px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {isPerSemesterEctsOpen ? "Collapse" : "Expand"}
+                                </button>
+                            </div>
+                            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isPerSemesterEctsOpen ? 6 : 0 }}>
+                                Target ~ {workloadTargetPerSemester.toFixed(1)} ECTS / semester
+                            </div>
+                            <div style={{ fontSize: 12, color: perSemesterWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isPerSemesterEctsOpen ? 6 : 0 }}>
+                                {perSemesterRows.length === 0
+                                    ? "No semester data yet."
+                                    : (perSemesterWithinDesiredWorkload
+                                        ? "You are under your desired workload in every semester."
+                                        : "At least one semester is above your desired workload.")}
+                            </div>
+                            {isPerSemesterEctsOpen && (
+                                <div style={{ display: "grid", gap: 8 }}>
+                                    {perSemesterRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No semester data yet.</div>}
+                                    {perSemesterRows.map((row) => {
+                                        const rowPct = Math.max(0, Math.min(100, (row.ects / maxSemesterWorkloadForScale) * 100));
+                                        const targetPct = Math.max(0, Math.min(100, (workloadTargetPerSemester / maxSemesterWorkloadForScale) * 100));
+                                        const greenPct = Math.max(0, Math.min(rowPct, targetPct));
+                                        const redPct = Math.max(0, rowPct - targetPct);
+                                        return (
+                                            <div key={row.sem} style={{ display: "grid", gap: 4 }}>
+                                                <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                                    <span>Semester {row.sem}</span>
+                                                    <strong>{row.ects.toFixed(1)} ECTS</strong>
+                                                </div>
+                                                <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
+                                                    <div style={{ display: "flex", height: "100%" }}>
+                                                        <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
+                                                        {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            position: "absolute",
+                                                            left: `${targetPct}%`,
+                                                            top: 0,
+                                                            width: 2,
+                                                            height: "100%",
+                                                            background: "#1f2937",
+                                                            opacity: 0.45,
+                                                            transform: "translateX(-1px)",
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        )}
+
+                        {dashboardViewMode === "planning" && (
+                        <div
+                            draggable
+                            onDragStart={() => handlePlannedSectionDragStart("planned_category")}
+                            onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_category")}
+                            onDrop={() => handlePlannedSectionDrop("planned_category")}
+                            onDragEnd={handlePlannedSectionDragEnd}
+                            style={plannedSectionStyle("planned_category", { marginBottom: 12 })}
+                        >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700 }}>Planned per Category (ECTS)</div>
+                                <button
+                                    onClick={() => setIsByCategoryOpen((v) => !v)}
+                                    style={{
+                                        border: "1px solid #d1d5db",
+                                        background: "#ffffff",
+                                        borderRadius: 999,
+                                        padding: "2px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    {isByCategoryOpen ? "Collapse" : "Expand"}
+                                </button>
+                            </div>
+                            <div style={{ display: "grid", gap: 4, marginBottom: isByCategoryOpen ? 6 : 0 }}>
+                                <div style={{ fontSize: 12, color: "#374151" }}>
+                                    Total categorized: <strong>{byCategoryTotalEcts.toFixed(1)} ECTS</strong> across <strong>{byCategoryRows.length}</strong> categories
+                                </div>
+                                {topByCategoryRow && (
+                                    <div style={{ fontSize: 12, color: "#374151" }}>
+                                        Largest category: <strong>{topByCategoryRow.category}</strong> ({topByCategoryRow.ects.toFixed(1)} ECTS)
+                                    </div>
+                                )}
+                            </div>
+                            {isByCategoryOpen && (
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    {byCategoryRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No category data yet.</div>}
+                                    {byCategoryRows.map((row, idx) => {
+                                        const pct = byCategoryTotalEcts > 0
+                                            ? Math.max(0, Math.min(100, (row.ects / byCategoryTotalEcts) * 100))
+                                            : 0;
+                                        return (
+                                            <div key={`${row.category}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+                                                    #{idx + 1} {row.category}
+                                                </div>
+                                                <div style={{ fontSize: 11, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                                    <span>{row.ects.toFixed(1)} ECTS</span>
+                                                    <span>{pct.toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        )}
+
+                        {isBachelorDashboard && dashboardViewMode === "progress" && (
+                            <div
+                                draggable
+                                onDragStart={() => handleDoneSectionDragStart("steop")}
+                                onDragOver={(event) => handleDoneSectionDragOver(event, "steop")}
+                                onDrop={() => handleDoneSectionDrop("steop")}
+                                onDragEnd={handleDoneSectionDragEnd}
+                                style={doneSectionStyle("steop", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
+                                    <button
+                                        onClick={() => setIsSteopInfoOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                        title="Show StEOP rules"
+                                    >
+                                        i
+                                    </button>
+                                </div>
+                                {isSteopInfoOpen && (
+                                    <div
+                                        style={{
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: 8,
+                                            background: "#f9fafb",
+                                            padding: 8,
+                                            marginBottom: 8,
+                                            fontSize: 11,
+                                            color: "#374151",
+                                            whiteSpace: "pre-line",
+                                        }}
+                                    >
+                                        {STEOP_RULES_TEXT}
+                                    </div>
+                                )}
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ fontSize: 12 }}>
+                                        Status: <strong style={{ color: bachelorSteopComplete ? "#166534" : "#991b1b" }}>
+                                            {bachelorSteopComplete ? "completed" : "not completed"}
+                                        </strong>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Complete in semester: <strong>{bachelorSteopLane == null ? "-" : bachelorSteopLane + 1}</strong>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Done progress: <strong>{steopDoneEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
+                                        {" "}(
+                                        mandatory {steopMandatoryDoneEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
+                                        {" "}pool {steopPoolDoneEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
+                                        )
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                        <div style={{ width: `${steopDonePct}%`, height: "100%", background: bachelorSteopComplete ? "#16a34a" : "#2563eb" }} />
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required courses</div>
+                                        <button
+                                            onClick={() => setIsSteopChecklistOpen((v) => !v)}
+                                            style={{
+                                                border: "1px solid #d1d5db",
+                                                background: "#ffffff",
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            {isSteopChecklistOpen ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                    {isSteopChecklistOpen && (
+                                        <>
+                                            {steopMandatoryChecklist
+                                                .filter((row) => !bachelorSteopComplete || row.done)
+                                                .map((row, idx) => (
+                                                <div key={`steop-man-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                                    {row.done ? "✓" : "○"} {row.label}
+                                                </div>
+                                            ))}
+                                            <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
+                                                Pool requirement (need at least {steopPoolRequiredEcts.toFixed(1)} ECTS):
+                                            </div>
+                                            {steopPoolChecklist
+                                                .filter((row) => !bachelorSteopComplete || row.done)
+                                                .map((row, idx) => (
+                                                <div key={`steop-pool-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                                    {row.done ? "✓" : "○"} {row.label}
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {isBachelorDashboard && hasSelectedFocusArea && dashboardViewMode === "progress" && (
+                            <div
+                                draggable
+                                onDragStart={() => handleDoneSectionDragStart("focus")}
+                                onDragOver={(event) => handleDoneSectionDragOver(event, "focus")}
+                                onDrop={() => handleDoneSectionDrop("focus")}
+                                onDragEnd={handleDoneSectionDragEnd}
+                                style={doneSectionStyle("focus", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
+                                    <button
+                                        onClick={() => setIsFocusInfoOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                        title="Show Focus Area info"
+                                    >
+                                        i
+                                    </button>
+                                </div>
+                                {isFocusInfoOpen && (
+                                    <div
+                                        style={{
+                                            border: "1px solid #e5e7eb",
+                                            borderRadius: 8,
+                                            background: "#f9fafb",
+                                            padding: 8,
+                                            marginBottom: 8,
+                                            fontSize: 11,
+                                            color: "#374151",
+                                            whiteSpace: "pre-line",
+                                        }}
+                                    >
+                                        {FOCUS_INFO_TEXT}
+                                    </div>
+                                )}
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus || "-"}</strong></div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Status: <strong style={{ color: bachelorFocusComplete ? "#166534" : "#991b1b" }}>
+                                            {bachelorFocusComplete ? "completed" : "not completed"}
+                                        </strong>
+                                    </div>
+                                    <div style={{ fontSize: 12 }}>
+                                        Checklist progress: <strong>{focusRequirementDoneCount}</strong> / {focusRequirementTotalCount}
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                        <div style={{ width: `${focusChecklistPct}%`, height: "100%", background: bachelorFocusComplete ? "#16a34a" : "#2563eb" }} />
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required modules</div>
+                                        <button
+                                            onClick={() => setIsFocusChecklistOpen((v) => !v)}
+                                            style={{
+                                                border: "1px solid #d1d5db",
+                                                background: "#ffffff",
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            {isFocusChecklistOpen ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                    {isFocusChecklistOpen && (
+                                        <>
+                                            {focusChecklist.length === 0 && (
+                                                <div style={{ fontSize: 12, color: "#6b7280" }}>No detailed focus checklist available.</div>
+                                            )}
+                                            {focusRequiredItems.length > 0 && (
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 2 }}>Mandatory modules</div>
+                                            )}
+                                            {focusRequiredItems
+                                                .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
+                                                .map((item, idx) => (
+                                                <div key={`focus-req-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                    {item?.done ? "✓" : "○"} {item?.label}
+                                                </div>
+                                            ))}
+                                            {focusChooseItems.length > 0 && (
+                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                                    Choose {Number(focusChooseSummary?.min || 0)} from {focusChooseItems.length} modules
+                                                    {focusChooseSummary ? ` (${Number(focusChooseSummary?.done || 0)} done)` : ""}
+                                                </div>
+                                            )}
+                                            {focusChooseItems
+                                                .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
+                                                .map((item, idx) => (
+                                                <div key={`focus-choose-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                    {item?.done ? "✓" : "○"} {item?.label}
+                                                </div>
+                                            ))}
+                                            {focusChooseGroupRows.map((group, gIdx) => (
+                                                <div key={`focus-group-${gIdx}`} style={{ display: "grid", gap: 4 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                                        Choose {Number(group?.summary?.min || 0)} from {group.items.length} modules
+                                                        {group?.summary ? ` (${Number(group.summary?.done || 0)} done)` : ""}
+                                                    </div>
+                                                    {group.items
+                                                        .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
+                                                        .map((item, idx) => (
+                                                        <div key={`focus-group-item-${gIdx}-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                            {item?.done ? "✓" : "○"} {item?.label}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "progress" && (
+                            <div
+                                draggable
+                                onDragStart={() => handleDoneSectionDragStart("exam_subject")}
+                                onDragOver={(event) => handleDoneSectionDragOver(event, "exam_subject")}
+                                onDrop={() => handleDoneSectionDrop("exam_subject")}
+                                onDragEnd={handleDoneSectionDragEnd}
+                                style={doneSectionStyle("exam_subject", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Done per Exam Subject (ECTS)</div>
+                                    <button
+                                        onClick={() => setIsExamSubjectProgressOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        {isExamSubjectProgressOpen ? "Collapse" : "Expand"}
+                                    </button>
+                                </div>
+                                <div style={{ display: "grid", gap: 4, marginBottom: isExamSubjectProgressOpen ? 6 : 0 }}>
+                                    <div style={{ fontSize: 12, color: "#374151" }}>
+                                        Done <strong>{examSubjectTotalDoneCount}/{examSubjectTotalCourseCount}</strong> courses •{" "}
+                                        <strong>{examSubjectDoneEctsTotal.toFixed(1)}/{examSubjectTotalEctsTotal.toFixed(1)} ECTS</strong>
+                                    </div>
+                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                        <div style={{ width: `${examSubjectAggregatePct}%`, height: "100%", background: examSubjectAggregatePct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
+                                    </div>
+                                </div>
+                                {isExamSubjectProgressOpen && (
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                        {examSubjectProgress.length === 0 && (
+                                            <div style={{ fontSize: 12, color: "#6b7280" }}>No exam-subject progress available yet.</div>
+                                        )}
+                                        {examSubjectProgress.map((row, idx) => {
+                                            const totalEcts = Number(row?.totalEcts || 0);
+                                            const doneEcts = Number(row?.doneEcts || 0);
+                                            const donePct = totalEcts > 0 ? Math.max(0, Math.min(100, (doneEcts / totalEcts) * 100)) : 0;
+                                            return (
+                                                <div key={`${row?.subject}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{row?.subject}</div>
+                                                    <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                                                        Done {row.doneCount}/{row.totalCount} courses • {doneEcts.toFixed(1)}/{totalEcts.toFixed(1)} ECTS
+                                                    </div>
+                                                    <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                                        <div style={{ width: `${donePct}%`, height: "100%", background: donePct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "progress" && (
+                            <div
+                                draggable
+                                onDragStart={() => handleDoneSectionDragStart("done_semester")}
+                                onDragOver={(event) => handleDoneSectionDragOver(event, "done_semester")}
+                                onDrop={() => handleDoneSectionDrop("done_semester")}
+                                onDragEnd={handleDoneSectionDragEnd}
+                                style={doneSectionStyle("done_semester", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Done per Semester (ECTS)</div>
+                                    <button
+                                        onClick={() => setIsDonePerSemesterEctsOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        {isDonePerSemesterEctsOpen ? "Collapse" : "Expand"}
+                                    </button>
+                                </div>
+                                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isDonePerSemesterEctsOpen ? 6 : 0 }}>
+                                    Target ~ {workloadTargetPerSemester.toFixed(1)} ECTS / semester
+                                </div>
+                                <div style={{ fontSize: 12, color: donePerSemesterWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isDonePerSemesterEctsOpen ? 6 : 0 }}>
+                                    {donePerSemesterRows.length === 0
+                                        ? "No done semester data yet."
+                                        : (donePerSemesterWithinDesiredWorkload
+                                            ? `Done total ${donePerSemesterTotal.toFixed(1)} ECTS and under desired workload in every semester.`
+                                            : `Done total ${donePerSemesterTotal.toFixed(1)} ECTS; at least one semester is above desired workload.`)}
+                                </div>
+                                {isDonePerSemesterEctsOpen && (
+                                    <div style={{ display: "grid", gap: 8 }}>
+                                        {donePerSemesterRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No done semester data yet.</div>}
+                                        {donePerSemesterRows.map((row) => {
+                                            const rowPct = Math.max(0, Math.min(100, (row.ects / maxDoneSemesterWorkloadForScale) * 100));
+                                            const targetPct = Math.max(0, Math.min(100, (workloadTargetPerSemester / maxDoneSemesterWorkloadForScale) * 100));
+                                            const greenPct = Math.max(0, Math.min(rowPct, targetPct));
+                                            const redPct = Math.max(0, rowPct - targetPct);
+                                            return (
+                                                <div key={`done-semester-row-${row.sem}`} style={{ display: "grid", gap: 4 }}>
+                                                    <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                                        <span>Semester {row.sem}</span>
+                                                        <strong>{row.ects.toFixed(1)} ECTS</strong>
+                                                    </div>
+                                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
+                                                        <div style={{ display: "flex", height: "100%" }}>
+                                                            <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
+                                                            {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                position: "absolute",
+                                                                left: `${targetPct}%`,
+                                                                top: 0,
+                                                                width: 2,
+                                                                height: "100%",
+                                                                background: "#1f2937",
+                                                                opacity: 0.45,
+                                                                transform: "translateX(-1px)",
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "progress" && (
+                            <div
+                                draggable
+                                onDragStart={() => handleDoneSectionDragStart("category")}
+                                onDragOver={(event) => handleDoneSectionDragOver(event, "category")}
+                                onDrop={() => handleDoneSectionDrop("category")}
+                                onDragEnd={handleDoneSectionDragEnd}
+                                style={doneSectionStyle("category", { marginBottom: 12 })}
+                            >
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Done per Category (ECTS)</div>
+                                    <button
+                                        onClick={() => setIsDoneByCategoryOpen((v) => !v)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            background: "#ffffff",
+                                            borderRadius: 999,
+                                            padding: "2px 8px",
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        {isDoneByCategoryOpen ? "Collapse" : "Expand"}
+                                    </button>
+                                </div>
+                                <div style={{ display: "grid", gap: 4, marginBottom: isDoneByCategoryOpen ? 6 : 0 }}>
+                                    <div style={{ fontSize: 12, color: "#374151" }}>
+                                        Done <strong>{donePerCategoryDoneTotalEcts.toFixed(1)} / {donePerCategoryPlannedTotalEcts.toFixed(1)} ECTS</strong> across <strong>{donePerCategoryProgressRows.length}</strong> categories
+                                    </div>
+                                    {donePerCategoryProgressRows.length > 0 && (
+                                        <div style={{ fontSize: 12, color: "#374151" }}>
+                                            Fully done categories: <strong>{donePerCategoryCompleteCount}</strong> / {donePerCategoryProgressRows.length}
+                                        </div>
+                                    )}
+                                </div>
+                                {isDoneByCategoryOpen && (
+                                    <div style={{ display: "grid", gap: 6 }}>
+                                        {donePerCategoryProgressRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No done category data yet.</div>}
+                                        {donePerCategoryProgressRows.map((row, idx) => {
+                                            return (
+                                                <div key={`done-by-category-row-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+                                                        #{idx + 1} {row.category}
+                                                    </div>
+                                                    <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                                                        {row.doneEcts.toFixed(1)} / {row.plannedEcts.toFixed(1)} ECTS done ({row.pct.toFixed(1)}%)
+                                                    </div>
+                                                    <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                                        <div style={{ width: `${row.pct}%`, height: "100%", background: row.pct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {dashboardViewMode === "planning" && (
+                            <>
+                                <div
+                                    draggable
+                                    onDragStart={() => handlePlannedSectionDragStart("missing")}
+                                    onDragOver={(event) => handlePlannedSectionDragOver(event, "missing")}
+                                    onDrop={() => handlePlannedSectionDrop("missing")}
+                                    onDragEnd={handlePlannedSectionDragEnd}
+                                    style={plannedSectionStyle("missing", { marginBottom: 12 })}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700 }}>Missing Requirements</div>
+                                        <button
+                                            onClick={() => {
+                                                if (!hasMissingRequirements) return;
+                                                setIsMissingRequirementsOpen((v) => !v);
+                                            }}
+                                            disabled={!hasMissingRequirements}
+                                            style={{
+                                                border: "1px solid #d1d5db",
+                                                background: "#ffffff",
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: hasMissingRequirements ? "pointer" : "not-allowed",
+                                                opacity: hasMissingRequirements ? 1 : 0.45,
+                                            }}
+                                        >
+                                            {isMissingRequirementsOpen ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                    <div style={{ fontSize: 12, color: missingItems.length === 0 ? "#166534" : "#991b1b", marginBottom: isMissingRequirementsOpen ? 6 : 0 }}>
+                                        {missingItems.length === 0
+                                            ? "No missing requirements."
+                                            : `${missingItems.length} missing requirement${missingItems.length === 1 ? "" : "s"}.`}
+                                    </div>
+                                    {isMissingRequirementsOpen && (
+                                        <div style={{ display: "grid", gap: 6 }}>
+                                            {missingItems.length === 0 && (
+                                                <div style={{ fontSize: 12, color: "#166534" }}>No missing requirements reported.</div>
+                                            )}
+                                            {missingItems.map((m, idx) => (
+                                                <div
+                                                    key={`${m}-${idx}`}
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: "#991b1b",
+                                                        border: "1px solid #fecaca",
+                                                        borderLeft: "4px solid #dc2626",
+                                                        borderRadius: 8,
+                                                        background: "#fef2f2",
+                                                        padding: "6px 8px",
+                                                    }}
+                                                >
+                                                    {m}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div
+                                    draggable
+                                    onDragStart={() => handlePlannedSectionDragStart("warnings")}
+                                    onDragOver={(event) => handlePlannedSectionDragOver(event, "warnings")}
+                                    onDrop={() => handlePlannedSectionDrop("warnings")}
+                                    onDragEnd={handlePlannedSectionDragEnd}
+                                    style={plannedSectionStyle("warnings", { marginBottom: 12 })}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700 }}>Warnings</div>
+                                        <button
+                                            onClick={() => {
+                                                if (!hasWarnings) return;
+                                                setIsWarningsOpen((v) => !v);
+                                            }}
+                                            disabled={!hasWarnings}
+                                            style={{
+                                                border: "1px solid #d1d5db",
+                                                background: "#ffffff",
+                                                borderRadius: 999,
+                                                padding: "2px 8px",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                cursor: hasWarnings ? "pointer" : "not-allowed",
+                                                opacity: hasWarnings ? 1 : 0.45,
+                                            }}
+                                        >
+                                            {isWarningsOpen ? "Collapse" : "Expand"}
+                                        </button>
+                                    </div>
+                                    <div style={{ fontSize: 12, color: warnings.length === 0 ? "#6b7280" : "#92400e", marginBottom: isWarningsOpen ? 6 : 0 }}>
+                                        {warnings.length === 0
+                                            ? "No warnings."
+                                            : `${warnings.length} warning${warnings.length === 1 ? "" : "s"}.`}
+                                    </div>
+                                    {isWarningsOpen && (
+                                        <div style={{ display: "grid", gap: 6 }}>
+                                            {warnings.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No warnings.</div>}
+                                            {warnings.map((w, idx) => (
+                                                <div
+                                                    key={`${w}-${idx}`}
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: "#92400e",
+                                                        border: "1px solid #fde68a",
+                                                        borderLeft: "4px solid #f59e0b",
+                                                        borderRadius: 8,
+                                                        background: "#fffbeb",
+                                                        padding: "6px 8px",
+                                                    }}
+                                                >
+                                                    {w}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                            </>
+                        )}
+
+                        <div style={{ fontSize: 12, color: "#6b7280", order: 9999, marginTop: 4 }}>
+                            Last update: {ruleCheckState.lastUpdatedAt ? new Date(ruleCheckState.lastUpdatedAt).toLocaleTimeString() : "-"}
+                        </div>
+                    </aside>
+                );
 
     if (viewMode === "graph") {
         return (
             <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
-                {prefillPromptNode}
+                {plannerNotificationsNode}
                 <button
                     onClick={handleSignOut}
                     disabled={isSigningOut}
@@ -2509,99 +3316,14 @@ export default function App({ currentUser, onSignOut }) {
                         }}
                     />
                 </div>
-                {isRuleDashboardOpen && (
-                    <aside
-                        style={{
-                            width: 420,
-                            borderLeft: "1px solid #e5e7eb",
-                            background: "#ffffff",
-                            padding: 12,
-                            overflow: "auto",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                            <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
-                            <button
-                                onClick={() => setIsRuleDashboardOpen(false)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "6px 10px",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Close
-                            </button>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>Program: {programCode}</div>
-                        {programCode === BACHELOR_PROGRAM_CODE && (
-                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>Focus: {selectedFocus || "-"}</div>
-                        )}
-
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Done ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{doneEctsKpi.toFixed(1)}</div>
-                            </div>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Planned ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{plannedEctsKpi.toFixed(1)}</div>
-                            </div>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Total ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{totalEctsKpi.toFixed(1)}</div>
-                            </div>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Target ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{targetEctsKpi.toFixed(1)}</div>
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Missing Requirements</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {missingItems.length === 0 && <div style={{ fontSize: 12, color: "#166534" }}>No missing requirements reported.</div>}
-                                {missingItems.map((m, idx) => (
-                                    <div key={`${m}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>{m}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Warnings</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {warnings.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No warnings.</div>}
-                                {warnings.map((w, idx) => (
-                                    <div key={`${w}-${idx}`} style={{ fontSize: 12, color: "#92400e" }}>{w}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Violations</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {violations.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No violations.</div>}
-                                {violations.map((v, idx) => (
-                                    <div key={`${v}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>{v}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>
-                            Last update: {ruleCheckState.lastUpdatedAt ? new Date(ruleCheckState.lastUpdatedAt).toLocaleTimeString() : "-"}
-                        </div>
-                    </aside>
-                )}
+                {ruleDashboardAside}
             </div>
         );
     }
 
     return (
         <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
-            {prefillPromptNode}
+            {plannerNotificationsNode}
             <button
                 onClick={handleSignOut}
                 disabled={isSigningOut}
@@ -2748,253 +3470,7 @@ export default function App({ currentUser, onSignOut }) {
                     )}
                 </div>
 
-                {isRuleDashboardOpen && (
-                    <aside
-                        style={{
-                            width: 420,
-                            borderLeft: "1px solid #e5e7eb",
-                            background: "#ffffff",
-                            padding: 12,
-                            overflow: "auto",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                            <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
-                            <button
-                                onClick={() => setIsRuleDashboardOpen(false)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "6px 10px",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Close
-                            </button>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-                            Program: {programCode}
-                        </div>
-                        {programCode === BACHELOR_PROGRAM_CODE && (
-                            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-                                Focus: {selectedFocus || "-"}
-                            </div>
-                        )}
-
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Done ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{doneEctsKpi.toFixed(1)}</div>
-                            </div>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Planned ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{plannedEctsKpi.toFixed(1)}</div>
-                            </div>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Total ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{totalEctsKpi.toFixed(1)}</div>
-                            </div>
-                            <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                <div style={{ fontSize: 11, color: "#6b7280" }}>Target ECTS</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{targetEctsKpi.toFixed(1)}</div>
-                            </div>
-                            {isBachelorDashboard && (
-                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Narrow Electives</div>
-                                    <div style={{ fontSize: 18, fontWeight: 700 }}>{bachelorNarrowCompleted}/{bachelorNarrowRequired}</div>
-                                </div>
-                            )}
-                        </div>
-
-                        {!isBachelorDashboard && (
-                            <div style={{ marginBottom: 12 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Key Buckets</div>
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>Subject modules (excl. free): <strong>{buckets.subject_modules_excl_free ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Free choice + TS: <strong>{buckets.free_choice_and_ts ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Transferable skills: <strong>{buckets.transferable_skills ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Diploma total: <strong>{buckets.diploma_total ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Needed free to hit 120: <strong>{buckets.needed_free_to_hit_120 ?? 0}</strong></div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Per Semester ECTS</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {Object.keys(perSemester).length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No semester data yet.</div>}
-                                {Object.entries(perSemester).map(([sem, ects]) => (
-                                    <div key={sem} style={{ fontSize: 12 }}>
-                                        Semester {Number(sem) + 1}: <strong>{ects}</strong>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>By Category</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {Object.keys(byCategory).length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No category data yet.</div>}
-                                {Object.entries(byCategory).map(([k, v]) => (
-                                    <div key={k} style={{ fontSize: 12 }}>{k}: <strong>{v}</strong></div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>By Exam Subject</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {Object.keys(byExamSubject).length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No exam-subject data yet.</div>}
-                                {Object.entries(byExamSubject).map(([k, v]) => (
-                                    <div key={k} style={{ fontSize: 12 }}>{k}: <strong>{v}</strong></div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {isBachelorDashboard && (
-                            <div style={{ marginBottom: 12 }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
-                                    <button
-                                        onClick={() => setIsSteopInfoOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                        title="Show StEOP rules"
-                                    >
-                                        i
-                                    </button>
-                                </div>
-                                {isSteopInfoOpen && (
-                                    <div
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 8,
-                                            background: "#f9fafb",
-                                            padding: 8,
-                                            marginBottom: 8,
-                                            fontSize: 11,
-                                            color: "#374151",
-                                            whiteSpace: "pre-line",
-                                        }}
-                                    >
-                                        {STEOP_RULES_TEXT}
-                                    </div>
-                                )}
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>
-                                        Status: <strong style={{ color: bachelorSteopComplete ? "#166534" : "#991b1b" }}>
-                                            {bachelorSteopComplete ? "completed" : "not completed"}
-                                        </strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Complete in semester: <strong>{bachelorSteopLane == null ? "-" : bachelorSteopLane + 1}</strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Done progress: <strong>{steopDoneEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
-                                        {" "}(
-                                        mandatory {steopMandatoryDoneEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
-                                        {" "}pool {steopPoolDoneEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
-                                        )
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {isBachelorDashboard && selectedFocus && (
-                            <div style={{ marginBottom: 12 }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
-                                    <button
-                                        onClick={() => setIsFocusInfoOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                        title="Show Focus Area info"
-                                    >
-                                        i
-                                    </button>
-                                </div>
-                                {isFocusInfoOpen && (
-                                    <div
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 8,
-                                            background: "#f9fafb",
-                                            padding: 8,
-                                            marginBottom: 8,
-                                            fontSize: 11,
-                                            color: "#374151",
-                                            whiteSpace: "pre-line",
-                                        }}
-                                    >
-                                        {FOCUS_INFO_TEXT}
-                                    </div>
-                                )}
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus}</strong></div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Status: <strong style={{ color: bachelorFocusComplete ? "#166534" : "#991b1b" }}>
-                                            {bachelorFocusComplete ? "completed" : "not completed"}
-                                        </strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Missing items: <strong style={{ color: bachelorFocusComplete ? "#166534" : "#991b1b" }}>{bachelorFocusMissingCount}</strong>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Missing Requirements</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {missingItems.length === 0 && <div style={{ fontSize: 12, color: "#166534" }}>No missing requirements reported.</div>}
-                                {missingItems.map((m, idx) => (
-                                    <div key={`${m}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>{m}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Warnings</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {warnings.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No warnings.</div>}
-                                {warnings.map((w, idx) => (
-                                    <div key={`${w}-${idx}`} style={{ fontSize: 12, color: "#92400e" }}>{w}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Violations</div>
-                            <div style={{ display: "grid", gap: 6 }}>
-                                {violations.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No violations.</div>}
-                                {violations.map((v, idx) => (
-                                    <div key={`${v}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>{v}</div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>
-                            Last update: {ruleCheckState.lastUpdatedAt ? new Date(ruleCheckState.lastUpdatedAt).toLocaleTimeString() : "-"}
-                        </div>
-                    </aside>
-                )}
+                {ruleDashboardAside}
             </div>
         </div>
     );

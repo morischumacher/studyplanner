@@ -39,6 +39,7 @@ const FOCUS_ADDITIONS = {
     digital_health: [
         { semester: 5, aliases: ["Methods for Data Generation and Analytics in Medicine and Life Sciences"] },
     ],
+    human_centered_computing: [],
     software_engineering: [
         { semester: 5, aliases: ["Software-Qualitätssicherung"] },
     ],
@@ -49,6 +50,88 @@ const FOCUS_ADDITIONS = {
     cybersecurity: [],
     theoretical_cs_logic: [],
     general: [],
+};
+
+const FOCUS_EXCLUSIONS = {
+    general: [
+        "Einführung in Visual Computing",
+        "Daten- und Informatikrecht",
+        "Verteilte Systeme",
+        "Interface und Interaction Design",
+        "Logic and Reasoning in Computer Science",
+        "Einführung in Artificial Intelligence",
+        "Software Engineering Projekt",
+        "Computersysteme",
+        "Betriebssysteme",
+        "Software Engineering",
+    ],
+    ai_ml: [
+        "Verteilte Systeme",
+        "Einführung in Visual Computing",
+        "Interface und Interaction Design",
+        "Daten- und Informatikrecht",
+        "Logic and Reasoning in Computer Science",
+        "Software Engineering Projekt",
+        "Software Engineering",
+        "Computersysteme",
+    ],
+    cybersecurity: [
+        "Verteilte Systeme",
+        "Logic and Reasoning in Computer Science",
+        "Einführung in Visual Computing",
+        "Daten- und Informatikrecht",
+        "Interface und Interaction Design",
+        "Software Engineering",
+        "Software Engineering Projekt",
+        "Computersysteme",
+    ],
+    digital_health: [
+        "Verteilte Systeme",
+        "Einführung in Artificial Intelligence",
+        "Logic and Reasoning in Computer Science",
+        "Software Engineering Projekt",
+        "Betriebssysteme",
+        "Computersysteme",
+    ],
+    human_centered_computing: [
+        "Daten- und Informatikrecht",
+        "Methods for Data Generation and Analytics in Medicine and Life Sciences",
+        "Verteilte Systeme",
+        "Einführung in Artificial Intelligence",
+        "Logic and Reasoning in Computer Science",
+        "Betriebssysteme",
+        "Computersysteme",
+        "Software Engineering Projekt",
+    ],
+    software_engineering: [
+        "Einführung in Visual Computing",
+        "Daten- und Informatikrecht",
+        "Einführung in Artificial Intelligence",
+        "Logic and Reasoning in Computer Science",
+        "Betriebssysteme",
+        "Computersysteme",
+    ],
+    theoretical_cs_logic: [
+        "Einführung in Visual Computing",
+        "Daten- und Informatikrecht",
+        "Interface und Interaction Design",
+        "Verteilte Systeme",
+        "Einführung in Artificial Intelligence",
+        "Software Engineering Projekt",
+        "Software Engineering",
+        "Betriebssysteme",
+        "Computersysteme",
+    ],
+    visual_computing: [
+        "Daten- und Informatikrecht",
+        "Verteilte Systeme",
+        "Software Engineering Projekt",
+        "Logic and Reasoning in Computer Science",
+        "Interface und Interaction Design",
+        "Einführung in Artificial Intelligence",
+        "Betriebssysteme",
+        "Computersysteme",
+    ],
 };
 
 function normalizeText(value) {
@@ -67,6 +150,7 @@ function resolveFocusKey(selectedFocus) {
     if (key.includes("artificial intelligence") && key.includes("machine learning")) return "ai_ml";
     if (key.includes("cybersecurity")) return "cybersecurity";
     if (key.includes("digital health")) return "digital_health";
+    if (key.includes("human centered computing") || key.includes("human centred computing")) return "human_centered_computing";
     if (key.includes("software engineering")) return "software_engineering";
     if (key.includes("visual computing")) return "visual_computing";
     if (key.includes("theoretische informatik") || key.includes("logic") || key.includes("logik")) return "theoretical_cs_logic";
@@ -150,7 +234,11 @@ function findBestCourse(catalogEntries, aliases, desiredEcts, usedCodes) {
 export function buildBachelorPrefillPlan(catalog, selectedFocus) {
     const focusKey = resolveFocusKey(selectedFocus);
     const additions = FOCUS_ADDITIONS[focusKey] || FOCUS_ADDITIONS.general;
-    const template = [...BASELINE_PLAN, ...additions];
+    const exclusions = new Set((FOCUS_EXCLUSIONS[focusKey] || []).map(normalizeText));
+    const template = [...BASELINE_PLAN, ...additions].filter((item) => {
+        const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+        return !aliases.some((alias) => exclusions.has(normalizeText(alias)));
+    });
     const catalogEntries = flattenCatalogCourses(catalog);
     const usedCodes = new Set();
     const plannedCourses = [];

@@ -103,13 +103,15 @@ export default class GraphFilterEngine {
         if (!level || level === "root") return true;
         const data = node?.data || {};
 
-        if (!Array.isArray(filters.examSubjects) || filters.examSubjects.length === 0) return false;
-        if (level === "subject") {
-            const subjectName = data?.subjectName ?? data?.label ?? null;
-            if (!subjectName || !filters.examSubjects.includes(subjectName)) return false;
-            return true;
+        const selectedExamSubjects = Array.isArray(filters.examSubjects) ? filters.examSubjects : [];
+        if (selectedExamSubjects.length > 0) {
+            if (level === "subject") {
+                const subjectName = data?.subjectName ?? data?.label ?? null;
+                if (!subjectName || !selectedExamSubjects.includes(subjectName)) return false;
+                return true;
+            }
+            if (!data?.examSubject || !selectedExamSubjects.includes(data.examSubject)) return false;
         }
-        if (!data?.examSubject || !filters.examSubjects.includes(data.examSubject)) return false;
 
         const selectedObligationTypes = Array.isArray(filters.obligationTypes) ? filters.obligationTypes : [];
         if (selectedObligationTypes.length > 0) {
@@ -118,8 +120,7 @@ export default class GraphFilterEngine {
             if (obligation && !selectedObligationTypes.includes(obligation)) return false;
         }
 
-        if (!Array.isArray(filters.progressStates) || filters.progressStates.length === 0) return false;
-        {
+        if (Array.isArray(filters.progressStates) && filters.progressStates.length > 0) {
             const status = String(data?.status || "todo");
             if (!filters.progressStates.includes(status)) return false;
         }
@@ -139,13 +140,17 @@ export default class GraphFilterEngine {
             }
         }
 
-        if (!Array.isArray(filters.courseTypes) || filters.courseTypes.length === 0) return false;
-        if (level === "module") {
-            const moduleTypes = Array.isArray(data?.moduleCourseTypes) ? data.moduleCourseTypes : [];
-            if (!moduleTypes.some((t) => filters.courseTypes.includes(t))) return false;
-        } else {
-            const courseType = this.normalizeCourseType(data?.courseType, data?.courseCode);
-            if (!courseType || !filters.courseTypes.includes(courseType)) return false;
+        if (Array.isArray(filters.courseTypes)) {
+            // Course type selection is strict:
+            // all selected -> all visible, none selected -> none visible.
+            if (filters.courseTypes.length === 0) return false;
+            if (level === "module") {
+                const moduleTypes = Array.isArray(data?.moduleCourseTypes) ? data.moduleCourseTypes : [];
+                if (!moduleTypes.some((t) => filters.courseTypes.includes(t))) return false;
+            } else {
+                const courseType = this.normalizeCourseType(data?.courseType, data?.courseCode);
+                if (!courseType || !filters.courseTypes.includes(courseType)) return false;
+            }
         }
 
         return true;

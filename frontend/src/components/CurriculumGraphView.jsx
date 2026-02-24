@@ -599,7 +599,6 @@ export default function CurriculumGraphView({
         [root]
     );
     const [displayNodes, setDisplayNodes] = useNodesState(nodes);
-    const areContentFiltersActive = hierarchyMode !== "force_expanded";
     const exitForcedHierarchyOnFilterInteraction = useCallback(() => {
         if (hierarchyMode === "normal") return;
         const baseCollapsed = new Set(effectiveCollapsedIds);
@@ -608,12 +607,8 @@ export default function CurriculumGraphView({
         setCollapsedIds(baseCollapsed);
     }, [hierarchyMode, effectiveCollapsedIds]);
     const visibleNodeIds = useMemo(
-        () => (
-            areContentFiltersActive
-                ? GraphFilterEngine.computeVisibleNodeIds(nodes, autoEdges, graphFilters, programCode)
-                : new Set((nodes || []).map((n) => n.id))
-        ),
-        [nodes, autoEdges, graphFilters, programCode, areContentFiltersActive]
+        () => GraphFilterEngine.computeVisibleNodeIds(nodes, autoEdges, graphFilters, programCode),
+        [nodes, autoEdges, graphFilters, programCode]
     );
     const edges = useMemo(
         () => autoEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)),
@@ -977,7 +972,7 @@ export default function CurriculumGraphView({
                         </button>
                         <button
                             onClick={() => {
-                                setHierarchyMode("normal");
+                                setHierarchyMode("force_expanded");
                                 const next = new Set();
                                 setCollapsedIds(next);
                                 setGraphViewState?.((prev) => ({ ...prev, collapsedIds: [] }));
@@ -985,7 +980,10 @@ export default function CurriculumGraphView({
                             }}
                             style={{
                                 border: "1px solid #d1d5db",
-                                background: (allCollapsibleIds.size > 0 && collapsedIds.size === 0) ? "#dbeafe" : "#ffffff",
+                                background: (
+                                    hierarchyMode === "force_expanded" ||
+                                    (allCollapsibleIds.size > 0 && collapsedIds.size === 0)
+                                ) ? "#dbeafe" : "#ffffff",
                                 borderRadius: 6,
                                 padding: "4px 8px",
                                 fontSize: 11,
