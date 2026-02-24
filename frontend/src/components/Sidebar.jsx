@@ -14,6 +14,7 @@ import { displayCourseHeader, displayModuleHeader, displayShortCode } from "../u
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
+    programCode,
     catalog,
     loading,
     error,
@@ -21,13 +22,6 @@ export default function Sidebar({
     togglePf,
     onDragStart,
     subjectColors,
-    programCode,
-    onProgramChange,
-    programOptions,
-    selectedFocus,
-    setSelectedFocus,
-    bachelorProgramCode,
-    bachelorFocusOptions,
     getCourseStatus,
     onAddCourseToPlan,
     onAddModuleToPlan,
@@ -36,6 +30,10 @@ export default function Sidebar({
     onRemoveCourseFromPlan,
     onRemoveModuleFromPlan,
     semesterOptions,
+    width = 300,
+    topOffset = 56,
+    bottomOffset = 84,
+    leftOffset = 0,
 }) {
     const [menuState, setMenuState] = useState({ key: null, view: "root", variantId: null });
     const [plusRevealCount, setPlusRevealCount] = useState(0);
@@ -119,7 +117,12 @@ export default function Sidebar({
     return (
         <aside
             style={{
-                width: 300,
+                width,
+                marginTop: topOffset,
+                marginBottom: bottomOffset,
+                marginLeft: leftOffset,
+                height: `calc(100vh - ${topOffset + bottomOffset}px)`,
+                alignSelf: "flex-start",
                 background: "#fff",
                 borderRight: "1px solid #e5e7eb",
                 padding: 16,
@@ -127,73 +130,6 @@ export default function Sidebar({
             }}
         >
             <div style={{ fontSize: 18, fontWeight: 600 }}>Course Catalog</div>
-            <div
-                style={{
-                    display: "grid",
-                    gap: 8,
-                    margin: "10px 0 12px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: 10,
-                    background: "#f9fafb",
-                    padding: 10,
-                    width: "100%",
-                    boxSizing: "border-box",
-                }}
-            >
-                <div style={{ display: "grid", gap: 6 }}>
-                    <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Study Program</label>
-                    <select
-                        value={programCode}
-                        onChange={(e) => onProgramChange?.(e.target.value)}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            background: "#fff",
-                            fontSize: 14,
-                            width: "100%",
-                            maxWidth: "100%",
-                            minWidth: 0,
-                            boxSizing: "border-box",
-                            display: "block",
-                        }}
-                    >
-                        {(programOptions || []).map((opt) => (
-                            <option key={opt.code} value={opt.code}>
-                                {opt.label} ({opt.code})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                {programCode === bachelorProgramCode && (
-                    <div style={{ display: "grid", gap: 6 }}>
-                        <label style={{ fontSize: 12, color: "#6b7280", fontWeight: 600 }}>Focus Area (Bachelor)</label>
-                        <select
-                            value={selectedFocus || ""}
-                            onChange={(e) => setSelectedFocus?.(e.target.value)}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                background: "#fff",
-                                fontSize: 13,
-                                width: "100%",
-                                maxWidth: "100%",
-                                minWidth: 0,
-                                boxSizing: "border-box",
-                                display: "block",
-                            }}
-                        >
-                            <option value="">Select focus area</option>
-                            {(bachelorFocusOptions || []).map((focus) => (
-                                <option key={focus} value={focus}>
-                                    {focus}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-            </div>
             <p style={{ fontSize: 14, color: "#6b7280" }}>
                 Drag a course or a multi-course module into any semester lane.
             </p>

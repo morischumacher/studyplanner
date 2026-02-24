@@ -12,6 +12,7 @@ import React, {
 import { currentProgram } from "./ProgramContext.jsx";
 import ReactFlow, {
     Background,
+    ControlButton,
     Controls,
     MiniMap,
     useNodesState,
@@ -90,6 +91,15 @@ const NODE_TYPES = {
 export default function App({ currentUser, onSignOut }) {
     const MIN_MODULE_GROUP_TOP_Y = 108;
     const MIN_GROUP_CHILD_Y = MIN_MODULE_GROUP_TOP_Y + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT;
+    const SIDEBAR_WIDTH = 300;
+    const SIDEBAR_VISUAL_WIDTH = 333;
+    const SIDEBAR_LEFT_OFFSET = 12;
+    const TABLE_TOP_CONTROLS_TOP = 12;
+    const TABLE_TOP_CONTROLS_HEIGHT = 78;
+    const TABLE_SIDEBAR_TOP_OFFSET = TABLE_TOP_CONTROLS_TOP + TABLE_TOP_CONTROLS_HEIGHT + 8;
+    const TABLE_SIDEBAR_BOTTOM_OFFSET = 0;
+    const PANEL_TOP_MARGIN = 56;
+    const PANEL_BOTTOM_MARGIN = 0;
     const {
         programCode,
         setProgramCode,
@@ -152,9 +162,14 @@ export default function App({ currentUser, onSignOut }) {
     const [plannerHydrated, setPlannerHydrated] = useState(false);
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [tableInteractionMode, setTableInteractionMode] = useState("pan");
+    const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
     const [focusPrefillPrompt, setFocusPrefillPrompt] = useState(null);
     const [dismissedInitialPrefillPrompt, setDismissedInitialPrefillPrompt] = useState(false);
     const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
+    const successFeedbackSignatureRef = useRef("");
     const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
     const setProgramRuleCheckState = useCallback((targetProgramCode, updater) => {
         if (!targetProgramCode) return;
@@ -1572,6 +1587,32 @@ export default function App({ currentUser, onSignOut }) {
         schedulePersist();
     }, [onNodeDragStop, schedulePersist]);
 
+    // When dragging a multi-selection, ensure all affected module backgrounds follow
+    // moved child courses as a final reconciliation step.
+    const onSelectionDragStopMerged = useCallback((_, draggedNodes) => {
+        const draggedIds = new Set(
+            (Array.isArray(draggedNodes) ? draggedNodes : [])
+                .map((n) => n?.id)
+                .filter(Boolean)
+        );
+        setNodes((prev) => {
+            const affectedGroupIds = new Set();
+            for (const n of prev) {
+                const isDragged = draggedIds.has(n.id) || Boolean(n?.selected);
+                if (!isDragged) continue;
+                if (n?.type !== "course" || !n?.data?.groupId) continue;
+                affectedGroupIds.add(n.data.groupId);
+            }
+            if (!affectedGroupIds.size) return prev;
+            let next = prev;
+            for (const groupId of affectedGroupIds) {
+                next = recomputeGroupFromChildren(next, groupId);
+            }
+            return resolveLaneCollisions(next);
+        });
+        schedulePersist();
+    }, [schedulePersist, setNodes, resolveLaneCollisions]);
+
     // Handle drop from the sidebar
     const onDrop = useCallback(
         (evt) => {
@@ -2136,6 +2177,30 @@ export default function App({ currentUser, onSignOut }) {
         return () => window.clearTimeout(t);
     }, [progressMilestone]);
 
+    const isRuleSuccessFeedback =
+        !stickyActive &&
+        !ruleCheckState?.sending &&
+        !ruleCheckState?.error &&
+        Boolean(ruleCheckState?.response?.ok);
+    useEffect(() => {
+        if (!isRuleSuccessFeedback) {
+            setShowTransientSuccessFeedback(true);
+            return;
+        }
+        const signature = `${programCode}:${ruleCheckState?.lastUpdatedAt ?? ""}:${ruleCheckState?.response?.message ?? ""}`;
+        if (successFeedbackSignatureRef.current !== signature) {
+            successFeedbackSignatureRef.current = signature;
+            setShowTransientSuccessFeedback(true);
+        }
+        const t = window.setTimeout(() => setShowTransientSuccessFeedback(false), 3000);
+        return () => window.clearTimeout(t);
+    }, [
+        programCode,
+        isRuleSuccessFeedback,
+        ruleCheckState?.lastUpdatedAt,
+        ruleCheckState?.response?.message,
+    ]);
+
     useEffect(() => {
         setFocusPrefillPrompt(null);
         setDismissedInitialPrefillPrompt(false);
@@ -2176,6 +2241,144 @@ export default function App({ currentUser, onSignOut }) {
             progressMilestoneText={progressMilestone?.text || ""}
         />
     );
+    const topActionsNode = (
+        <div
+            style={{
+                position: "fixed",
+                top: 12,
+                right: 12,
+                zIndex: 30,
+                display: "flex",
+                gap: 8,
+            }}
+        >
+            <button
+                onClick={() => setIsProfileOpen(true)}
+                style={{
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                }}
+                title="Open profile settings"
+            >
+                Profile
+            </button>
+            <button
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                style={{
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    opacity: isSigningOut ? 0.65 : 1,
+                }}
+                title={`Signed in as ${currentUser?.username || "user"}`}
+            >
+                {isSigningOut ? "⏻ Signing Out..." : "⏻ Sign Out"}
+            </button>
+        </div>
+    );
+    const profileModalNode = isProfileOpen ? (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 40,
+                background: "rgba(15, 23, 42, 0.32)",
+                display: "grid",
+                placeItems: "center",
+                padding: 16,
+            }}
+        >
+            <div
+                style={{
+                    width: 420,
+                    maxWidth: "100%",
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 10,
+                    padding: 12,
+                    display: "grid",
+                    gap: 10,
+                    boxShadow: "0 20px 42px rgba(15, 23, 42, 0.2)",
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ fontSize: 14, color: "#111827", fontWeight: 700 }}>Profile</div>
+                    <button
+                        onClick={() => setIsProfileOpen(false)}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "6px 10px",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                        }}
+                    >
+                        Close
+                    </button>
+                </div>
+                <div style={{ fontSize: 13, color: "#111827" }}>
+                    Name: <strong>{currentUser?.username || "user"}</strong>
+                </div>
+                <div style={{ display: "grid", gap: 4 }}>
+                    <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
+                    <select
+                        value={programCode}
+                        onChange={(e) => setProgramCode?.(e.target.value)}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontWeight: 600,
+                            width: "100%",
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        {(PROGRAM_OPTIONS || []).map((opt) => (
+                            <option key={opt.code} value={opt.code}>
+                                {opt.label} ({opt.code})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {programCode === BACHELOR_PROGRAM_CODE && (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
+                        <select
+                            value={selectedFocus || ""}
+                            onChange={(e) => setSelectedFocus?.(e.target.value)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                boxSizing: "border-box",
+                            }}
+                        >
+                            <option value="">Select focus area</option>
+                            {(BACHELOR_FOCUS_OPTIONS || []).map((focus) => (
+                                <option key={focus} value={focus}>
+                                    {focus}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+            </div>
+        </div>
+    ) : null;
 
     const ruleDashboardAside = isRuleDashboardOpen && (
                     <aside
@@ -2183,10 +2386,14 @@ export default function App({ currentUser, onSignOut }) {
                             width: 420,
                             borderLeft: "1px solid #e5e7eb",
                             background: "#ffffff",
+                            marginTop: PANEL_TOP_MARGIN,
+                            marginBottom: PANEL_BOTTOM_MARGIN,
+                            height: `calc(100vh - ${PANEL_TOP_MARGIN + PANEL_BOTTOM_MARGIN}px)`,
                             padding: 12,
                             overflow: "auto",
                             display: "flex",
                             flexDirection: "column",
+                            alignSelf: "flex-start",
                         }}
                     >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -3257,26 +3464,8 @@ export default function App({ currentUser, onSignOut }) {
         return (
             <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
                 {plannerNotificationsNode}
-                <button
-                    onClick={handleSignOut}
-                    disabled={isSigningOut}
-                    style={{
-                        position: "fixed",
-                        top: 12,
-                        right: 12,
-                        zIndex: 30,
-                        border: "1px solid #d1d5db",
-                        background: "#ffffff",
-                        borderRadius: 8,
-                        padding: "8px 12px",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        opacity: isSigningOut ? 0.65 : 1,
-                    }}
-                    title={`Signed in as ${currentUser?.username || "user"}`}
-                >
-                    {isSigningOut ? "⏻ Signing Out..." : `⏻ Sign Out (${currentUser?.username || "user"})`}
-                </button>
+                {topActionsNode}
+                {profileModalNode}
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <CurriculumGraphView
                         catalog={catalog}
@@ -3322,126 +3511,120 @@ export default function App({ currentUser, onSignOut }) {
     }
 
     return (
-        <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+        <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb", position: "relative" }}>
             {plannerNotificationsNode}
-            <button
-                onClick={handleSignOut}
-                disabled={isSigningOut}
+            {topActionsNode}
+            {profileModalNode}
+            <div
                 style={{
-                    position: "fixed",
-                    top: 12,
-                    right: 12,
-                    zIndex: 30,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: "8px 12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    opacity: isSigningOut ? 0.65 : 1,
+                    position: "absolute",
+                    top: TABLE_TOP_CONTROLS_TOP,
+                    left: SIDEBAR_LEFT_OFFSET,
+                    zIndex: 7,
+                    display: "grid",
+                    gap: 6,
+                    gridTemplateColumns: "1fr 1fr",
+                    width: SIDEBAR_VISUAL_WIDTH,
+                    boxSizing: "border-box",
                 }}
-                title={`Signed in as ${currentUser?.username || "user"}`}
             >
-                {isSigningOut ? "⏻ Signing Out..." : `⏻ Sign Out (${currentUser?.username || "user"})`}
-            </button>
-            <Sidebar
-                catalog={catalog}
-                loading={loadingCatalog}
-                error={catalogError}
-                expandedSet={expandedPf}
-                togglePf={togglePf}
-                onDragStart={handleDragStart}
-                subjectColors={subjectColors}
-                programCode={programCode}
-                onProgramChange={setProgramCode}
-                programOptions={PROGRAM_OPTIONS}
-                selectedFocus={selectedFocus}
-                setSelectedFocus={setSelectedFocus}
-                bachelorProgramCode={BACHELOR_PROGRAM_CODE}
-                bachelorFocusOptions={BACHELOR_FOCUS_OPTIONS}
-                getCourseStatus={getCourseStatus}
-                onAddCourseToPlan={addGraphCourseToPlan}
-                onAddModuleToPlan={addGraphModuleToPlan}
-                onToggleCourseDone={toggleGraphCourseDone}
-                onToggleModuleDone={toggleGraphModuleDone}
-                onRemoveCourseFromPlan={removeGraphCourseFromPlan}
-                onRemoveModuleFromPlan={removeGraphModuleFromPlan}
-                semesterOptions={sidebarSemesters}
-            />
+                <button
+                    onClick={() => setViewMode("graph")}
+                    style={{
+                        flex: 1,
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "6px 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    ⇆ Graph View
+                </button>
+                <button
+                    onClick={() => setIsRuleDashboardOpen((v) => !v)}
+                    style={{
+                        flex: 1,
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "6px 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    {isRuleDashboardOpen ? "▦ Close Dashboard" : "▦ Open Dashboard"}
+                </button>
+                <button
+                    onClick={() => setIsSidebarOpen((v) => !v)}
+                    style={{
+                        gridColumn: "1 / -1",
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "6px 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    {isSidebarOpen ? "☰ Hide Sidebar" : "☰ Show Sidebar"}
+                </button>
+            </div>
+            {isSidebarOpen && (
+                <Sidebar
+                    programCode={programCode}
+                    catalog={catalog}
+                    loading={loadingCatalog}
+                    error={catalogError}
+                    expandedSet={expandedPf}
+                    togglePf={togglePf}
+                    onDragStart={handleDragStart}
+                    subjectColors={subjectColors}
+                    getCourseStatus={getCourseStatus}
+                    onAddCourseToPlan={addGraphCourseToPlan}
+                    onAddModuleToPlan={addGraphModuleToPlan}
+                    onToggleCourseDone={toggleGraphCourseDone}
+                    onToggleModuleDone={toggleGraphModuleDone}
+                    onRemoveCourseFromPlan={removeGraphCourseFromPlan}
+                    onRemoveModuleFromPlan={removeGraphModuleFromPlan}
+                    semesterOptions={sidebarSemesters}
+                    width={SIDEBAR_WIDTH}
+                    leftOffset={SIDEBAR_LEFT_OFFSET}
+                    topOffset={TABLE_SIDEBAR_TOP_OFFSET}
+                    bottomOffset={TABLE_SIDEBAR_BOTTOM_OFFSET}
+                />
+            )}
 
             <div style={{ flex: 1, display: "flex", minWidth: 0 }}>
                 <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
-                    <button
-                        onClick={() => setViewMode("graph")}
-                        style={{
-                            position: "absolute",
-                            top: 12,
-                            left: 12,
-                            zIndex: 5,
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                        }}
-                    >
-                        Graph View
-                    </button>
-
-                    <button
-                        onClick={() => setIsRuleDashboardOpen((v) => !v)}
-                        style={{
-                            position: "absolute",
-                            top: 12,
-                            left: 120,
-                            zIndex: 5,
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                        }}
-                    >
-                        {isRuleDashboardOpen ? "Close Rule Dashboard" : "Open Rule Dashboard"}
-                    </button>
-                    <button
-                        onClick={() => setIsLegendOpen((v) => !v)}
-                        style={{
-                            position: "absolute",
-                            top: 12,
-                            left: 306,
-                            zIndex: 5,
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                        }}
-                    >
-                        {isLegendOpen ? "Hide Legend" : "Show Legend"}
-                    </button>
-
-                    <div
-                        style={{
-                            position: "absolute",
-                            top: 12,
-                            right: 12,
-                            zIndex: 5,
-                            border: `1px solid ${feedbackBorder}`,
-                            background: feedbackBg,
-                            color: feedbackColor,
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            maxWidth: 360,
-                        }}
-                    >
-                        {feedbackText}
-                    </div>
+                    {(!isRuleSuccessFeedback || showTransientSuccessFeedback) && (
+                        <div
+                            style={{
+                                position: "absolute",
+                                top: 12,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                zIndex: 5,
+                                border: `1px solid ${feedbackBorder}`,
+                                background: feedbackBg,
+                                color: feedbackColor,
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                maxWidth: 520,
+                            }}
+                        >
+                            {feedbackText}
+                        </div>
+                    )}
 
                     <div className="rf-wrapper" ref={wrapperRef} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave} style={{ position: "absolute", inset: 0 }}>
                         <ReactFlow
@@ -3451,15 +3634,33 @@ export default function App({ currentUser, onSignOut }) {
                             onNodeDragStart={onNodeDragStart}
                             onNodeDrag={onNodeDrag}
                             onNodeDragStop={onNodeDragStopMerged}
-                            onSelectionDragStop={schedulePersist}
+                            onSelectionDragStop={onSelectionDragStopMerged}
                             nodeTypes={NODE_TYPES}
                             fitView
                             snapToGrid
                             snapGrid={[GRID_SIZE, GRID_SIZE]}
+                            selectNodesOnDrag={tableInteractionMode === "select"}
+                            selectionOnDrag={tableInteractionMode === "select"}
+                            panOnDrag={tableInteractionMode === "pan"}
                             proOptions={{ hideAttribution: true }}
                         >
                             <MiniMap pannable zoomable />
-                            <Controls position="bottom-left" />
+                            <Controls position="bottom-left">
+                                <ControlButton
+                                    onClick={() => setTableInteractionMode((m) => (m === "pan" ? "select" : "pan"))}
+                                    title={`Mode: ${tableInteractionMode === "select" ? "Select" : "Pan"}`}
+                                    aria-label={`Mode: ${tableInteractionMode === "select" ? "Select" : "Pan"}`}
+                                >
+                                    <span style={{ fontSize: 13, lineHeight: 1 }}>{tableInteractionMode === "select" ? "▣" : "✋"}</span>
+                                </ControlButton>
+                                <ControlButton
+                                    onClick={() => setIsLegendOpen((v) => !v)}
+                                    title={isLegendOpen ? "Close Legend" : "Show Legend"}
+                                    aria-label={isLegendOpen ? "Close Legend" : "Show Legend"}
+                                >
+                                    <span style={{ fontSize: 14, lineHeight: 1 }}>ℹ</span>
+                                </ControlButton>
+                            </Controls>
                             <Background gap={GRID_SIZE} />
                         </ReactFlow>
                     </div>

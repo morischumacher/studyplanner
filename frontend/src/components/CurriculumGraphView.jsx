@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ReactFlow, { applyNodeChanges, Background, Controls, MarkerType, MiniMap, SelectionMode, useNodesState } from "reactflow";
+import ReactFlow, { applyNodeChanges, Background, ControlButton, Controls, MarkerType, MiniMap, SelectionMode, useNodesState } from "reactflow";
 import "reactflow/dist/style.css";
 import { CARD_WIDTH, NODE_HEIGHT, SEMESTERS } from "../utils/constants.js";
 import {
@@ -858,20 +858,21 @@ export default function CurriculumGraphView({
         });
     }, [displayNodes.length, programCode]);
 
-    const topControlsTop = programCode === bachelorProgramCode ? 152 : 88;
-    const filterPanelTop = topControlsTop + 44;
-    const filterPanelWidth = 380;
-    const programBoxWidth = 380;
+    const topControlsTop = 12;
+    const filterPanelTop = topControlsTop + 78;
+    const filterPanelWidth = 333;
+    const programBoxWidth = 333;
     const topButtonStyle = {
         border: "1px solid #d1d5db",
         background: "#ffffff",
         borderRadius: 8,
-        padding: "0 12px",
-        height: 36,
-        lineHeight: "36px",
+        padding: "6px 8px",
         fontWeight: 600,
         cursor: "pointer",
         boxSizing: "border-box",
+        flex: 1,
+        textAlign: "center",
+        whiteSpace: "nowrap",
     };
 
     return (
@@ -883,11 +884,9 @@ export default function CurriculumGraphView({
                     left: 12,
                     width: programBoxWidth,
                     zIndex: 6,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    flexWrap: "nowrap",
-                    gap: 8,
+                    display: "grid",
+                    gap: 6,
+                    gridTemplateColumns: "1fr 1fr",
                 }}
             >
                 <button
@@ -897,34 +896,26 @@ export default function CurriculumGraphView({
                     }}
                     style={{
                         ...topButtonStyle,
-                        padding: "0 8px",
-                        textAlign: "center",
-                        whiteSpace: "nowrap",
                     }}
                 >
                     ⇆ Table View
                 </button>
                 <button
-                    onClick={() => setIsFiltersOpen((v) => !v)}
-                    style={{
-                        ...topButtonStyle,
-                        padding: "0 8px",
-                        textAlign: "center",
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    {isFiltersOpen ? "☰ Hide Filters" : "☰ Show Filters"}
-                </button>
-                <button
                     onClick={() => onToggleRuleDashboard?.()}
                     style={{
                         ...topButtonStyle,
-                        padding: "0 8px",
-                        textAlign: "center",
-                        whiteSpace: "nowrap",
                     }}
                 >
                     {isRuleDashboardOpen ? "▦ Close Dashboard" : "▦ Open Dashboard"}
+                </button>
+                <button
+                    onClick={() => setIsFiltersOpen((v) => !v)}
+                    style={{
+                        ...topButtonStyle,
+                        gridColumn: "1 / -1",
+                    }}
+                >
+                    {isFiltersOpen ? "☰ Hide Filters" : "☰ Show Filters"}
                 </button>
             </div>
             {isFiltersOpen && (
@@ -1195,77 +1186,6 @@ export default function CurriculumGraphView({
                 </div>
                 </div>
             )}
-            <div
-                style={{
-                    position: "absolute",
-                    top: 12,
-                    left: 12,
-                    zIndex: 6,
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 8,
-                    padding: 8,
-                    display: "grid",
-                    gap: 8,
-                    width: programBoxWidth,
-                    minWidth: programBoxWidth,
-                    maxWidth: programBoxWidth,
-                    boxSizing: "border-box",
-                }}
-            >
-                <div style={{ display: "grid", gap: 4 }}>
-                    <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
-                    <select
-                        value={programCode}
-                        onChange={(e) => {
-                            persistGraphSnapshot();
-                            setProgramCode?.(e.target.value);
-                        }}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontWeight: 600,
-                            width: "100%",
-                            display: "block",
-                            boxSizing: "border-box",
-                        }}
-                    >
-                        {(programOptions || []).map((opt) => (
-                            <option key={opt.code} value={opt.code}>
-                                {opt.label} ({opt.code})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                {programCode === bachelorProgramCode && (
-                    <div style={{ display: "grid", gap: 4 }}>
-                        <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
-                        <select
-                            value={selectedFocus || ""}
-                            onChange={(e) => setSelectedFocus?.(e.target.value)}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                display: "block",
-                                boxSizing: "border-box",
-                            }}
-                        >
-                            <option value="">Select focus area</option>
-                            {(bachelorFocusOptions || []).map((focus) => (
-                                <option key={focus} value={focus}>
-                                    {focus}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-            </div>
             {feedbackToast.visible && feedbackToast.text && (
                 <div
                     style={{
@@ -1307,37 +1227,6 @@ export default function CurriculumGraphView({
                     </button>
                 </div>
             )}
-            <div
-                style={{
-                    position: "absolute",
-                    left: 84,
-                    bottom: 12,
-                    zIndex: 6,
-                    display: "flex",
-                    gap: 6,
-                    flexWrap: "wrap",
-                }}
-            >
-                <button
-                    onClick={() => setInteractionMode((m) => (m === "pan" ? "select" : "pan"))}
-                    style={{
-                        border: "1px solid #d1d5db",
-                        background: interactionMode === "select" ? "#dbeafe" : "#ffffff",
-                        borderRadius: 8,
-                        padding: "6px 10px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                    }}
-                >
-                    ◫ Mode: {interactionMode === "select" ? "Select" : "Pan"}
-                </button>
-                <button
-                    onClick={() => onToggleLegend?.()}
-                    style={{ border: "1px solid #d1d5db", background: "#ffffff", borderRadius: 8, padding: "6px 10px", fontWeight: 600, cursor: "pointer" }}
-                >
-                    {isLegendOpen ? "ℹ Hide Legend" : "ℹ Show Legend"}
-                </button>
-            </div>
             {isLegendOpen && (
                 <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 5 }}>
                     <VisualLegend programCode={programCode} />
@@ -1385,7 +1274,22 @@ export default function CurriculumGraphView({
                     proOptions={{ hideAttribution: true }}
                 >
                     <MiniMap pannable zoomable />
-                    <Controls />
+                    <Controls position="bottom-left">
+                        <ControlButton
+                            onClick={() => setInteractionMode((m) => (m === "pan" ? "select" : "pan"))}
+                            title={`Mode: ${interactionMode === "select" ? "Select" : "Pan"}`}
+                            aria-label={`Mode: ${interactionMode === "select" ? "Select" : "Pan"}`}
+                        >
+                            <span style={{ fontSize: 13, lineHeight: 1 }}>{interactionMode === "select" ? "▣" : "✋"}</span>
+                        </ControlButton>
+                        <ControlButton
+                            onClick={() => onToggleLegend?.()}
+                            title={isLegendOpen ? "Close Legend" : "Show Legend"}
+                            aria-label={isLegendOpen ? "Close Legend" : "Show Legend"}
+                        >
+                            <span style={{ fontSize: 14, lineHeight: 1 }}>ℹ</span>
+                        </ControlButton>
+                    </Controls>
                     <Background gap={18} />
                 </ReactFlow>
             )}
