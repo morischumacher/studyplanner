@@ -10,7 +10,7 @@ import {
     stateVisualByStatus,
 } from "../utils/courseVisuals.js";
 import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
-import { displayCourseHeader, displayModuleHeader, displayShortCode } from "../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle, displayModuleHeader, displayShortCode } from "../utils/courseCodeDisplay.js";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
@@ -37,7 +37,9 @@ export default function Sidebar({
 }) {
     const [menuState, setMenuState] = useState({ key: null, view: "root", variantId: null });
     const [plusRevealCount, setPlusRevealCount] = useState(0);
+    const [searchQuery, setSearchQuery] = useState("");
     const semesters = Array.isArray(semesterOptions) ? semesterOptions : [];
+    const searchNeedle = String(searchQuery || "").trim().toLowerCase();
 
     const openMenu = (key) => {
         setPlusRevealCount(0);
@@ -114,6 +116,21 @@ export default function Sidebar({
         if (isCore) return 1;
         return 2;
     };
+    const moduleMatchesQuery = (mod) => {
+        if (!searchNeedle) return true;
+        const moduleName = String(mod?.name ?? "").toLowerCase();
+        const moduleCode = String(mod?.code ?? "").toLowerCase();
+        const moduleCategory = String(mod?.category ?? "").toLowerCase();
+        if (moduleName.includes(searchNeedle) || moduleCode.includes(searchNeedle) || moduleCategory.includes(searchNeedle)) {
+            return true;
+        }
+        const courses = Array.isArray(mod?.courses) ? mod.courses : [];
+        return courses.some((course) => {
+            const courseName = String(course?.name ?? "").toLowerCase();
+            const courseCode = String(course?.code ?? "").toLowerCase();
+            return courseName.includes(searchNeedle) || courseCode.includes(searchNeedle);
+        });
+    };
     return (
         <aside
             style={{
@@ -133,6 +150,23 @@ export default function Sidebar({
             <p style={{ fontSize: 14, color: "#6b7280" }}>
                 Drag a course or a multi-course module into any semester lane.
             </p>
+            <input
+                type="text"
+                placeholder="Search courses/modules..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    marginBottom: 10,
+                    border: "1px solid #d1d5db",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    fontWeight: 500,
+                    background: "#ffffff",
+                }}
+            />
 
             {!(Array.isArray(catalog) && catalog.length > 0) && (
                 <div style={{ fontSize: 14, color: "#6b7280", margin: "8px 0 12px" }}>
@@ -153,7 +187,10 @@ export default function Sidebar({
                             const bn = String(b?.name ?? "").toLowerCase();
                             return an.localeCompare(bn);
                         });
+                    const visibleModules = modules.filter(moduleMatchesQuery);
+                    if (searchNeedle && visibleModules.length === 0) return null;
                     const isOpen = expandedSet.has(pfName);
+                    const isBodyOpen = isOpen || Boolean(searchNeedle);
                     const subjectColor = subjectColors?.[pfName] ?? "#2563eb";
                     const subjectSoft = hexToRgba(subjectColor, 0.22);
                     const moduleColor = hexToRgba(subjectColor, MODULE_GROUP_COLOR_ALPHA);
@@ -184,16 +221,16 @@ export default function Sidebar({
                                     cursor: "pointer",
                                     borderTopLeftRadius: 10,
                                     borderTopRightRadius: 10,
-                                    borderBottomLeftRadius: isOpen ? 0 : 10,
-                                    borderBottomRightRadius: isOpen ? 0 : 10,
+                                    borderBottomLeftRadius: isBodyOpen ? 0 : 10,
+                                    borderBottomRightRadius: isBodyOpen ? 0 : 10,
                                 }}
-                                aria-expanded={isOpen}
+                                aria-expanded={isBodyOpen}
                             >
                 <span
                     aria-hidden
                     style={{
                         display: "inline-block",
-                        transform: `rotate(${isOpen ? 90 : 0}deg)`,
+                        transform: `rotate(${isBodyOpen ? 90 : 0}deg)`,
                         transition: "transform 0.15s ease",
                         color: "#ffffff",
                         fontWeight: 700,
@@ -203,14 +240,14 @@ export default function Sidebar({
                 </span>
                                 <span style={{ fontWeight: 700, color: "#ffffff" }}>{pfName}</span>
                                 <span style={{ marginLeft: "auto", color: "rgba(255,255,255,0.9)", fontSize: 12 }}>
-                  {modules.length} Module
+                  {visibleModules.length} Module
                 </span>
                             </button>
 
                             {/* Body */}
-                            {isOpen && (
+                            {isBodyOpen && (
                                 <div style={{ padding: "8px 10px 12px 10px", display: "grid", gap: 8, borderBottomLeftRadius: 10, borderBottomRightRadius: 10 }}>
-                                    {modules.map((mod, modIdx) => {
+                                    {visibleModules.map((mod, modIdx) => {
                                         const courses = Array.isArray(mod.courses) ? mod.courses : [];
                                         const moduleCodeFallback = String(mod?.code || `MOD-${pfIdx + 1}-${modIdx + 1}`);
                                         const moduleEctsFallback = Number(mod?.ects);
@@ -331,7 +368,7 @@ export default function Sidebar({
                                                             )}
                                                         </div>
                                                     )}
-                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: standaloneStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{mod.name}</div>
+                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: standaloneStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{displayCourseTitle(mod?.name)}</div>
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
                                                         <span style={{ color: "#6b7280", whiteSpace: "nowrap" }}>{plannedEntryEcts ? `${plannedEntryEcts} ECTS` : "-"}</span>
                                                         <span style={{ color: "#6b7280", fontWeight: 700, flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{typeMeta.label}</span>
@@ -442,7 +479,7 @@ export default function Sidebar({
                                                             )}
                                                         </div>
                                                     )}
-                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{course.name ?? mod.name}</div>
+                                                    <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{displayCourseTitle(course?.name ?? mod?.name)}</div>
                                                     <div
                                                         style={{
                                                             display: "flex",
@@ -623,7 +660,7 @@ export default function Sidebar({
                                                         </div>
                                                     )}
                                                     <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: isGroupDone ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                                                        {mod.name}
+                                                        {displayCourseTitle(mod?.name)}
                                                     </div>
                                                     {hasSplitVariants && groupStatus === "todo" && (
                                                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -765,7 +802,7 @@ export default function Sidebar({
                                                                         )}
                                                                     </div>
                                                                 )}
-                                                                <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{course?.name ?? mod.name}</div>
+                                                                <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{displayCourseTitle(course?.name ?? mod?.name)}</div>
                                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
                                                                     <span style={{ color: "#6b7280", whiteSpace: "nowrap" }}>{typeof course?.ects === "number" ? `${course?.ects} ECTS` : (course?.ects || "-")}</span>
                                                                     <span style={{ color: "#6b7280", fontWeight: 700, flex: 1, minWidth: 0, textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{childTypeMeta.label}</span>

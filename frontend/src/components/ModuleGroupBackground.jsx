@@ -7,7 +7,7 @@ import {
 import { colorForType } from "../utils/constants.js";
 import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../utils/examSubjectColors.js";
 import { mapTypeForProgram, stateVisualByStatus } from "../utils/courseVisuals.js";
-import { displayModuleHeader } from "../utils/courseCodeDisplay.js";
+import { displayCourseTitle, displayModuleHeader } from "../utils/courseCodeDisplay.js";
 
 /** ModuleGroupBackground — soft panel wrapping a set of course nodes. */
 export default function ModuleGroupBackground({ data }) {
@@ -234,7 +234,7 @@ export default function ModuleGroupBackground({ data }) {
                         color: isDone ? "#6b7280" : "#111827",
                     }}
                 >
-                    {title ?? "Module"}
+                    {displayCourseTitle(title ?? "Module")}
                 </div>
                 <div
                     style={{

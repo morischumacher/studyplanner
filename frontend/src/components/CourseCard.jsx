@@ -8,7 +8,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../utils/courseVisuals.js";
-import { displayCourseHeader } from "../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
 
 /** CourseCard — React Flow node renderer */
 export default function CourseCard({ data }) {
@@ -254,7 +254,7 @@ export default function CourseCard({ data }) {
                     textOverflow: "ellipsis",
                 }}
             >
-                {data.label}
+                {displayCourseTitle(data?.label)}
             </div>
             {isTransferableSkills && data?.onUpdateEcts && (
                 <div style={{ marginTop: 6 }}>

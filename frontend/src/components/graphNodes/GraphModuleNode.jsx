@@ -8,7 +8,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
-import { displayModuleHeader } from "../../utils/courseCodeDisplay.js";
+import { displayCourseTitle, displayModuleHeader } from "../../utils/courseCodeDisplay.js";
 
 export default function GraphModuleNode({ data }) {
     const color = data?.color || "#4b5563";
@@ -248,7 +248,7 @@ export default function GraphModuleNode({ data }) {
                     color: isDone ? "#6b7280" : "#111827",
                 }}
             >
-                {data?.label}
+                {displayCourseTitle(data?.modulePayload?.name || data?.label)}
             </div>
             <div style={{ color: "#6b7280", fontSize: 12 }}>
                 {Number(data?.moduleCourseCount ?? data?.modulePayload?.courses?.length ?? 0)} courses

@@ -89,6 +89,22 @@ export function displayCourseHeader(code, name = "", type = "") {
     return typeToken ? `${shortCode} | ${typeToken}` : shortCode;
 }
 
+export function displayCourseTitle(name = "") {
+    const raw = String(name || "").trim();
+    if (!raw) return "";
+    const typeGroup = "(VU|VO|UE|PR|SE|KO|KS|EX|PS|PJ|ILV|RE)";
+    const parenMatch = raw.match(new RegExp(`\\s*${"\\("}${typeGroup}${"\\)"}\\s*$`, "i"));
+    if (parenMatch) return raw.slice(0, parenMatch.index).trim();
+
+    // Also strip plain trailing type tokens that appear without parentheses, e.g. "Data Stewardship UE".
+    const separatedMatch = raw.match(new RegExp(`\\s*[-_/|]\\s*${typeGroup}\\s*$`));
+    if (separatedMatch) return raw.slice(0, separatedMatch.index).trim();
+    const plainSuffixMatch = raw.match(new RegExp(`\\s+${typeGroup}\\s*$`));
+    if (plainSuffixMatch) return raw.slice(0, plainSuffixMatch.index).trim();
+
+    return raw;
+}
+
 function longestCommonPrefix(values) {
     const list = (values || []).filter(Boolean);
     if (!list.length) return "";

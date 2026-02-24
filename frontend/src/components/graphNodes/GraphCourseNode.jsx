@@ -7,7 +7,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
-import { displayCourseHeader } from "../../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle } from "../../utils/courseCodeDisplay.js";
 
 export default function GraphCourseNode({ data }) {
     const color = data?.color || "#4b5563";
@@ -230,7 +230,7 @@ export default function GraphCourseNode({ data }) {
                     fontWeight: 700,
                 }}
             >
-                {data?.label}
+                {displayCourseTitle(data?.courseName ?? data?.label)}
             </div>
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: "auto" }}>
