@@ -256,12 +256,15 @@ class RuleChecker:
     # Public API
     # ----------------------------
     def evaluate(self, payload: dict[str, Any]) -> RuleCheckResult:
+        max_ects_per_semester, recommended_ects_per_semester = self._resolve_semester_load_limits(payload)
         lanes = self._extract_lanes(payload)
         parsed, parse_error = self._parse_courses(lanes, payload)
         if parse_error is not None:
             return RuleCheckResult(ok=False, message=parse_error, stats={}, missing=[])
 
         stats, missing = self._build_dashboard(parsed)
+        stats["maxEctsPerSemester"] = round(max_ects_per_semester, 1)
+        stats["recommendedEctsPerSemester"] = round(recommended_ects_per_semester, 1)
         normalized_change = self._normalize_change(payload.get("change"))
         if normalized_change:
             stats["last_change"] = normalized_change
@@ -272,11 +275,19 @@ class RuleChecker:
         if dup_msg:
             violations.append(dup_msg)
 
-        sem_msg, warnings = self._check_semester_load(stats)
+        sem_msg, warnings, sem_missing = self._check_semester_load(
+            stats,
+            max_ects_per_semester,
+            recommended_ects_per_semester,
+        )
         if sem_msg:
             violations.append(sem_msg)
         if warnings:
             stats.setdefault("warnings", []).extend(warnings)
+        if sem_missing:
+            for m in sem_missing:
+                if m not in missing:
+                    missing.append(m)
 
         mis_msg = self._check_known_module_consistency(parsed)
         if mis_msg:
@@ -609,6 +620,28 @@ class RuleChecker:
     # ----------------------------
     # Validations (hard reject)
     # ----------------------------
+    @staticmethod
+    def _resolve_semester_load_limits(payload: Dict[str, Any]) -> Tuple[float, float]:
+        default_max = RuleChecker.MAX_ECTS_PER_SEMESTER
+        default_recommended = RuleChecker.RECOMMENDED_ECTS_PER_SEMESTER
+        raw_max = payload.get("maxEctsPerSemester")
+        raw_recommended = payload.get("recommendedEctsPerSemester")
+        try:
+            max_ects = float(raw_max)
+        except (TypeError, ValueError):
+            max_ects = default_max
+        try:
+            recommended_ects = float(raw_recommended)
+        except (TypeError, ValueError):
+            recommended_ects = default_recommended
+        if max_ects <= 0:
+            max_ects = default_max
+        if recommended_ects <= 0:
+            recommended_ects = default_recommended
+        if recommended_ects > max_ects:
+            recommended_ects = max_ects
+        return max_ects, recommended_ects
+
     def _check_duplicates(self, courses: List[Dict[str, Any]]) -> Optional[str]:
         seen: Dict[str, Dict[str, Any]] = {}
         for c in courses:
@@ -621,25 +654,36 @@ class RuleChecker:
             seen[k] = c
         return None
 
-    def _check_semester_load(self, stats: Dict[str, Any]) -> Tuple[Optional[str], List[str]]:
+    def _check_semester_load(
+        self,
+        stats: Dict[str, Any],
+        max_ects_per_semester: float,
+        recommended_ects_per_semester: float,
+    ) -> Tuple[Optional[str], List[str], List[str]]:
         warnings: List[str] = []
+        missing: List[str] = []
         per_sem = stats.get("per_semester", {})
+        hard_error: Optional[str] = None
         for sem_str, ects in per_sem.items():
             try:
                 sem_idx = int(sem_str)
             except ValueError:
                 continue
-            if ects > self.MAX_ECTS_PER_SEMESTER + 1e-9:
-                return (
-                    f"Semester {sem_idx + 1} exceeds the maximum allowed planning load of "
-                    f"{self.MAX_ECTS_PER_SEMESTER:.1f} ECTS (currently {ects:.1f}).",
-                    warnings,
+            if ects > max_ects_per_semester + 1e-9:
+                if hard_error is None:
+                    hard_error = (
+                        f"Semester {sem_idx + 1} exceeds the maximum allowed planning load of "
+                        f"{max_ects_per_semester:.1f} ECTS (currently {ects:.1f})."
+                    )
+                missing.append(
+                    f"Semester load limit exceeded in semester {sem_idx + 1}: {ects:.1f}/{max_ects_per_semester:.1f} ECTS. "
+                    f"Reduce by {max(0.0, ects - max_ects_per_semester):.1f} ECTS."
                 )
-            if ects > self.RECOMMENDED_ECTS_PER_SEMESTER + 1e-9:
+            if ects > recommended_ects_per_semester + 1e-9:
                 warnings.append(
-                    f"Semester {sem_idx + 1} is heavy: {ects:.1f} ECTS planned/done (recommended ~{self.RECOMMENDED_ECTS_PER_SEMESTER:.0f})."
+                    f"Semester {sem_idx + 1} is heavy: {ects:.1f} ECTS planned/done (recommended ~{recommended_ects_per_semester:.0f})."
                 )
-        return None, warnings
+        return hard_error, warnings, missing
 
     def _check_known_module_consistency(self, courses: List[Dict[str, Any]]) -> Optional[str]:
         # If a known mandatory/core module appears with wrong examSubject or ects out of range or wrong category -> reject.

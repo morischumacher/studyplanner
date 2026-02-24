@@ -72,6 +72,28 @@ class RuleChecker:
     def _course_code(course: dict[str, Any]) -> str:
         return str(course.get("code") or course.get("name") or "").strip()
 
+    @staticmethod
+    def _resolve_semester_load_limits(payload: dict[str, Any]) -> Tuple[float, float]:
+        default_max = RuleChecker.MAX_ECTS_PER_SEMESTER
+        default_recommended = RuleChecker.RECOMMENDED_ECTS_PER_SEMESTER
+        raw_max = payload.get("maxEctsPerSemester")
+        raw_recommended = payload.get("recommendedEctsPerSemester")
+        try:
+            max_ects = float(raw_max)
+        except (TypeError, ValueError):
+            max_ects = default_max
+        try:
+            recommended_ects = float(raw_recommended)
+        except (TypeError, ValueError):
+            recommended_ects = default_recommended
+        if max_ects <= 0:
+            max_ects = default_max
+        if recommended_ects <= 0:
+            recommended_ects = default_recommended
+        if recommended_ects > max_ects:
+            recommended_ects = max_ects
+        return max_ects, recommended_ects
+
     # ----------------------------
     # Init curriculum model
     # ----------------------------
@@ -602,6 +624,7 @@ class RuleChecker:
     # Evaluate
     # ----------------------------
     def evaluate(self, payload: dict[str, Any]) -> RuleCheckResult:
+        max_ects_per_semester, recommended_ects_per_semester = self._resolve_semester_load_limits(payload)
         warnings: List[str] = []
         errors: List[str] = []
         missing: List[str] = []
@@ -696,11 +719,21 @@ class RuleChecker:
             if module_key not in earliest_lane_for_module or li < earliest_lane_for_module[module_key]:
                 earliest_lane_for_module[module_key] = li
 
-        # Per-semester overload check (hard)
+        # Per-semester overload check:
+        # - warning above recommended load
+        # - missing-requirement + hard reject above max load
         if not errors:
             for li, s in lane_ects.items():
-                if s > self.MAX_ECTS_PER_SEMESTER + 1e-6:
-                    errors.append(f"rejected: semester {li+1} exceeds max load ({s:.1f} ECTS > {self.MAX_ECTS_PER_SEMESTER:.1f}).")
+                if s > recommended_ects_per_semester + 1e-6:
+                    warnings.append(
+                        f"Semester {li + 1} is heavy: {s:.1f} ECTS planned/done (recommended ~{recommended_ects_per_semester:.1f})."
+                    )
+                if s > max_ects_per_semester + 1e-6:
+                    missing.append(
+                        f"Semester load limit exceeded in semester {li + 1}: {s:.1f}/{max_ects_per_semester:.1f} ECTS. "
+                        f"Reduce by {max(0.0, s - max_ects_per_semester):.1f} ECTS."
+                    )
+                    errors.append(f"rejected: semester {li+1} exceeds max load ({s:.1f} ECTS > {max_ects_per_semester:.1f}).")
 
         for module_key, parts in split_module_parts.items():
             if "vu" in parts and ("vo" in parts or "ue" in parts):
@@ -1081,8 +1114,8 @@ class RuleChecker:
             "totalEcts": round(total_ects, 2),
             "ectsMissingTo180": round(max(0.0, self.TOTAL_ECTS - total_ects), 2),
             "ectsPerSemester": {str(k): round(v, 2) for k, v in sorted(lane_ects.items())},
-            "recommendedEctsPerSemester": self.RECOMMENDED_ECTS_PER_SEMESTER,
-            "maxEctsPerSemester": self.MAX_ECTS_PER_SEMESTER,
+            "recommendedEctsPerSemester": recommended_ects_per_semester,
+            "maxEctsPerSemester": max_ects_per_semester,
             "ectsByCategory": {k: round(v, 2) for k, v in sorted(cat_ects.items())},
             "ectsByExamSubject": subj_pretty,
             "narrowElectives": {

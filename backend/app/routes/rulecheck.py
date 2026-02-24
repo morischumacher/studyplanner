@@ -17,6 +17,8 @@ class RuleCheckPayload(BaseModel):
     doneCourses: list[dict[str, Any]] = Field(default_factory=list)
     change: dict[str, Any] = Field(default_factory=dict)
     selectedFocus: str | None = None
+    maxEctsPerSemester: float | None = None
+    recommendedEctsPerSemester: float | None = None
 
 
 def _normalize_program_code(value: str | None) -> str:

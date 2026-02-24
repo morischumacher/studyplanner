@@ -17,6 +17,24 @@ const EMPTY_GRAPH_VIEW_STATE = {
     filters: DEFAULT_GRAPH_FILTERS,
     filtersConfigured: false,
 };
+const DEFAULT_SEMESTER_LOAD_LIMITS = {
+    maxEctsPerSemester: 42,
+    recommendedEctsPerSemester: 30,
+};
+
+function sanitizeSemesterLoadLimits(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const parsedMax = Number(source.maxEctsPerSemester);
+    const parsedRecommended = Number(source.recommendedEctsPerSemester);
+    const maxEctsPerSemester = Number.isFinite(parsedMax) && parsedMax > 0
+        ? parsedMax
+        : DEFAULT_SEMESTER_LOAD_LIMITS.maxEctsPerSemester;
+    const recommendedRaw = Number.isFinite(parsedRecommended) && parsedRecommended > 0
+        ? parsedRecommended
+        : DEFAULT_SEMESTER_LOAD_LIMITS.recommendedEctsPerSemester;
+    const recommendedEctsPerSemester = Math.min(recommendedRaw, maxEctsPerSemester);
+    return { maxEctsPerSemester, recommendedEctsPerSemester };
+}
 
 function sanitizeGraphFilters(filters) {
     const source = filters && typeof filters === "object" ? filters : {};
@@ -212,6 +230,7 @@ export function ProgramProvider({ children }) {
     const [lastPlanChange, setLastPlanChange] = useState(null);
     const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
     const [graphViewByProgram, setGraphViewByProgram] = useState({});
+    const [semesterLoadLimitsByProgram, setSemesterLoadLimitsByProgram] = useState({});
 
     const semesterBounds = semesterBoundsForProgram(programCode);
     const emptyPlanForProgram = useMemo(() => emptyCoursesOnlyPlan(semesterBounds.min), [semesterBounds.min]);
@@ -219,6 +238,9 @@ export function ProgramProvider({ children }) {
     const doneCourseCodes = doneByProgram?.[programCode] ?? EMPTY_DONE_CODES;
     const selectedFocus = selectedFocusByProgram?.[programCode] ?? "";
     const graphViewState = graphViewByProgram?.[programCode] ?? EMPTY_GRAPH_VIEW_STATE;
+    const semesterLoadLimits = sanitizeSemesterLoadLimits(
+        semesterLoadLimitsByProgram?.[programCode] ?? DEFAULT_SEMESTER_LOAD_LIMITS
+    );
 
     const setCoursesFromNodes = useCallback((nodes) => {
         const bounds = semesterBoundsForProgram(programCode);
@@ -361,6 +383,32 @@ export function ProgramProvider({ children }) {
         });
     }, [programCode]);
 
+    const setSemesterLoadLimits = useCallback((nextValueOrUpdater) => {
+        setSemesterLoadLimitsByProgram((prev) => {
+            const current = sanitizeSemesterLoadLimits(prev?.[programCode] ?? DEFAULT_SEMESTER_LOAD_LIMITS);
+            const patchCandidate = typeof nextValueOrUpdater === "function"
+                ? nextValueOrUpdater(current)
+                : nextValueOrUpdater;
+            const next = sanitizeSemesterLoadLimits(patchCandidate);
+            if (
+                current.maxEctsPerSemester === next.maxEctsPerSemester &&
+                current.recommendedEctsPerSemester === next.recommendedEctsPerSemester
+            ) {
+                return prev;
+            }
+            setLastPlanChange({
+                id: Date.now(),
+                type: "semester_load_limits_updated",
+                maxEctsPerSemester: next.maxEctsPerSemester,
+                recommendedEctsPerSemester: next.recommendedEctsPerSemester,
+            });
+            return {
+                ...(prev || {}),
+                [programCode]: next,
+            };
+        });
+    }, [programCode]);
+
     const exportPlannerStateSnapshot = useCallback(() => ({
         version: 1,
         programCode,
@@ -368,7 +416,8 @@ export function ProgramProvider({ children }) {
         doneByProgram,
         selectedFocusByProgram,
         graphViewByProgram,
-    }), [programCode, coursesByProgram, doneByProgram, selectedFocusByProgram, graphViewByProgram]);
+        semesterLoadLimitsByProgram,
+    }), [programCode, coursesByProgram, doneByProgram, selectedFocusByProgram, graphViewByProgram, semesterLoadLimitsByProgram]);
 
     const importPlannerStateSnapshot = useCallback((snapshot) => {
         if (!snapshot || typeof snapshot !== "object") return;
@@ -413,6 +462,15 @@ export function ProgramProvider({ children }) {
             };
         }
         setGraphViewByProgram(normalizedGraphViewByProgram);
+        const rawSemesterLoadLimitsByProgram =
+            snapshot?.semesterLoadLimitsByProgram && typeof snapshot.semesterLoadLimitsByProgram === "object"
+                ? snapshot.semesterLoadLimitsByProgram
+                : {};
+        const normalizedSemesterLoadLimitsByProgram = {};
+        for (const [prog, limits] of Object.entries(rawSemesterLoadLimitsByProgram)) {
+            normalizedSemesterLoadLimitsByProgram[prog] = sanitizeSemesterLoadLimits(limits);
+        }
+        setSemesterLoadLimitsByProgram(normalizedSemesterLoadLimitsByProgram);
         if (typeof snapshot?.programCode === "string" && snapshot.programCode.trim()) {
             setProgramCode(snapshot.programCode);
         }
@@ -425,6 +483,7 @@ export function ProgramProvider({ children }) {
         setLastPlanChange(null);
         setSelectedFocusByProgram({});
         setGraphViewByProgram({});
+        setSemesterLoadLimitsByProgram({});
     }, []);
 
     const value = useMemo(() => ({
@@ -440,6 +499,8 @@ export function ProgramProvider({ children }) {
         lastPlanChange,
         graphViewState,
         setGraphViewState,
+        semesterLoadLimits,
+        setSemesterLoadLimits,
         getCoursesForSemester,
         getModulesForSemester,
         exportPlannerStateSnapshot,
@@ -457,6 +518,8 @@ export function ProgramProvider({ children }) {
         lastPlanChange,
         graphViewState,
         setGraphViewState,
+        semesterLoadLimits,
+        setSemesterLoadLimits,
         getCoursesForSemester,
         getModulesForSemester,
         exportPlannerStateSnapshot,

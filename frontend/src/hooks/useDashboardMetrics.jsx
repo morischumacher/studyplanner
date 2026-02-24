@@ -12,6 +12,7 @@ export function useDashboardMetrics({
     catalog,
     dashboardViewMode,
     stickyViolation,
+    semesterLoadLimits,
     resolveDashboardCategoryForProgram,
     getExamSubjectForCode,
 }) {
@@ -374,26 +375,29 @@ export function useDashboardMetrics({
 
     const donePerSemesterTotal = donePerSemesterRows.reduce((sum, row) => sum + Number(row?.ects || 0), 0);
     const perSemesterPlannedTotal = perSemesterRows.reduce((sum, row) => sum + Number(row?.ects || 0), 0);
-    const workloadTargetPerSemester = minSemesterCount > 0
-        ? Number((targetEctsKpi / minSemesterCount).toFixed(1))
-        : 0;
+    const maxSemesterEcts = (() => {
+        const parsed = Number(semesterLoadLimits?.maxEctsPerSemester);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        const fallbackFromStats = Number(ruleStats?.maxEctsPerSemester);
+        if (Number.isFinite(fallbackFromStats) && fallbackFromStats > 0) return fallbackFromStats;
+        return 42;
+    })();
+    const workloadTargetPerSemester = (() => {
+        const parsed = Number(semesterLoadLimits?.recommendedEctsPerSemester);
+        if (Number.isFinite(parsed) && parsed > 0) return Math.min(parsed, maxSemesterEcts);
+        const fallbackFromStats = Number(ruleStats?.recommendedEctsPerSemester);
+        if (Number.isFinite(fallbackFromStats) && fallbackFromStats > 0) return Math.min(fallbackFromStats, maxSemesterEcts);
+        return 30;
+    })();
     const perSemesterWithinDesiredWorkload = perSemesterRows.every(
         (row) => Number(row?.ects || 0) <= workloadTargetPerSemester + 1e-6
     );
-    const baselineWorkloadScale = Math.max(workloadTargetPerSemester * 1.25, 1);
-    const maxSemesterWorkloadForScale = Math.max(
-        baselineWorkloadScale,
-        ...perSemesterRows.map((row) => row.ects),
-        1
-    );
+    const baselineWorkloadScale = maxSemesterEcts;
+    const maxSemesterWorkloadForScale = Math.max(maxSemesterEcts, 1);
     const donePerSemesterWithinDesiredWorkload = donePerSemesterRows.every(
         (row) => Number(row?.ects || 0) <= workloadTargetPerSemester + 1e-6
     );
-    const maxDoneSemesterWorkloadForScale = Math.max(
-        baselineWorkloadScale,
-        ...donePerSemesterRows.map((row) => row.ects),
-        1
-    );
+    const maxDoneSemesterWorkloadForScale = Math.max(maxSemesterEcts, 1);
 
     const byCategoryRows = (() => {
         const byCategoryMap = new Map();

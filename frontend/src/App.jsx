@@ -113,6 +113,8 @@ export default function App({ currentUser, onSignOut }) {
         lastPlanChange,
         graphViewState,
         setGraphViewState,
+        semesterLoadLimits,
+        setSemesterLoadLimits,
         exportPlannerStateSnapshot,
         importPlannerStateSnapshot,
     } = currentProgram();
@@ -1422,6 +1424,8 @@ export default function App({ currentUser, onSignOut }) {
             doneCourses,
             change: changeSnapshot,
             selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
+            maxEctsPerSemester: Number(semesterLoadLimits?.maxEctsPerSemester),
+            recommendedEctsPerSemester: Number(semesterLoadLimits?.recommendedEctsPerSemester),
         })
             .then((response) => {
                 if ((latestRuleCheckChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
@@ -1469,7 +1473,7 @@ export default function App({ currentUser, onSignOut }) {
                     lastUpdatedAt: Date.now(),
                 }));
             });
-    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackCourseStatusToggle, selectedFocus, setProgramRuleCheckState]);
+    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackCourseStatusToggle, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, setProgramRuleCheckState]);
 
     // Initial sync for current program so dashboard has data before first edit.
     useEffect(() => {
@@ -1491,6 +1495,8 @@ export default function App({ currentUser, onSignOut }) {
             doneCourses,
             change: { type: "initial_sync" },
             selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
+            maxEctsPerSemester: Number(semesterLoadLimits?.maxEctsPerSemester),
+            recommendedEctsPerSemester: Number(semesterLoadLimits?.recommendedEctsPerSemester),
         })
             .then((response) => {
                 setProgramRuleCheckState(requestProgramCode, {
@@ -1510,7 +1516,7 @@ export default function App({ currentUser, onSignOut }) {
                 }));
                 pendingInitialSyncProgramRef.current = null;
             });
-    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, setProgramRuleCheckState]);
+    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, setProgramRuleCheckState]);
 
     useEffect(() => {
         if (!stickyViolation?.message) return;
@@ -2138,6 +2144,7 @@ export default function App({ currentUser, onSignOut }) {
         catalog,
         dashboardViewMode,
         stickyViolation,
+        semesterLoadLimits,
         resolveDashboardCategoryForProgram,
         getExamSubjectForCode,
     });
@@ -2376,6 +2383,63 @@ export default function App({ currentUser, onSignOut }) {
                         </select>
                     </div>
                 )}
+                <div style={{ display: "grid", gap: 8 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Rulecheck Semester Load</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Max ECTS / semester</label>
+                            <input
+                                type="number"
+                                min={1}
+                                step={0.5}
+                                value={Number(semesterLoadLimits?.maxEctsPerSemester ?? 42)}
+                                onChange={(e) => {
+                                    const nextMax = Number(e.target.value);
+                                    if (!Number.isFinite(nextMax) || nextMax <= 0) return;
+                                    setSemesterLoadLimits?.((prev) => ({
+                                        ...(prev || {}),
+                                        maxEctsPerSemester: nextMax,
+                                    }));
+                                }}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontWeight: 600,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Recommended ECTS</label>
+                            <input
+                                type="number"
+                                min={1}
+                                step={0.5}
+                                value={Number(semesterLoadLimits?.recommendedEctsPerSemester ?? 30)}
+                                onChange={(e) => {
+                                    const nextRecommended = Number(e.target.value);
+                                    if (!Number.isFinite(nextRecommended) || nextRecommended <= 0) return;
+                                    setSemesterLoadLimits?.((prev) => ({
+                                        ...(prev || {}),
+                                        recommendedEctsPerSemester: nextRecommended,
+                                    }));
+                                }}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontWeight: 600,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     ) : null;
@@ -3462,7 +3526,7 @@ export default function App({ currentUser, onSignOut }) {
 
     if (viewMode === "graph") {
         return (
-            <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb" }}>
+            <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb", overflow: "hidden" }}>
                 {plannerNotificationsNode}
                 {topActionsNode}
                 {profileModalNode}
@@ -3511,7 +3575,7 @@ export default function App({ currentUser, onSignOut }) {
     }
 
     return (
-        <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb", position: "relative" }}>
+        <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f9fafb", position: "relative", overflow: "hidden" }}>
             {plannerNotificationsNode}
             {topActionsNode}
             {profileModalNode}
