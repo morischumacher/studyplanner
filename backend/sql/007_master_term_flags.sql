@@ -6,132 +6,132 @@ TRUNCATE TABLE _master_term_target;
 
 INSERT INTO _master_term_target (code, term_availability)
 VALUES
-        -- AC
-        ('Algorithmics', 'winter'::term_availability),
-        ('ARA-VU', 'summer'::term_availability),
-        ('AET-VU', 'winter'::term_availability),
-        ('AGEO-VU', 'winter'::term_availability),
-        ('ASOC-VU', 'summer'::term_availability),
-        ('AGT-VU', 'summer'::term_availability),
-        ('BEA-VU', 'winter'::term_availability),
-        ('COMPX-VU', 'winter'::term_availability),
-        ('FPT-VU', 'winter'::term_availability),
-        ('GDA-VU', 'summer'::term_availability),
-        ('HOT-VU', 'winter'::term_availability),
-        ('MPOTL-VU', 'summer'::term_availability),
-        ('SDMT-VU', 'summer'::term_availability),
-        ('Advanced Topics In Algorithms and Complexity', 'both'::term_availability),
+    -- AC
+    ('ALGO', 'winter'::term_availability),
+    ('ARA', 'summer'::term_availability),
+    ('AET', 'winter'::term_availability),
+    ('AGEO', 'winter'::term_availability),
+    ('ASOC', 'summer'::term_availability),
+    ('AGT', 'summer'::term_availability),
+    ('BEA', 'winter'::term_availability),
+    ('COMPX', 'winter'::term_availability),
+    ('FPT', 'winter'::term_availability),
+    ('GDA', 'summer'::term_availability),
+    ('HOT', 'winter'::term_availability),
+    ('MPOTL', 'summer'::term_availability),
+    ('SDMT', 'summer'::term_availability),
+    ('ATAC', 'both'::term_availability),
 
-        -- AMR
-        ('Mobile Robotics', 'summer'::term_availability),
-        ('ARC-VU', 'summer'::term_availability),
-        ('ITA-VU', 'winter'::term_availability),
-        ('PPMR-VU', 'summer'::term_availability),
-        ('Advanced Topics In Automation and Mobile Robotics', 'both'::term_availability),
+    -- AMR
+    ('MR', 'summer'::term_availability),
+    ('ARC', 'summer'::term_availability),
+    ('ITA', 'winter'::term_availability),
+    ('PPMR', 'summer'::term_availability),
+    ('ATAMR', 'both'::term_availability),
 
-        -- DMIS
-        ('Advanced Database Systems', 'summer'::term_availability),
-        ('BI-VU', 'winter'::term_availability),
-        ('DBT-VU', 'winter'::term_availability),
-        ('DS-VO', 'summer'::term_availability),
-        ('DS-UE', 'summer'::term_availability),
-        ('KG-VU', 'summer'::term_availability),
-        ('LBAI-VU', 'winter'::term_availability),
-        ('MGD-VU', 'summer'::term_availability),
-        ('PSAI-VU', 'winter'::term_availability),
-        ('PDK-VU', 'winter'::term_availability),
-        ('TGD-VU', 'summer'::term_availability),
-        ('Advanced Topics In Data Management and Intelligent Systems', 'both'::term_availability),
+    -- DMIS
+    ('ADS', 'summer'::term_availability),
+    ('BI', 'winter'::term_availability),
+    ('DBT', 'winter'::term_availability),
+    ('DS', 'summer'::term_availability),
+    ('DSUE', 'summer'::term_availability),
+    ('KG', 'summer'::term_availability),
+    ('LBAI', 'winter'::term_availability),
+    ('MGD', 'summer'::term_availability),
+    ('PSAI', 'winter'::term_availability),
+    ('PDK', 'winter'::term_availability),
+    ('TGD', 'summer'::term_availability),
+    ('ATDMIS', 'both'::term_availability),
 
-        -- DNGC
-        ('Advanced Internet Computing', 'winter'::term_availability),
-        ('Distributed Systems Technologies', 'summer'::term_availability),
-        ('ABD-VU', 'winter'::term_availability),
-        ('HQCS-VU', 'summer'::term_availability),
-        ('IOT-VU', 'winter'::term_availability),
-        ('QC-VU', 'winter'::term_availability),
-        ('Advanced Topics In Distributed and Next Generation Computing', 'both'::term_availability),
+    -- DNGC
+    ('AIC', 'winter'::term_availability),
+    ('DST', 'summer'::term_availability),
+    ('ABD', 'winter'::term_availability),
+    ('HQCS', 'summer'::term_availability),
+    ('IOT', 'winter'::term_availability),
+    ('QC', 'winter'::term_availability),
+    ('ATDNGC', 'both'::term_availability),
 
-        -- HPC
-        ('AMPP-VU', 'winter'::term_availability),
-        ('GPU-VU', 'summer'::term_availability),
-        ('GHPC-VU', 'summer'::term_availability),
-        ('HPC-VU', 'summer'::term_availability),
-        ('HPC4AI-VU', 'winter'::term_availability),
-        ('Advanced Topics In High Performance Computing', 'both'::term_availability),
+    -- HPC
+    ('AMPP', 'winter'::term_availability),
+    ('GPU', 'summer'::term_availability),
+    ('GHPC', 'summer'::term_availability),
+    ('HPC', 'summer'::term_availability),
+    ('HPC4AI', 'winter'::term_availability),
+    ('ATHPC', 'both'::term_availability),
 
-        -- ML
-        ('Machine Learning', 'winter'::term_availability),
-        ('ARL-VU', 'summer'::term_availability),
-        ('ADS-VU', 'summer'::term_availability),
-        ('AGAI-VU', 'winter'::term_availability),
-        ('DLNLP-VU', 'summer'::term_availability),
-        ('GENAI-VU', 'winter'::term_availability),
-        ('MLO-VU', 'summer'::term_availability),
-        ('RL-VU', 'summer'::term_availability),
-        ('TFR-ML-VU', 'winter'::term_availability),
-        ('TFDL-VU', 'winter'::term_availability),
-        ('Advanced Topics In Machine Learning', 'both'::term_availability),
+    -- ML
+    ('ML', 'winter'::term_availability),
+    ('ARL', 'summer'::term_availability),
+    ('ADSVU', 'summer'::term_availability),
+    ('AGAI', 'winter'::term_availability),
+    ('DLNLP', 'summer'::term_availability),
+    ('GENAI', 'winter'::term_availability),
+    ('MLO', 'summer'::term_availability),
+    ('RL', 'summer'::term_availability),
+    ('TFRML', 'winter'::term_availability),
+    ('TFDL', 'winter'::term_availability),
+    ('ATML', 'both'::term_availability),
 
-        -- SP
-        ('ACR-VU', 'winter'::term_availability),
-        ('APET-VU', 'summer'::term_availability),
-        ('AICS-VU', 'winter'::term_availability),
-        ('CRYPTOC-VU', 'summer'::term_availability),
-        ('FM-SP-VU', 'winter'::term_availability),
-        ('Network Security', 'summer'::term_availability),
-        ('NETSEC-AT-VU', 'summer'::term_availability),
-        ('SC-VU', 'summer'::term_availability),
-        ('SYMCR-VU', 'winter'::term_availability),
-        ('SAS-VU', 'winter'::term_availability),
-        ('Advanced Topics In Security and Privacy', 'both'::term_availability),
+    -- SP
+    ('ACR', 'winter'::term_availability),
+    ('APET', 'summer'::term_availability),
+    ('AICS', 'winter'::term_availability),
+    ('CRYPTOC', 'summer'::term_availability),
+    ('FMSP', 'winter'::term_availability),
+    ('NS', 'summer'::term_availability),
+    ('NETSECAT', 'summer'::term_availability),
+    ('SC', 'summer'::term_availability),
+    ('SYMCR', 'winter'::term_availability),
+    ('SAS', 'winter'::term_availability),
+    ('ATSP', 'both'::term_availability),
 
-        -- SICR
-        ('HCAI-VU', 'winter'::term_availability),
-        ('AIE-VU', 'summer'::term_availability),
-        ('CAS-VU', 'winter'::term_availability),
-        ('CSE-PR', 'both'::term_availability),
-        ('CTMI-VU', 'winter'::term_availability),
-        ('HAI-VU', 'winter'::term_availability),
-        ('HAI-PR', 'summer'::term_availability),
-        ('ICS-VU', 'summer'::term_availability),
-        ('LTLA-VU', 'winter'::term_availability),
-        ('RDE-VU', 'winter'::term_availability),
-        ('Advanced Topics In Societal Impact and Critical Reflections', 'both'::term_availability),
+    -- SICR
+    ('HCAI', 'winter'::term_availability),
+    ('AIE', 'summer'::term_availability),
+    ('CAS', 'winter'::term_availability),
+    ('CSE', 'both'::term_availability),
+    ('CTMI', 'winter'::term_availability),
+    ('HAI', 'winter'::term_availability),
+    ('HAIPR', 'summer'::term_availability),
+    ('ICS', 'summer'::term_availability),
+    ('LTLA', 'winter'::term_availability),
+    ('RDE', 'winter'::term_availability),
+    ('ATSICR', 'both'::term_availability),
 
-        -- SEP
-        ('Advanced Software Engineering', 'winter'::term_availability),
-        ('Advanced Software Engineering Project', 'both'::term_availability),
-        ('ALP-VU', 'summer'::term_availability),
-        ('AME-VU', 'winter'::term_availability),
-        ('AIP-VU', 'winter'::term_availability),
-        ('EP-VU', 'summer'::term_availability),
-        ('EP-PR', 'summer'::term_availability),
-        ('LLP-VU', 'winter'::term_availability),
-        ('ME-VU', 'winter'::term_availability),
-        ('PPL-VU', 'summer'::term_availability),
-        ('TS-VU', 'summer'::term_availability),
-        ('Advanced Topics In Software Engineering and Programming', 'both'::term_availability),
+    -- SEP
+    ('ASE', 'winter'::term_availability),
+    ('ASEP', 'both'::term_availability),
+    ('ALP', 'summer'::term_availability),
+    ('AME', 'winter'::term_availability),
+    ('AIP', 'winter'::term_availability),
+    ('EP', 'summer'::term_availability),
+    ('EPPR', 'summer'::term_availability),
+    ('LLP', 'winter'::term_availability),
+    ('ME', 'winter'::term_availability),
+    ('PPL', 'summer'::term_availability),
+    ('TS', 'summer'::term_availability),
+    ('ATSEP', 'both'::term_availability),
 
-        -- VAR
-        ('Formal Methods in Systems Engineering', 'winter'::term_availability),
-        ('AUTOLOG-VU', 'winter'::term_availability),
-        ('ADED-VU', 'winter'::term_availability),
-        ('CAV-VU', 'winter'::term_availability),
-        ('LAC-VU', 'winter'::term_availability),
-        ('PA-VU', 'summer'::term_availability),
-        ('SATEXT-VU', 'winter'::term_availability),
-        ('Advanced Topics In Verification and Automated Reasoning', 'both'::term_availability),
+    -- VAR
+    ('FMSE', 'winter'::term_availability),
+    ('AUTOLOG', 'winter'::term_availability),
+    ('ADED', 'winter'::term_availability),
+    ('CAV', 'winter'::term_availability),
+    ('LAC', 'winter'::term_availability),
+    ('PA', 'summer'::term_availability),
+    ('SATEXT', 'winter'::term_availability),
+    ('ATVAR', 'both'::term_availability),
 
-        -- MCS / EXT / FWTS / THESIS
-        ('Seminar in Computer Science', 'both'::term_availability),
-        ('Project in Computer Science', 'both'::term_availability),
-        ('PRJ-CS-2', 'both'::term_availability),
-        ('Extension', 'both'::term_availability),
-        ('FWTS-EL', 'both'::term_availability),
-        ('Seminar for Diploma Students', 'both'::term_availability),
-        ('Master Thesis', 'both'::term_availability),
-        ('Final Oral Exam / Defense', 'both'::term_availability);
+    -- MCS / EXT / FWTS / THESIS
+    ('SCS', 'both'::term_availability),
+    ('PRJCS1', 'both'::term_availability),
+    ('PRJCS2', 'both'::term_availability),
+    ('EXTENSION', 'both'::term_availability),
+    ('FWTSEL', 'both'::term_availability),
+    ('SDS', 'both'::term_availability),
+    ('MTH', 'both'::term_availability),
+    ('FOE', 'both'::term_availability);
 
 UPDATE course c
 SET term_availability = t.term_availability
@@ -140,27 +140,10 @@ WHERE c.code = t.code
   AND EXISTS (
     SELECT 1
     FROM module_course mc
-        JOIN module m ON m.id = mc.module_id
-        JOIN study_program sp ON sp.id = m.program_id
+    JOIN module m ON m.id = mc.module_id
+    JOIN study_program sp ON sp.id = m.program_id
     WHERE mc.course_id = c.id
       AND sp.code = '066 937'
-);
-
--- Any master course not explicitly listed above defaults to "both".
-UPDATE course c
-SET term_availability = 'both'::term_availability
-WHERE EXISTS (
-    SELECT 1
-    FROM module_course mc
-        JOIN module m ON m.id = mc.module_id
-        JOIN study_program sp ON sp.id = m.program_id
-    WHERE mc.course_id = c.id
-      AND sp.code = '066 937'
-)
-AND NOT EXISTS (
-    SELECT 1
-    FROM _master_term_target t
-    WHERE t.code = c.code
 );
 
 -- Clear existing per-user overrides for master so these values act as defaults.

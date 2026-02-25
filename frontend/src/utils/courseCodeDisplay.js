@@ -8,39 +8,9 @@ function normalizeText(value) {
         .trim();
 }
 
-const COURSE_TYPE_TOKENS = ["VU", "VO", "UE", "PR", "SE", "KO", "KS", "EX", "PS", "PJ", "ILV", "RE"];
 const SHORTNAME_STOP_WORDS = new Set([
     "and", "und", "for", "der", "die", "das", "in", "of", "the", "to", "mit", "fuer", "fur",
 ]);
-
-function extractCourseTypeToken(type, code) {
-    const fromType = String(type || "").trim().toUpperCase();
-    if (COURSE_TYPE_TOKENS.includes(fromType)) return fromType;
-    const codeText = String(code || "").toUpperCase();
-    const match = codeText.match(/\b(VU|VO|UE|PR|SE|KO|KS|EX|PS|PJ|ILV|RE)\b/);
-    return match ? match[1] : "";
-}
-
-function stripCourseTypeSuffix(code) {
-    const raw = String(code || "").trim();
-    if (!raw) return "";
-    const upper = raw.toUpperCase();
-    for (const token of COURSE_TYPE_TOKENS) {
-        const suffixPatterns = [
-            `-${token}`,
-            `_${token}`,
-            ` ${token}`,
-            `/${token}`,
-            `.${token}`,
-        ];
-        for (const suffix of suffixPatterns) {
-            if (upper.endsWith(suffix)) {
-                return raw.slice(0, raw.length - suffix.length).trim();
-            }
-        }
-    }
-    return raw;
-}
 
 function buildAcronym(name) {
     const words = String(name || "")
@@ -72,21 +42,18 @@ function buildAcronym(name) {
     return first.slice(0, 10).toUpperCase();
 }
 
-export function displayShortCode(code, name = "") {
-    const fromName = buildAcronym(name);
-    if (fromName) return fromName;
-
+export function displayShortCode(code) {
     const rawCode = String(code || "").trim();
-    const codeWithoutType = stripCourseTypeSuffix(rawCode);
-    const compactCode = /^[A-Za-z0-9._/-]+$/.test(codeWithoutType) ? codeWithoutType : "";
-    if (compactCode) return compactCode.toUpperCase();
-    return codeWithoutType || rawCode;
+    return rawCode;
 }
 
 export function displayCourseHeader(code, name = "", type = "") {
-    const shortCode = displayShortCode(code, name);
-    const typeToken = extractCourseTypeToken(type, code);
-    return typeToken ? `${shortCode} | ${typeToken}` : shortCode;
+    void name;
+    const rawCode = String(code || "").trim();
+    const rawType = String(type || "").trim();
+    if (rawCode && rawType) return `${rawCode} | ${rawType}`;
+    if (rawCode) return rawCode;
+    return rawType;
 }
 
 export function displayCourseTitle(name = "") {

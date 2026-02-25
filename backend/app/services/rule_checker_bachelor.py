@@ -233,13 +233,17 @@ class RuleChecker:
         # EIDI split
         map_course_to_module("Einführung in die Programmierung 1", "Einführung in die Programmierung")
         map_course_to_module("Einführung in die Programmierung 2", "Einführung in die Programmierung")
-        map_course_to_module("EIDI1-VU", "Einführung in die Programmierung")
-        map_course_to_module("EIDI2-VU", "Einführung in die Programmierung")
+        map_course_to_module("EIDI1", "Einführung in die Programmierung")
+        map_course_to_module("EIDI2", "Einführung in die Programmierung")
+        map_course_to_module("EIDI1-VU", "Einführung in die Programmierung")  # legacy alias
+        map_course_to_module("EIDI2-VU", "Einführung in die Programmierung")  # legacy alias
 
         # Orientation: keep module mapping for ECTS, BUT StEOP checks it by course code/title.
         map_course_to_module("Orientierung Informatik und Wirtschaftsinformatik", "Denkweisen der Informatik")
-        map_course_to_module("ORI-VU", "Denkweisen der Informatik")
-        map_course_to_module("DWI-VU", "Denkweisen der Informatik")
+        map_course_to_module("OIW", "Denkweisen der Informatik")
+        map_course_to_module("DI", "Denkweisen der Informatik")
+        map_course_to_module("ORI-VU", "Denkweisen der Informatik")  # legacy alias
+        map_course_to_module("DWI-VU", "Denkweisen der Informatik")  # legacy alias
 
         # Algebra/Analysis variants
         for c in [
@@ -252,7 +256,7 @@ class RuleChecker:
             "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (VU)",
         ]:
             map_course_to_module(c, "Algebra und Diskrete Mathematik")
-        for c in ["ADM-VO", "ADM-UE", "ADM-VU"]:
+        for c in ["ADM", "ADMUE", "ADMVU", "ADM-VO", "ADM-UE", "ADM-VU"]:
             map_course_to_module(c, "Algebra und Diskrete Mathematik")
         for c in [
             "Analysis",
@@ -264,64 +268,66 @@ class RuleChecker:
             "Analysis für Informatik und Wirtschaftsinformatik (VU)",
         ]:
             map_course_to_module(c, "Analysis")
-        for c in ["ANL-VO", "ANL-UE", "ANL-VU"]:
+        for c in ["ANL", "ANLUE", "ANLVU", "ANL-VO", "ANL-UE", "ANL-VU"]:
             map_course_to_module(c, "Analysis")
-        for c in ["SWT-VO", "SWT-UE", "SWT-VU"]:
+        for c in ["SWT", "SWTUE", "SWTVU", "SWT-VO", "SWT-UE", "SWT-VU"]:
             map_course_to_module(c, "Statistik und Wahrscheinlichkeitstheorie")
 
         # Thesis split
-        map_course_to_module("BA-PR", "Bachelorarbeit")
-        map_course_to_module("WISS-SE", "Bachelorarbeit")
+        map_course_to_module("BA", "Bachelorarbeit")
+        map_course_to_module("WA", "Bachelorarbeit")
+        map_course_to_module("BA-PR", "Bachelorarbeit")  # legacy alias
+        map_course_to_module("WISS-SE", "Bachelorarbeit")  # legacy alias
         map_course_to_module("Bachelorarbeit für Informatik und Wirtschaftsinformatik", "Bachelorarbeit")
         map_course_to_module("Wissenschaftliches Arbeiten", "Bachelorarbeit")
 
         # DB course-code mapping (from 003_bachelorcatalog.sql) to keep code usage consistent
-        map_codes("Effiziente Algorithmen", "EA-VU")
-        map_codes("Funktionale Programmierung", "FP-VU")
-        map_codes("Logikprogrammierung und Constraints", "LPC-VU")
-        map_codes("Abstrakte Maschinen", "AM-VU")
-        map_codes("Parallel Computing", "PC-VU")
-        map_codes("Übersetzerbau", "UB-VU")
-        map_codes("Zuverlässige Echtzeitsysteme", "RTS-VO", "DSYS-VU")
-        map_codes("Audio and Video Production", "AVP-VU")
-        map_codes("Computermusik", "CMUS-VU")
-        map_codes("Creative Media Production", "CMP-VU")
-        map_codes("Grundlagen der Computergraphik", "GCG-VU")
-        map_codes("Grundlagen der Computer Vision", "GCV-VU")
-        map_codes("Grundlagen der Visualisierung", "GVIS-VU")
-        map_codes("Multimedia", "MM-VU")
-        map_codes("Programmiertechniken für Visual Computing", "PTVC-PR")
-        map_codes("Access Computing", "ACC-VU")
-        map_codes("Design und Fertigung", "DUF-VU")
-        map_codes("Menschzentrierte Künstliche Intelligenz", "MKAI-VU")
-        map_codes("Sozio-technische Systeme", "STS-VU")
-        map_codes("Usability Engineering and Mobile Interaction", "UEMI-VU")
-        map_codes("Einführung in wissensbasierte Systeme", "EWS-VU")
-        map_codes("Einführung in Information Retrieval", "IR-VU")
-        map_codes("Semistrukturierte Daten", "SSD-VU")
-        map_codes("Web Engineering", "WEBE-VU")
-        map_codes("Argumentieren und Beweisen", "AUB-VU")
-        map_codes("Deklaratives Problemlösen", "DPR-VU")
-        map_codes("Einführung in Machine Learning", "EML-VU")
-        map_codes("Logik und Grundlagen der Mathematik", "LGM-VO", "LGM-UE")
-        map_codes("Logik für Wissensrepräsentation", "LWR-VU")
-        map_codes("Bio-Medical Visualization and Visual Analytics", "BMVVA-VU")
-        map_codes("Design und Entwicklung von Anwendungen im Gesundheitswesen", "DEAG-VU")
-        map_codes("Human Augmentation", "HAUG-VU")
-        map_codes("Informationssysteme des Gesundheitswesens", "ISG-VU")
-        map_codes("Methods for Data Generation and Analytics in Medicine and Life Sciences", "MDGAM-VU")
-        map_codes("Attacks and Defenses in Computer Security", "ADCS-UE")
-        map_codes("Foundations of System and Application Security", "FSAS-VU")
-        map_codes("Privacy-Enhancing Technologies", "PET-VU")
-        map_codes("Computational Statistics", "CSTAT-VU", "SCOMP-VU", "SIM-VU")
-        map_codes("Datenanalyse", "DA-VU")
-        map_codes("Methoden der Angewandten Statistik", "MAS-VO", "MAS-UE")
-        map_codes("Multivariate Statistik", "MVS-VO", "MVS-UE")
-        map_codes("Numerical Computation", "NUMC-VU")
-        map_codes("Programm- und Systemverifikation", "PSV-VU")
-        map_codes("Software-Qualitätssicherung", "SQS-VU")
-        map_codes("Introduction to Cryptography", "ITC-VU")
-        map_codes("Einführung in Quantencomputing", "EQC-VU")
+        map_codes("Effiziente Algorithmen", "EA")
+        map_codes("Funktionale Programmierung", "FP")
+        map_codes("Logikprogrammierung und Constraints", "LPC")
+        map_codes("Abstrakte Maschinen", "AM")
+        map_codes("Parallel Computing", "PC")
+        map_codes("Übersetzerbau", "UB")
+        map_codes("Zuverlässige Echtzeitsysteme", "RTS", "DSYS")
+        map_codes("Audio and Video Production", "AVP")
+        map_codes("Computermusik", "CMUS")
+        map_codes("Creative Media Production", "CMP")
+        map_codes("Grundlagen der Computergraphik", "GCG")
+        map_codes("Grundlagen der Computer Vision", "GCV")
+        map_codes("Grundlagen der Visualisierung", "GVIS")
+        map_codes("Multimedia", "MM")
+        map_codes("Programmiertechniken für Visual Computing", "PTVC")
+        map_codes("Access Computing", "ACC")
+        map_codes("Design und Fertigung", "DUF")
+        map_codes("Menschzentrierte Künstliche Intelligenz", "MKAI")
+        map_codes("Sozio-technische Systeme", "STS")
+        map_codes("Usability Engineering and Mobile Interaction", "UEMI")
+        map_codes("Einführung in wissensbasierte Systeme", "EWS")
+        map_codes("Einführung in Information Retrieval", "IR")
+        map_codes("Semistrukturierte Daten", "SSD")
+        map_codes("Web Engineering", "WEBE")
+        map_codes("Argumentieren und Beweisen", "AUB")
+        map_codes("Deklaratives Problemlösen", "DPR")
+        map_codes("Einführung in Machine Learning", "EML")
+        map_codes("Logik und Grundlagen der Mathematik", "LGM", "LGMUE")
+        map_codes("Logik für Wissensrepräsentation", "LWR")
+        map_codes("Bio-Medical Visualization and Visual Analytics", "BMVVA")
+        map_codes("Design und Entwicklung von Anwendungen im Gesundheitswesen", "DEAG")
+        map_codes("Human Augmentation", "HAUG")
+        map_codes("Informationssysteme des Gesundheitswesens", "ISG")
+        map_codes("Methods for Data Generation and Analytics in Medicine and Life Sciences", "MDGAM")
+        map_codes("Attacks and Defenses in Computer Security", "ADCS")
+        map_codes("Foundations of System and Application Security", "FSAS")
+        map_codes("Privacy-Enhancing Technologies", "PET")
+        map_codes("Computational Statistics", "CSTAT", "SCOMP", "SIM")
+        map_codes("Datenanalyse", "DA")
+        map_codes("Methoden der Angewandten Statistik", "MAS", "MASUE")
+        map_codes("Multivariate Statistik", "MVS", "MVSUE")
+        map_codes("Numerical Computation", "NUMC")
+        map_codes("Programm- und Systemverifikation", "PSV")
+        map_codes("Software-Qualitätssicherung", "SQS")
+        map_codes("Introduction to Cryptography", "ITC")
+        map_codes("Einführung in Quantencomputing", "EQC")
 
         # ----------------------------
         # StEOP definition (LV-level!)
@@ -329,11 +335,14 @@ class RuleChecker:
         # Mandatory StEOP LVs:
         self.steop_mandatory_lv_keys: Dict[str, float] = {
             self._norm("Einführung in die Programmierung 1"): 5.5,
+            self._norm("EIDI1"): 5.5,
             self._norm("EIDI1-VU"): 5.5,
             self._norm("Mathematisches Arbeiten für Informatik und Wirtschaftsinformatik 1"): 2.0,
             self._norm("Mathematisches Arbeiten"): 2.0,
+            self._norm("MA"): 2.0,
             self._norm("MA-VU"): 2.0,
             self._norm("Orientierung Informatik und Wirtschaftsinformatik"): 1.0,
+            self._norm("OIW"): 1.0,
             self._norm("ORI-VU"): 1.0,
         }
 
@@ -344,6 +353,10 @@ class RuleChecker:
             self._norm("Denkweisen der Informatik"),
             self._norm("Grundzüge digitaler Systeme"),
             # allow LV codes
+            self._norm("ADM"), self._norm("ADMUE"), self._norm("ADMVU"),
+            self._norm("ANL"), self._norm("ANLUE"), self._norm("ANLVU"),
+            self._norm("SWT"), self._norm("SWTUE"), self._norm("SWTVU"),
+            self._norm("DI"), self._norm("GGDS"),
             self._norm("ADM-VO"), self._norm("ADM-UE"), self._norm("ADM-VU"),
             self._norm("ANL-VO"), self._norm("ANL-UE"), self._norm("ANL-VU"),
             self._norm("DWI-VU"),
@@ -358,6 +371,11 @@ class RuleChecker:
             self._norm("Einführung in die Programmierung 2"),
             self._norm("Einführung in Visual Computing"),
             # DB-ish codes
+            self._norm("AD"),
+            self._norm("DBS"),
+            self._norm("DIR"),
+            self._norm("EIDI2"),
+            self._norm("EHVC"),
             self._norm("AD-VU"),
             self._norm("DBS-VU"),
             self._norm("DIR-VU"),
@@ -584,11 +602,11 @@ class RuleChecker:
         Identify the 3 mandatory StEOP LVs by LV code/title (not module mapping).
         """
         k = self._norm(self._course_code(course))
-        if k in (self._norm("Einführung in die Programmierung 1"), self._norm("EIDI1-VU")):
+        if k in (self._norm("Einführung in die Programmierung 1"), self._norm("EIDI1"), self._norm("EIDI1-VU")):
             return "eidi1"
-        if k in (self._norm("Mathematisches Arbeiten"), self._norm("Mathematisches Arbeiten für Informatik und Wirtschaftsinformatik 1"), self._norm("MA-VU")):
+        if k in (self._norm("Mathematisches Arbeiten"), self._norm("Mathematisches Arbeiten für Informatik und Wirtschaftsinformatik 1"), self._norm("MA"), self._norm("MA-VU")):
             return "ma"
-        if k in (self._norm("Orientierung Informatik und Wirtschaftsinformatik"), self._norm("ORI-VU")):
+        if k in (self._norm("Orientierung Informatik und Wirtschaftsinformatik"), self._norm("OIW"), self._norm("ORI-VU")):
             return "ori"
         return None
 
@@ -863,7 +881,7 @@ class RuleChecker:
         if items_done:
             for c, _ in items_done:
                 mod_title = self._infer_module_title(c)
-                if self._norm(mod_title) == self._norm("Bachelorarbeit") or self._norm(self._course_code(c)) in (self._norm("BA-PR"), self._norm("WISS-SE")):
+                if self._norm(mod_title) == self._norm("Bachelorarbeit") or self._norm(self._course_code(c)) in (self._norm("BA"), self._norm("WA"), self._norm("BA-PR"), self._norm("WISS-SE")):
                     li = self._lane_index_of(c, 0)
                     thesis_done_lane = li if thesis_done_lane is None else min(thesis_done_lane, li)
 

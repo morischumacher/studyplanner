@@ -63,8 +63,8 @@ function buildTree(catalog, subjectColors) {
                     courseName: hasNoCourses ? (mod?.name ?? "Course") : (course?.name ?? mod?.name ?? "Course"),
                     ects: hasNoCourses ? (mod?.ects ?? null) : (course?.ects ?? mod?.ects ?? null),
                     courseType: hasNoCourses
-                        ? GraphFilterEngine.normalizeCourseType(null, mod?.code)
-                        : GraphFilterEngine.normalizeCourseType(course?.type, course?.code ?? mod?.code),
+                        ? null
+                        : (course?.type ?? null),
                     category: mod?.category ?? null,
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     isMandatory: Boolean(mod?.is_mandatory),
@@ -83,7 +83,7 @@ function buildTree(catalog, subjectColors) {
                     code: course?.code ?? "",
                     name: course?.name ?? "Course",
                     ects: course?.ects ?? null,
-                    type: GraphFilterEngine.normalizeCourseType(course?.type, course?.code),
+                    type: course?.type ?? null,
                 })),
             };
 
@@ -114,7 +114,7 @@ function buildTree(catalog, subjectColors) {
                     courseCode: course?.code ?? "",
                     courseName: course?.name ?? "Course",
                     ects: course?.ects ?? null,
-                    courseType: GraphFilterEngine.normalizeCourseType(course?.type, course?.code),
+                    courseType: course?.type ?? null,
                     category: mod?.category ?? null,
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     isMandatory: Boolean(mod?.is_mandatory),
@@ -641,10 +641,15 @@ export default function CurriculumGraphView({
     }, [obligationOptions, filterOptions?.courseTypes, filterOptions?.examSubjects]);
     const withFilterDefaults = useCallback((filters) => {
         const hasConfiguredFilters = Boolean(graphViewState?.filtersConfigured);
-        if (!hasConfiguredFilters) return buildDefaultFilters(filters);
+        const hasPersistedFilters =
+            graphViewState?.filters && typeof graphViewState.filters === "object";
+        // On first interaction we may set filtersConfigured before persisting filters.
+        // In that transient state, keep safe defaults instead of strict empty filters.
+        if (!hasConfiguredFilters || !hasPersistedFilters) return buildDefaultFilters(filters);
         return filters;
     }, [
         graphViewState?.filtersConfigured,
+        graphViewState?.filters,
         buildDefaultFilters,
     ]);
     const [graphFilters, setGraphFilters] = useState(() =>
@@ -652,15 +657,25 @@ export default function CurriculumGraphView({
             GraphFilterEngine.normalizeFilters(graphViewState?.filters, filterOptions?.ectsBounds, programCode)
         )
     );
-    const markFiltersConfigured = useCallback(() => {
+    const markFiltersConfigured = useCallback((filtersSnapshot = null) => {
         setGraphViewState?.((prev) => {
-            if (prev?.filtersConfigured) return prev;
+            if (prev?.filtersConfigured && prev?.filters && typeof prev.filters === "object") return prev;
+            const normalizedSnapshot =
+                filtersSnapshot && typeof filtersSnapshot === "object"
+                    ? GraphFilterEngine.normalizeFilters(filtersSnapshot, filterOptions?.ectsBounds, programCode)
+                    : null;
+            const fallbackFromPrev =
+                prev?.filters && typeof prev.filters === "object"
+                    ? GraphFilterEngine.normalizeFilters(prev.filters, filterOptions?.ectsBounds, programCode)
+                    : GraphFilterEngine.normalizeFilters(undefined, filterOptions?.ectsBounds, programCode);
+            const nextFilters = buildDefaultFilters(normalizedSnapshot ?? fallbackFromPrev);
             return {
                 ...prev,
                 filtersConfigured: true,
+                filters: nextFilters,
             };
         });
-    }, [setGraphViewState]);
+    }, [setGraphViewState, buildDefaultFilters, filterOptions?.ectsBounds, programCode]);
     const [collapsedIds, setCollapsedIds] = useState(() => {
         const saved = graphViewState?.collapsedIds;
         if (Array.isArray(saved)) return new Set(saved);
@@ -886,7 +901,7 @@ export default function CurriculumGraphView({
             collapsedBeforeForceHierarchyRef.current = null;
         }
         if (wasCollapsed) {
-            markFiltersConfigured();
+            markFiltersConfigured(graphFilters);
             filtersDirtyRef.current = true;
             setGraphFilters((prev) => {
                 return relaxFiltersForExpandedSubtree({
@@ -909,6 +924,7 @@ export default function CurriculumGraphView({
         hierarchyMode,
         effectiveCollapsedIds,
         root,
+        graphFilters,
         getCourseStatus,
         filterOptions?.ectsBounds,
         markFiltersConfigured,

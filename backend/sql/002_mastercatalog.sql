@@ -5,6 +5,7 @@ VALUES ('066 937','Master Software Engineering','master','en',120,4)
 ON CONFLICT (code) DO NOTHING;
 COMMIT;
 
+
 -- === Exam subjects for 066 937 ===
 INSERT INTO exam_subject (program_id, code, name)
 SELECT id, 'AC',  'Algorithms and Complexity' FROM study_program WHERE code='066 937' ON CONFLICT DO NOTHING;
@@ -290,151 +291,151 @@ COMMIT;
 -- === Courses ===
 -- AC
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Algorithmics','Algorithmics','VU',6,'en'),
-                                                       ('ARA-VU','Advanced Research in Algorithmics','VU',6,'en'),
-                                                       ('AET-VU','Algorithmic Encoding Techniques','VU',6,'en'),
-                                                       ('AGEO-VU','Algorithmic Geometry','VU',6,'en'),
-                                                       ('ASOC-VU','Algorithmic Social Choice','VU',6,'en'),
-                                                       ('AGT-VU','Algorithms in Graph Theory','VU',6,'en'),
-                                                       ('BEA-VU','Beyond Exact Algorithms','VU',6,'en'),
-                                                       ('COMPX-VU','Complexity Theory','VU',6,'en'),
-                                                       ('FPT-VU','Fixed-Parameter Algorithms and Complexity','VU',6,'en'),
-                                                       ('GDA-VU','Graph Drawing Algorithms','VU',6,'en'),
-                                                       ('HOT-VU','Heuristic Optimization Techniques','VU',6,'en'),
-                                                       ('MPOTL-VU','Mathematical Programming and Optimization in Transport Logistics','VU',6,'en'),
-                                                       ('SDMT-VU','Structural Decompositions and Meta Theorems','VU',6,'en'),
-                                                       ('Advanced Topics In Algorithms and Complexity','Advanced Topics In Algorithms and Complexity','SE',3,'en');
+                                                       ('ALGO','Algorithmics','VU',6,'en'),
+                                                       ('ARA','Advanced Research in Algorithmics','VU',6,'en'),
+                                                       ('AET','Algorithmic Encoding Techniques','VU',6,'en'),
+                                                       ('AGEO','Algorithmic Geometry','VU',6,'en'),
+                                                       ('ASOC','Algorithmic Social Choice','VU',6,'en'),
+                                                       ('AGT','Algorithms in Graph Theory','VU',6,'en'),
+                                                       ('BEA','Beyond Exact Algorithms','VU',6,'en'),
+                                                       ('COMPX','Complexity Theory','VU',6,'en'),
+                                                       ('FPT','Fixed-Parameter Algorithms and Complexity','VU',6,'en'),
+                                                       ('GDA','Graph Drawing Algorithms','VU',6,'en'),
+                                                       ('HOT','Heuristic Optimization Techniques','VU',6,'en'),
+                                                       ('MPOTL','Mathematical Programming and Optimization in Transport Logistics','VU',6,'en'),
+                                                       ('SDMT','Structural Decompositions and Meta Theorems','VU',6,'en'),
+                                                       ('ATAC','Advanced Topics In Algorithms and Complexity','SE',3,'en');
 COMMIT;
 
 -- AMR
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Mobile Robotics','Mobile Robotics','VU',6,'en'),
-                                                       ('ARC-VU','Autonomous Racing Cars','VU',6,'en'),
-                                                       ('ITA-VU','Information Technology in Automation','VU',6,'en'),
-                                                       ('PPMR-VU','Programming Principles of Mobile Robotics','VU',6,'en'),
-                                                       ('Advanced Topics In Automation and Mobile Robotics','Advanced Topics In Automation and Mobile Robotics','SE',3,'en');
+                                                       ('MR','Mobile Robotics','VU',6,'en'),
+                                                       ('ARC','Autonomous Racing Cars','VU',6,'en'),
+                                                       ('ITA','Information Technology in Automation','VU',6,'en'),
+                                                       ('PPMR','Programming Principles of Mobile Robotics','VU',6,'en'),
+                                                       ('ATAMR','Advanced Topics In Automation and Mobile Robotics','SE',3,'en');
 COMMIT;
 
 -- DMIS
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Advanced Database Systems','Advanced Database Systems','VU',6,'en'),
-                                                       ('BI-VU','Business Intelligence','VU',6,'en'),
-                                                       ('DBT-VU','Database Theory','VU',6,'en'),
-                                                       ('DS-VO','Data Stewardship VO','VO',3,'en'),
-                                                       ('DS-UE','Data Stewardship UE','UE',3,'en'),
-                                                       ('KG-VU','Knowledge Graphs','VU',6,'en'),
-                                                       ('LBAI-VU','Logic-based Artificial Intelligence','VU',6,'en'),
-                                                       ('MGD-VU','Management of Graph Data','VU',6,'en'),
-                                                       ('PSAI-VU','Problem Solving and Search in Artificial Intelligence','VU',6,'en'),
-                                                       ('PDK-VU','Processing of Declarative Knowledge','VU',6,'en'),
-                                                       ('TGD-VU','Theory of Graph Data','VU',6,'en'),
-                                                       ('Advanced Topics In Data Management and Intelligent Systems','Advanced Topics In Data Management and Intelligent Systems','SE',3,'en');
+                                                       ('ADS','Advanced Database Systems','VU',6,'en'),
+                                                       ('BI','Business Intelligence','VU',6,'en'),
+                                                       ('DBT','Database Theory','VU',6,'en'),
+                                                       ('DS','Data Stewardship VO','VO',3,'en'),
+                                                       ('DSUE','Data Stewardship UE','UE',3,'en'),
+                                                       ('KG','Knowledge Graphs','VU',6,'en'),
+                                                       ('LBAI','Logic-based Artificial Intelligence','VU',6,'en'),
+                                                       ('MGD','Management of Graph Data','VU',6,'en'),
+                                                       ('PSAI','Problem Solving and Search in Artificial Intelligence','VU',6,'en'),
+                                                       ('PDK','Processing of Declarative Knowledge','VU',6,'en'),
+                                                       ('TGD','Theory of Graph Data','VU',6,'en'),
+                                                       ('ATDMIS','Advanced Topics In Data Management and Intelligent Systems','SE',3,'en');
 COMMIT;
 
 -- DNGC
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Advanced Internet Computing','Advanced Internet Computing','VU',6,'en'),
-                                                       ('Distributed Systems Technologies','Distributed Systems Technologies','VU',6,'en'),
-                                                       ('ABD-VU','Artifact-based Design','VU',6,'en'),
-                                                       ('HQCS-VU','Hybrid Quantum - Classical Systems','VU',6,'en'),
-                                                       ('IOT-VU','Internet of Things','VU',6,'en'),
-                                                       ('QC-VU','Quantum Computing','VU',6,'en'),
-                                                       ('Advanced Topics In Distributed and Next Generation Computing','Advanced Topics In Distributed and Next Generation Computing','SE',3,'en');
+                                                       ('AIC','Advanced Internet Computing','VU',6,'en'),
+                                                       ('DST','Distributed Systems Technologies','VU',6,'en'),
+                                                       ('ABD','Artifact-based Design','VU',6,'en'),
+                                                       ('HQCS','Hybrid Quantum - Classical Systems','VU',6,'en'),
+                                                       ('IOT','Internet of Things','VU',6,'en'),
+                                                       ('QC','Quantum Computing','VU',6,'en'),
+                                                       ('ATDNGC','Advanced Topics In Distributed and Next Generation Computing','SE',3,'en');
 COMMIT;
 
 -- HPC
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('AMPP-VU','Advanced Multiprocessor Programming','VU',6,'en'),
-                                                       ('GPU-VU','GPU Computing and Architectures','VU',6,'en'),
-                                                       ('GHPC-VU','Green HPC','VU',6,'en'),
-                                                       ('HPC-VU','High Performance Computing','VU',6,'en'),
-                                                       ('HPC4AI-VU','HPC for AI','VU',6,'en'),
-                                                       ('Advanced Topics In High Performance Computing','Advanced Topics In High Performance Computing','SE',3,'en');
+                                                       ('AMPP','Advanced Multiprocessor Programming','VU',6,'en'),
+                                                       ('GPU','GPU Computing and Architectures','VU',6,'en'),
+                                                       ('GHPC','Green HPC','VU',6,'en'),
+                                                       ('HPC','High Performance Computing','VU',6,'en'),
+                                                       ('HPC4AI','HPC for AI','VU',6,'en'),
+                                                       ('ATHPC','Advanced Topics In High Performance Computing','SE',3,'en');
 COMMIT;
 
 -- ML
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Machine Learning','Machine Learning','VU',6,'en'),
-                                                       ('ARL-VU','Advanced Reinforcement Learning','VU',6,'en'),
-                                                       ('ADS-VU','Algorithms for Data Science','VU',6,'en'),
-                                                       ('AGAI-VU','Applied Generative AI and LLM-based Systems','VU',6,'en'),
-                                                       ('DLNLP-VU','Deep Learning for Natural Language Processing','VU',6,'en'),
-                                                       ('GENAI-VU','Generative AI','VU',6,'en'),
-                                                       ('MLO-VU','Machine Learning for Optimization','VU',6,'en'),
-                                                       ('RL-VU','Reinforcement Learning','VU',6,'en'),
-                                                       ('TFR-ML-VU','Theoretical Foundations and Research Topics in ML','VU',6,'en'),
-                                                       ('TFDL-VU','Theoretical Foundations of Deep Learning','VU',6,'en'),
-                                                       ('Advanced Topics In Machine Learning','Advanced Topics In Machine Learning','SE',3,'en');
+                                                       ('ML','Machine Learning','VU',6,'en'),
+                                                       ('ARL','Advanced Reinforcement Learning','VU',6,'en'),
+                                                       ('ADSVU','Algorithms for Data Science','VU',6,'en'),
+                                                       ('AGAI','Applied Generative AI and LLM-based Systems','VU',6,'en'),
+                                                       ('DLNLP','Deep Learning for Natural Language Processing','VU',6,'en'),
+                                                       ('GENAI','Generative AI','VU',6,'en'),
+                                                       ('MLO','Machine Learning for Optimization','VU',6,'en'),
+                                                       ('RL','Reinforcement Learning','VU',6,'en'),
+                                                       ('TFRML','Theoretical Foundations and Research Topics in ML','VU',6,'en'),
+                                                       ('TFDL','Theoretical Foundations of Deep Learning','VU',6,'en'),
+                                                       ('ATML','Advanced Topics In Machine Learning','SE',3,'en');
 COMMIT;
 
 -- SP
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('ACR-VU','Advanced Cryptography','VU',6,'en'),
-                                                       ('APET-VU','Advanced Privacy Enhancing Technologies','VU',6,'en'),
-                                                       ('AICS-VU','Artificial Intelligence for Computer Security','VU',6,'en'),
-                                                       ('CRYPTOC-VU','Cryptocurrencies','VU',6,'en'),
-                                                       ('FM-SP-VU','Formal Methods for Security and Privacy','VU',6,'en'),
-                                                       ('Network Security','Network Security','VU',3,'en'),
-                                                       ('NETSEC-AT-VU','Network Security - Advanced Topics','VU',3,'en'),
-                                                       ('SC-VU','Smart Contracts','VU',6,'en'),
-                                                       ('SYMCR-VU','Symmetric Cryptography','VU',6,'en'),
-                                                       ('SAS-VU','System and Application Security','VU',6,'en'),
-                                                       ('Advanced Topics In Security and Privacy','Advanced Topics In Security and Privacy','SE',3,'en');
+                                                       ('ACR','Advanced Cryptography','VU',6,'en'),
+                                                       ('APET','Advanced Privacy Enhancing Technologies','VU',6,'en'),
+                                                       ('AICS','Artificial Intelligence for Computer Security','VU',6,'en'),
+                                                       ('CRYPTOC','Cryptocurrencies','VU',6,'en'),
+                                                       ('FMSP','Formal Methods for Security and Privacy','VU',6,'en'),
+                                                       ('NS','Network Security','VU',3,'en'),
+                                                       ('NETSECAT','Network Security - Advanced Topics','VU',3,'en'),
+                                                       ('SC','Smart Contracts','VU',6,'en'),
+                                                       ('SYMCR','Symmetric Cryptography','VU',6,'en'),
+                                                       ('SAS','System and Application Security','VU',6,'en'),
+                                                       ('ATSP','Advanced Topics In Security and Privacy','SE',3,'en');
 COMMIT;
 
 -- SICR
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('HCAI-VU','Advanced Human-Centered AI: from concepts to implementation','VU',6,'en'),
-                                                       ('AIE-VU','AI Ethics','VU',6,'en'),
-                                                       ('CAS-VU','Critical Algorithm Studies','VU',6,'en'),
-                                                       ('CSE-PR','Computer Science Education: Advances in Research and Practice','PR',6,'en'),
-                                                       ('CTMI-VU','Critical Theory of Media and Informatics','VU',6,'en'),
-                                                       ('HAI-VU','Human-agent Interaction (VU)','VU',6,'en'),
-                                                       ('HAI-PR','Human-agent Interaction (PR)','PR',6,'en'),
-                                                       ('ICS-VU','Introduction to Computational Sustainability','VU',6,'en'),
-                                                       ('LTLA-VU','Learning Technologies and Learning Analytics','VU',6,'en'),
-                                                       ('RDE-VU','Responsible Digital Ethics','VU',6,'en'),
-                                                       ('Advanced Topics In Societal Impact and Critical Reflections','Advanced Topics In Societal Impact and Critical Reflections','SE',3,'en');
+                                                       ('HCAI','Advanced Human-Centered AI: from concepts to implementation','VU',6,'en'),
+                                                       ('AIE','AI Ethics','VU',6,'en'),
+                                                       ('CAS','Critical Algorithm Studies','VU',6,'en'),
+                                                       ('CSE','Computer Science Education: Advances in Research and Practice','PR',6,'en'),
+                                                       ('CTMI','Critical Theory of Media and Informatics','VU',6,'en'),
+                                                       ('HAI','Human-agent Interaction (VU)','VU',6,'en'),
+                                                       ('HAIPR','Human-agent Interaction (PR)','PR',6,'en'),
+                                                       ('ICS','Introduction to Computational Sustainability','VU',6,'en'),
+                                                       ('LTLA','Learning Technologies and Learning Analytics','VU',6,'en'),
+                                                       ('RDE','Responsible Digital Ethics','VU',6,'en'),
+                                                       ('ATSICR','Advanced Topics In Societal Impact and Critical Reflections','SE',3,'en');
 COMMIT;
 
 -- SEP
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Advanced Software Engineering','Advanced Software Engineering','VU',6,'en'),
-                                                       ('Advanced Software Engineering Project','Advanced Software Engineering Project','PR',6,'en'),
-                                                       ('ALP-VU','Advanced Logic Programming','VU',6,'en'),
-                                                       ('AME-VU','Advanced Model Engineering','VU',6,'en'),
-                                                       ('AIP-VU','AI Programming','VU',6,'en'),
-                                                       ('EP-VU','Efficient Programs (VU)','VU',3,'en'),
-                                                       ('EP-PR','Efficient Programs (PR)','PR',3,'en'),
-                                                       ('LLP-VU','Low-Level Programming','VU',6,'en'),
-                                                       ('ME-VU','Model Engineering','VU',6,'en'),
-                                                       ('PPL-VU','Programming Paradigms and Languages','VU',6,'en'),
-                                                       ('TS-VU','Type Systems','VU',6,'en'),
-                                                       ('Advanced Topics In Software Engineering and Programming','Advanced Topics In Software Engineering and Programming','SE',3,'en');
+                                                       ('ASE','Advanced Software Engineering','VU',6,'en'),
+                                                       ('ASEP','Advanced Software Engineering Project','PR',6,'en'),
+                                                       ('ALP','Advanced Logic Programming','VU',6,'en'),
+                                                       ('AME','Advanced Model Engineering','VU',6,'en'),
+                                                       ('AIP','AI Programming','VU',6,'en'),
+                                                       ('EP','Efficient Programs (VU)','VU',3,'en'),
+                                                       ('EPPR','Efficient Programs (PR)','PR',3,'en'),
+                                                       ('LLP','Low-Level Programming','VU',6,'en'),
+                                                       ('ME','Model Engineering','VU',6,'en'),
+                                                       ('PPL','Programming Paradigms and Languages','VU',6,'en'),
+                                                       ('TS','Type Systems','VU',6,'en'),
+                                                       ('ATSEP','Advanced Topics In Software Engineering and Programming','SE',3,'en');
 COMMIT;
 
 -- VAR
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Formal Methods in Systems Engineering','Formal Methods in Systems Engineering','VU',6,'en'),
-                                                       ('AUTOLOG-VU','Automata and Logic','VU',6,'en'),
-                                                       ('ADED-VU','Automated Deduction','VU',6,'en'),
-                                                       ('CAV-VU','Computer-Aided Verification','VU',6,'en'),
-                                                       ('LAC-VU','Logic and Computability','VU',6,'en'),
-                                                       ('PA-VU','Program Analysis','VU',6,'en'),
-                                                       ('SATEXT-VU','SAT Algorithms, Applications and Extensions','VU',6,'en'),
-                                                       ('Advanced Topics In Verification and Automated Reasoning','Advanced Topics In Verification and Automated Reasoning','SE',3,'en');
+                                                       ('FMSE','Formal Methods in Systems Engineering','VU',6,'en'),
+                                                       ('AUTOLOG','Automata and Logic','VU',6,'en'),
+                                                       ('ADED','Automated Deduction','VU',6,'en'),
+                                                       ('CAV','Computer-Aided Verification','VU',6,'en'),
+                                                       ('LAC','Logic and Computability','VU',6,'en'),
+                                                       ('PA','Program Analysis','VU',6,'en'),
+                                                       ('SATEXT','SAT Algorithms, Applications and Extensions','VU',6,'en'),
+                                                       ('ATVAR','Advanced Topics In Verification and Automated Reasoning','SE',3,'en');
 COMMIT;
 
 -- MCS / EXT / FWTS / THESIS
 INSERT INTO course (code,title,type,ects,language) VALUES
-                                                       ('Seminar in Computer Science','Seminar in Computer Science','SE',3,'en'),
-                                                       ('Project in Computer Science','Project in Computer Science 1','PR',6,'en'),
-                                                       ('PRJ-CS-2','Project in Computer Science 2','PR',6,'en'),
-                                                       ('Extension','Extension (Electives)','VU',12,'en'),
-                                                       ('FWTS-EL','Freie Wahlfächer und Transferable Skills','VU',9,'en'),
-                                                       ('Seminar for Diploma Students','Seminar für Diplomand_innen','SE',1.5,'en'),
-                                                       ('Master Thesis','Diplomarbeit','PR',27,'en'),
-                                                       ('Final Oral Exam / Defense','Kommissionelle Abschlussprüfung','SE',1.5,'en');
+                                                       ('SCS','Seminar in Computer Science','SE',3,'en'),
+                                                       ('PRJCS1','Project in Computer Science 1','PR',6,'en'),
+                                                       ('PRJCS2','Project in Computer Science 2','PR',6,'en'),
+                                                       ('EXTENSION','Extension (Electives)','VU',12,'en'),
+                                                       ('FWTSEL','Freie Wahlfächer und Transferable Skills','VU',9,'en'),
+                                                       ('SDS','Seminar für Diplomand_innen','SE',1.5,'en'),
+                                                       ('MTH','Diplomarbeit','PR',27,'en'),
+                                                       ('FOE','Kommissionelle Abschlussprüfung','SE',1.5,'en');
 COMMIT;
 
 -- === Link modules to courses ===
@@ -442,7 +443,7 @@ COMMIT;
 INSERT INTO module_course (module_id,course_id)
 SELECT m.id, c.id
 FROM module m
-         JOIN course c ON c.code='Algorithmics'
+         JOIN course c ON c.code='ALGO'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Algorithmics'
 ON CONFLICT DO NOTHING;
@@ -450,7 +451,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course (module_id,course_id)
 SELECT m.id, c.id
 FROM module m
-         JOIN course c ON c.code='ARA-VU'
+         JOIN course c ON c.code='ARA'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Research in Algorithmics'
 ON CONFLICT DO NOTHING;
@@ -458,7 +459,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='AET-VU'
+         JOIN course c ON c.code='AET'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Algorithmic Encoding Techniques'
 ON CONFLICT DO NOTHING;
@@ -466,7 +467,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='AGEO-VU'
+         JOIN course c ON c.code='AGEO'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Algorithmic Geometry'
 ON CONFLICT DO NOTHING;
@@ -474,7 +475,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='ASOC-VU'
+         JOIN course c ON c.code='ASOC'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Algorithmic Social Choice'
 ON CONFLICT DO NOTHING;
@@ -482,7 +483,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='AGT-VU'
+         JOIN course c ON c.code='AGT'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Algorithms in Graph Theory'
 ON CONFLICT DO NOTHING;
@@ -490,7 +491,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='BEA-VU'
+         JOIN course c ON c.code='BEA'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Beyond Exact Algorithms'
 ON CONFLICT DO NOTHING;
@@ -498,7 +499,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='COMPX-VU'
+         JOIN course c ON c.code='COMPX'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Complexity Theory'
 ON CONFLICT DO NOTHING;
@@ -506,7 +507,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='FPT-VU'
+         JOIN course c ON c.code='FPT'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Fixed-Parameter Algorithms and Complexity'
 ON CONFLICT DO NOTHING;
@@ -514,7 +515,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='GDA-VU'
+         JOIN course c ON c.code='GDA'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Graph Drawing Algorithms'
 ON CONFLICT DO NOTHING;
@@ -522,7 +523,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='HOT-VU'
+         JOIN course c ON c.code='HOT'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Heuristic Optimization Techniques'
 ON CONFLICT DO NOTHING;
@@ -530,7 +531,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='MPOTL-VU'
+         JOIN course c ON c.code='MPOTL'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Mathematical Programming and Optimization in Transport Logistics'
 ON CONFLICT DO NOTHING;
@@ -538,7 +539,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='SDMT-VU'
+         JOIN course c ON c.code='SDMT'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Structural Decompositions and Meta Theorems'
 ON CONFLICT DO NOTHING;
@@ -546,7 +547,7 @@ ON CONFLICT DO NOTHING;
 INSERT INTO module_course
 SELECT m.id,c.id
 FROM module m
-         JOIN course c ON c.code='Advanced Topics In Algorithms and Complexity'
+         JOIN course c ON c.code='ATAC'
          JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Algorithms and Complexity'
 ON CONFLICT DO NOTHING;
@@ -554,451 +555,451 @@ COMMIT;
 
 -- AMR
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Mobile Robotics'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='MR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Mobile Robotics' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ARC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ARC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Autonomous Racing Cars' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ITA-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ITA'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Information Technology in Automation' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='PPMR-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='PPMR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Programming Principles of Mobile Robotics' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Automation and Mobile Robotics'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATAMR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Automation and Mobile Robotics' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- DMIS (Data Stewardship = VO+UE 3+3)
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Database Systems'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ADS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Database Systems' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='BI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='BI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Business Intelligence' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='DBT-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='DBT'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Database Theory' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('DS-VO','DS-UE')
+SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('DS','DSUE')
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Data Stewardship' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='KG-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='KG'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Knowledge Graphs' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='LBAI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='LBAI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Logic-based Artificial Intelligence' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='MGD-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='MGD'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Management of Graph Data' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='PSAI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='PSAI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Problem Solving and Search in AI' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='PDK-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='PDK'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Processing of Declarative Knowledge' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='TGD-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='TGD'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Theory of Graph Data' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Data Management and Intelligent Systems'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATDMIS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Data Management and Intelligent Systems' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- DNGC
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Internet Computing'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AIC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Internet Computing' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Distributed Systems Technologies'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='DST'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Distributed Systems Technologies' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ABD-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ABD'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Artifact-based Design' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='HQCS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='HQCS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Hybrid Quantum - Classical Systems' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='IOT-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='IOT'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Internet of Things' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='QC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='QC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Quantum Computing' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Distributed and Next Generation Computing'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATDNGC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Distributed and Next Generation Computing' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- HPC
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AMPP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AMPP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Multiprocessor Programming' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='GPU-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='GPU'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='GPU Computing and Architectures' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='GHPC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='GHPC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Green HPC' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='HPC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='HPC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='High Performance Computing' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='HPC4AI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='HPC4AI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='HPC for AI' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In High Performance Computing'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATHPC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In High Performance Computing' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- ML
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Machine Learning'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ML'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Machine Learning' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ARL-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ARL'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Reinforcement Learning' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ADS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ADSVU'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Algorithms for Data Science' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AGAI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AGAI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Applied Generative AI and LLM-based Systems' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='DLNLP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='DLNLP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Deep Learning for NLP' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='GENAI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='GENAI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Generative AI' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='MLO-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='MLO'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Machine Learning for Optimization' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='RL-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='RL'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Reinforcement Learning' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='TFR-ML-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='TFRML'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Theoretical Foundations and Research Topics in ML' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='TFDL-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='TFDL'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Theoretical Foundations of Deep Learning' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Machine Learning'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATML'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Machine Learning' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- SP (incl. split Network Security)
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ACR-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ACR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Cryptography' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='APET-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='APET'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Privacy Enhancing Technologies' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AICS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AICS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Artificial Intelligence for Computer Security' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='CRYPTOC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='CRYPTOC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Cryptocurrencies' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='FM-SP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='FMSP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Formal Methods for Security and Privacy' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Network Security','NETSEC-AT-VU')
+SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('NS','NETSECAT')
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Network Security' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='SC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='SC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Smart Contracts' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='SYMCR-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='SYMCR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Symmetric Cryptography' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='SAS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='SAS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='System and Application Security' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Security and Privacy'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATSP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Security and Privacy' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- SICR (incl. 12 ECTS HAI via VU+PR)
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='HCAI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='HCAI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Human-Centered AI: from concepts to implementation' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AIE-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AIE'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='AI Ethics' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='CAS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='CAS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Critical Algorithm Studies' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='CSE-PR'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='CSE'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Computer Science Education: Advances in Research and Practice' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='CTMI-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='CTMI'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Critical Theory of Media and Informatics' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('HAI-VU','HAI-PR')
+SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('HAI','HAIPR')
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Human-agent Interaction' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ICS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ICS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Introduction to Computational Sustainability' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='LTLA-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='LTLA'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Learning Technologies and Learning Analytics' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='RDE-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='RDE'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Responsible Digital Ethics' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Societal Impact and Critical Reflections'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATSICR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Societal Impact and Critical Reflections' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- SEP
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Software Engineering'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ASE'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Software Engineering' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Software Engineering Project'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ASEP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Software Engineering Project' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ALP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ALP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Logic Programming' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AME-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AME'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Model Engineering' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AIP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AIP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='AI Programming' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('EP-VU','EP-PR')
+SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('EP','EPPR')
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Efficient Programs' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='LLP-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='LLP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Low-Level Programming' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ME-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ME'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Model Engineering' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='PPL-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='PPL'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Programming Paradigms and Languages' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='TS-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='TS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Type Systems' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Software Engineering and Programming'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATSEP'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Software Engineering and Programming' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- VAR
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Formal Methods in Systems Engineering'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='FMSE'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Formal Methods in Systems Engineering' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='AUTOLOG-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='AUTOLOG'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Automata and Logic' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='ADED-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ADED'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Automated Deduction' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='CAV-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='CAV'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Computer-Aided Verification' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='LAC-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='LAC'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Logic and Computability' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='PA-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='PA'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Program Analysis' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='SATEXT-VU'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='SATEXT'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='SAT Algorithms, Applications and Extensions' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Advanced Topics In Verification and Automated Reasoning'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='ATVAR'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Advanced Topics In Verification and Automated Reasoning' ON CONFLICT DO NOTHING;
 COMMIT;
 
 -- MCS
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Seminar in Computer Science'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='SCS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Seminar in Computer Science' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('Project in Computer Science','PRJ-CS-2')
+SELECT m.id,c.id FROM module m JOIN course c ON c.code IN ('PRJCS1','PRJCS2')
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Project in Computer Science' ON CONFLICT DO NOTHING;
 
 -- EXT / FWTS / THESIS
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Extension'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='EXTENSION'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Extension' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='FWTS-EL'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='FWTSEL'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Freie Wahlfächer und Transferable Skills' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Seminar for Diploma Students'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='SDS'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Seminar für Diplomand_innen' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Master Thesis'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='MTH'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Diplomarbeit' ON CONFLICT DO NOTHING;
 
 INSERT INTO module_course
-SELECT m.id,c.id FROM module m JOIN course c ON c.code='Final Oral Exam / Defense'
+SELECT m.id,c.id FROM module m JOIN course c ON c.code='FOE'
                                JOIN study_program sp ON sp.id=m.program_id AND sp.code='066 937'
 WHERE m.name='Kommissionelle Abschlussprüfung' ON CONFLICT DO NOTHING;
 COMMIT;

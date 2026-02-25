@@ -183,6 +183,8 @@ class RuleChecker:
             # diploma parts (if represented as separate “courses”)
             "Final Oral Exam / Defense": ["Master Thesis"],
             "Seminar for Diploma Students": ["Master Thesis"],
+            "FOE": ["MTH"],
+            "SDS": ["MTH"],
         }
 
         # Category normalization map (many synonyms accepted)
@@ -236,18 +238,48 @@ class RuleChecker:
         self.special_category_by_code: Dict[str, str] = {
             # Free choice + transferable skills
             "fwts-el": "transferable_skills",
+            "fwtsel": "transferable_skills",
             "freie wahlfächer und transferable skills": "transferable_skills",
             "freie wahlfaecher und transferable skills": "transferable_skills",
             "free choice and transferable skills": "transferable_skills",
             # Diploma components
             "master thesis": "diploma_thesis",
+            "mth": "diploma_thesis",
             "diplomarbeit": "diploma_thesis",
             "seminar for diploma students": "diploma_seminar",
+            "sds": "diploma_seminar",
             "seminar für diplomand_innen": "diploma_seminar",
             "seminar fuer diplomand_innen": "diploma_seminar",
             "final oral exam / defense": "diploma_defense",
+            "foe": "diploma_defense",
             "kommissionelle abschlussprüfung": "diploma_defense",
             "kommissionelle abschlusspruefung": "diploma_defense",
+        }
+
+        # Canonical course-code aliases from the SQL catalogs.
+        # The rule engine internally uses curriculum module names for consistency checks.
+        self.course_alias_to_name: Dict[str, str] = {
+            # mandatory
+            "ASE": "Advanced Software Engineering",
+            "ASEP": "Advanced Software Engineering Project",
+            "SCS": "Seminar in Computer Science",
+            # core modules
+            "ALGO": "Algorithmics",
+            "MR": "Mobile Robotics",
+            "ADS": "Advanced Database Systems",
+            "AIC": "Advanced Internet Computing",
+            "DST": "Distributed Systems Technologies",
+            "ML": "Machine Learning",
+            "FMSE": "Formal Methods in Systems Engineering",
+            # variable-ECTS modules
+            "NS": "Network Security",
+            "PRJCS1": "Project in Computer Science",
+            "PRJCS2": "Project in Computer Science",
+            "EXTENSION": "Extension",
+            # diploma aliases
+            "MTH": "Master Thesis",
+            "SDS": "Seminar for Diploma Students",
+            "FOE": "Final Oral Exam / Defense",
         }
 
     # ----------------------------
@@ -393,6 +425,12 @@ class RuleChecker:
             return "diploma_other"
         return None
 
+    def _canonical_rule_name(self, code_or_name: Any) -> str:
+        raw = self._norm(code_or_name)
+        if not raw:
+            return ""
+        return self.course_alias_to_name.get(raw, raw)
+
     def _parse_courses(
         self, lanes: List[Dict[str, Any]], payload: Dict[str, Any]
     ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
@@ -449,6 +487,8 @@ class RuleChecker:
                         {
                             "code": code,
                             "code_key": self._norm_key(code),
+                            "rule_name": self._canonical_rule_name(code),
+                            "rule_key": self._norm_key(self._canonical_rule_name(code)),
                             "ects": float(ects),
                             "category_raw": raw_cat,
                             "category": mapped_cat,
@@ -557,7 +597,7 @@ class RuleChecker:
 
         # Mandatory modules presence
         for m in self.mandatory_modules.keys():
-            if not any(self._norm_key(c["code"]) == self._norm_key(m) for c in courses):
+            if not any(c.get("rule_key") == self._norm_key(m) for c in courses):
                 if m == "Seminar in Computer Science":
                     missing.append("Mandatory: Seminar in Computer Science (min. 3.0 ECTS) is missing.")
                 else:
@@ -696,21 +736,22 @@ class RuleChecker:
 
         for c in courses:
             code = c["code"]
-            code_key = c["code_key"]
+            rule_name = c.get("rule_name") or code
+            rule_key = c.get("rule_key") or self._norm_key(rule_name)
             ects = c["ects"]
             cat = c["category"]
             exam_key = c["examSubject_key"]
 
             # Advanced Topics family: min 3 ECTS
             for prefix in self.advanced_topics_prefixes:
-                if self._norm_key(code).startswith(self._norm_key(prefix)):
+                if self._norm_key(rule_name).startswith(self._norm_key(prefix)):
                     if ects + 1e-9 < 3.0:
                         return f"'{code}' is an Advanced Topics module and must be at least 3.0 ECTS (currently {ects:.1f})."
                     # examSubject should be non-empty, but may be handled in parse; no further check here.
                     break
 
             # Exact match with known spec?
-            spec = known.get(code) or known.get(self._best_known_name(code_key, known))
+            spec = known.get(rule_name) or known.get(self._best_known_name(rule_key, known))
             if spec is None:
                 # If user marks something as core/mandatory but we don't recognize it, reject as “misattributed category”.
                 if cat in {"mandatory", "core"}:
@@ -753,11 +794,12 @@ class RuleChecker:
         # Build earliest lane index per course code
         lane_of: Dict[str, int] = {}
         for c in courses:
-            k = c["code_key"]
+            k = c.get("rule_key") or c["code_key"]
             lane_of[k] = min(lane_of.get(k, c["laneIndex"]), c["laneIndex"])
 
         def find_lane(name: str) -> Optional[int]:
-            return lane_of.get(self._norm_key(name))
+            canonical = self._canonical_rule_name(name)
+            return lane_of.get(self._norm_key(canonical))
 
         # Check explicit prerequisites (if these items are used)
         for course_name, prereqs in self.prerequisites.items():
@@ -781,7 +823,7 @@ class RuleChecker:
         warnings: List[str] = []
         lane_of: Dict[str, int] = {}
         for c in courses:
-            k = c["code_key"]
+            k = c.get("rule_key") or c["code_key"]
             lane_of[k] = min(lane_of.get(k, c["laneIndex"]), c["laneIndex"])
 
         ase_key = self._norm_key("Advanced Software Engineering")
@@ -822,7 +864,7 @@ class RuleChecker:
         # code_key -> laneIndex (earliest occurrence, done only)
         done_lane_of: Dict[str, int] = {}
         for c in courses:
-            k = c["code_key"]
+            k = c.get("rule_key") or c["code_key"]
             lane_of[k] = min(lane_of.get(k, c["laneIndex"]), c["laneIndex"])
             if c.get("status") == "done":
                 done_lane_of[k] = min(done_lane_of.get(k, c["laneIndex"]), c["laneIndex"])

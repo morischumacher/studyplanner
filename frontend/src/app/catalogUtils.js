@@ -38,6 +38,8 @@ export function normalizeRulecheckCategoryForProgram(course, activeProgramCode) 
     const codeOrName = normalize(course?.code || course?.name || course?.title);
     const moduleName = normalize(course?.moduleMeta?.name || course?.moduleMeta?.title);
     const isThesisRelated =
+        codeOrName === normalize("BA") ||
+        codeOrName === normalize("WA") ||
         codeOrName === normalize("BA-PR") ||
         codeOrName === normalize("WISS-SE") ||
         codeOrName === normalize("Bachelorarbeit") ||

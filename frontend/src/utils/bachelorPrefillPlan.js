@@ -37,13 +37,18 @@ const FOCUS_ADDITIONS = {
         { semester: 5, aliases: ["Einführung in Machine Learning"] },
     ],
     digital_health: [
-        { semester: 5, aliases: ["Methods for Data Generation and Analytics in Medicine and Life Sciences"] },
+        { semester: 5, aliases: ["Einführung in Visual Computing"], prefillFixedSemester: true },
+        // Keep this in semester 5 for the prebuilt plan.
+        { semester: 5, aliases: ["Methods for Data Generation and Analytics in Medicine and Life Sciences"], prefillFixedSemester: true },
     ],
-    human_centered_computing: [],
+    human_centered_computing: [
+        { semester: 5, aliases: ["Einführung in Visual Computing"], prefillFixedSemester: true },
+    ],
     software_engineering: [
         { semester: 5, aliases: ["Software-Qualitätssicherung"] },
     ],
     visual_computing: [
+        { semester: 5, aliases: ["Einführung in Visual Computing"], prefillFixedSemester: true },
         { semester: 5, aliases: ["Grundlagen der Computergraphik"] },
         { semester: 5, aliases: ["Grundlagen der Computer Vision"] },
     ],
@@ -86,6 +91,7 @@ const FOCUS_EXCLUSIONS = {
         "Computersysteme",
     ],
     digital_health: [
+        "Einführung in Visual Computing",
         "Verteilte Systeme",
         "Einführung in Artificial Intelligence",
         "Logic and Reasoning in Computer Science",
@@ -94,6 +100,7 @@ const FOCUS_EXCLUSIONS = {
         "Computersysteme",
     ],
     human_centered_computing: [
+        "Einführung in Visual Computing",
         "Daten- und Informatikrecht",
         "Methods for Data Generation and Analytics in Medicine and Life Sciences",
         "Verteilte Systeme",
@@ -123,6 +130,7 @@ const FOCUS_EXCLUSIONS = {
         "Computersysteme",
     ],
     visual_computing: [
+        "Einführung in Visual Computing",
         "Daten- und Informatikrecht",
         "Verteilte Systeme",
         "Software Engineering Projekt",
@@ -296,16 +304,18 @@ export function buildBachelorPrefillPlan(catalog, selectedFocus, options = {}) {
     const focusKey = resolveFocusKey(selectedFocus);
     const additions = FOCUS_ADDITIONS[focusKey] || FOCUS_ADDITIONS.general;
     const exclusions = new Set((FOCUS_EXCLUSIONS[focusKey] || []).map(normalizeText));
-    const template = [...BASELINE_PLAN, ...additions]
-        .filter((item) => {
-            const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
-            return !aliases.some((alias) => exclusions.has(normalizeText(alias)));
-        })
+    const baseTemplate = BASELINE_PLAN.filter((item) => {
+        const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+        return !aliases.some((alias) => exclusions.has(normalizeText(alias)));
+    });
+    const template = [...baseTemplate, ...additions]
         .map((item) => {
             const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
             return {
                 ...item,
-                semester: remapSemesterForStart(item?.semester, aliases, startSeason),
+                semester: item?.prefillFixedSemester
+                    ? Number(item?.semester)
+                    : remapSemesterForStart(item?.semester, aliases, startSeason),
             };
         });
     const catalogEntries = flattenCatalogCourses(catalog);
@@ -326,7 +336,7 @@ export function buildBachelorPrefillPlan(catalog, selectedFocus, options = {}) {
         usedCodes.add(match.code);
         plannedCourses.push({
             semester: Number(item.semester),
-            prefillFixedSemester: Number.isInteger(strictFixedSemester),
+            prefillFixedSemester: Boolean(item?.prefillFixedSemester) || Number.isInteger(strictFixedSemester),
             code: match.code,
             name: match.name,
             ects: match.ects,
