@@ -8,7 +8,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
-import { displayCourseTitle, displayModuleHeader } from "../../utils/courseCodeDisplay.js";
+import { displayCourseTitle } from "../../utils/courseCodeDisplay.js";
 
 export default function GraphModuleNode({ data }) {
     const color = data?.color || "#4b5563";
@@ -40,9 +40,6 @@ export default function GraphModuleNode({ data }) {
         return { color: "#4b5563", label: "todo" };
     })();
     const statusLabel = status === "done" ? "done" : (status === "in_plan" ? "planned" : "not planned");
-    const moduleCode = data?.moduleCode || data?.modulePayload?.code || "";
-    const moduleName = data?.modulePayload?.name || data?.label || "";
-    const headerCode = displayModuleHeader(moduleCode, moduleName, data?.moduleCourseCodes || []);
 
     return (
         <div
@@ -69,10 +66,7 @@ export default function GraphModuleNode({ data }) {
             <Handle id="left-target" type="target" position={Position.Left} />
             <Handle id="right-source" type="source" position={Position.Right} />
 
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                    {headerCode}
-                </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                     {(isInPlan || isDone) && (
                         <button

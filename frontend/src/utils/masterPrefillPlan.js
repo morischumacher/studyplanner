@@ -19,6 +19,15 @@ const MASTER_TEMPLATE = [
     },
 ];
 
+function templateForStartSeason(startSeason) {
+    const normalized = normalizeText(startSeason);
+    if (normalized !== "summer") return MASTER_TEMPLATE;
+    return MASTER_TEMPLATE.map((item) => ({
+        ...item,
+        semester: 2,
+    }));
+}
+
 function flattenCatalogCourses(catalog) {
     const out = [];
     for (const subject of Array.isArray(catalog) ? catalog : []) {
@@ -80,13 +89,15 @@ function findBestCourse(catalogEntries, aliases, usedCodes) {
     return best;
 }
 
-export function buildMasterPrefillPlan(catalog) {
+export function buildMasterPrefillPlan(catalog, options = {}) {
+    const startSeason = options?.startSeason;
+    const template = templateForStartSeason(startSeason);
     const catalogEntries = flattenCatalogCourses(catalog);
     const usedCodes = new Set();
     const plannedCourses = [];
     const missingAliases = [];
 
-    for (const item of MASTER_TEMPLATE) {
+    for (const item of template) {
         const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
         const match = findBestCourse(catalogEntries, aliases, usedCodes);
         if (!match) {

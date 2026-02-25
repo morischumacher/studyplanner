@@ -180,8 +180,6 @@ class RuleChecker:
 
         # Minimal prerequisite model (sequence checks)
         self.prerequisites: Dict[str, List[str]] = {
-            # very common/expected sequencing
-            "Advanced Software Engineering Project": ["Advanced Software Engineering"],
             # diploma parts (if represented as separate “courses”)
             "Final Oral Exam / Defense": ["Master Thesis"],
             "Seminar for Diploma Students": ["Master Thesis"],
@@ -296,6 +294,10 @@ class RuleChecker:
         pre_msg = self._check_prerequisites(parsed)
         if pre_msg:
             violations.append(pre_msg)
+
+        sequencing_warnings = self._recommended_sequencing_warnings(parsed)
+        if sequencing_warnings:
+            stats.setdefault("warnings", []).extend(sequencing_warnings)
 
         # ✅ NEW: core/elective relationship is missing+warning, not a violation
         core_warnings, core_missing = self._core_dependency_feedback(parsed)
@@ -774,6 +776,31 @@ class RuleChecker:
 
         # Also ensure: if a user takes a known core module and its examSubject electives exist earlier, core should not be later (handled in core gating)
         return None
+
+    def _recommended_sequencing_warnings(self, courses: List[Dict[str, Any]]) -> List[str]:
+        warnings: List[str] = []
+        lane_of: Dict[str, int] = {}
+        for c in courses:
+            k = c["code_key"]
+            lane_of[k] = min(lane_of.get(k, c["laneIndex"]), c["laneIndex"])
+
+        ase_key = self._norm_key("Advanced Software Engineering")
+        ase_project_key = self._norm_key("Advanced Software Engineering Project")
+        ase_lane = lane_of.get(ase_key)
+        ase_project_lane = lane_of.get(ase_project_key)
+        if ase_project_lane is not None:
+            if ase_lane is None:
+                warnings.append(
+                    "Recommended sequencing: take 'Advanced Software Engineering' together with "
+                    "'Advanced Software Engineering Project' (same semester)."
+                )
+            elif ase_lane != ase_project_lane:
+                warnings.append(
+                    "Recommended sequencing: place 'Advanced Software Engineering' and "
+                    "'Advanced Software Engineering Project' in the same semester."
+                )
+
+        return warnings
 
     def _core_dependency_feedback(self, courses: List[Dict[str, Any]]) -> Tuple[List[str], List[str]]:
         """

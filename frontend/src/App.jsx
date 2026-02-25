@@ -21,8 +21,11 @@ import "reactflow/dist/style.css";
 
 import {
     fetchCatalog,
+    fetchProfileSettings,
     fetchPlannerState,
+    saveCourseTerms,
     savePlannerState,
+    saveStartTerm,
     sendRuleCheckUpdate,
 } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
@@ -43,7 +46,18 @@ import {
 } from "./utils/constants.js";
 import { centerX, laneIndexFromX, laneX, projectToLaneAndSnap } from "./utils/geometry.js";
 import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
-import { buildSemesterList, semesterBoundsForProgram } from "./utils/semesters.js";
+import {
+    buildSemesterList,
+    firstAllowedLaneAtOrAfter,
+    isLaneAllowedForTerm,
+    laneSeason,
+    normalizeStartSeason,
+    normalizeTermAvailability,
+    semesterBoundsForProgram,
+    TERM_BOTH,
+    TERM_SUMMER,
+    TERM_WINTER,
+} from "./utils/semesters.js";
 import { buildBachelorPrefillPlan } from "./utils/bachelorPrefillPlan.js";
 import { buildMasterPrefillPlan } from "./utils/masterPrefillPlan.js";
 import { resolveModuleVariantCourses } from "./utils/bachelorCourseVariants.js";
@@ -88,7 +102,7 @@ const NODE_TYPES = {
 /****************
  * Main component
  ****************/
-export default function App({ currentUser, onSignOut }) {
+export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = false, onSignupSetupPromptConsumed }) {
     const MIN_MODULE_GROUP_TOP_Y = 108;
     const MIN_GROUP_CHILD_Y = MIN_MODULE_GROUP_TOP_Y + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT;
     const SIDEBAR_WIDTH = 300;
@@ -108,6 +122,7 @@ export default function App({ currentUser, onSignOut }) {
         doneCourseCodes,
         selectedFocus,
         setSelectedFocus,
+        setSelectedFocusForProgram,
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
@@ -153,6 +168,8 @@ export default function App({ currentUser, onSignOut }) {
     const wrapperRef = useRef(null);
     const rfRef = useRef(null);
     const groupDragRef = useRef(new Map()); // Map<groupId, { lastX, lastY }>
+    const nodeDragStartPosRef = useRef(new Map()); // Map<nodeId, { x, y }>
+    const nodeDragInProgressRef = useRef(false);
     const latestRuleCheckChangeIdRef = useRef({});
     const pendingInitialSyncProgramRef = useRef(programCode);
     const pendingDragPayloadRef = useRef(null);
@@ -165,6 +182,17 @@ export default function App({ currentUser, onSignOut }) {
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isSignupSetupOpen, setIsSignupSetupOpen] = useState(false);
+    const [profileSearch, setProfileSearch] = useState("");
+    const [profileSettingsByProgram, setProfileSettingsByProgram] = useState({});
+    const [lockedProgramCode, setLockedProgramCode] = useState(null);
+    const [signupSetupProgramCode, setSignupSetupProgramCode] = useState(programCode);
+    const [signupSetupStartSeason, setSignupSetupStartSeason] = useState(TERM_WINTER);
+    const [signupSetupStartYear, setSignupSetupStartYear] = useState(new Date().getFullYear());
+    const [signupSetupFocus, setSignupSetupFocus] = useState(selectedFocus || "");
+    const [isSavingSignupSetup, setIsSavingSignupSetup] = useState(false);
+    const [pendingCourseTermUpdateByCode, setPendingCourseTermUpdateByCode] = useState({});
+    const [isSavingProfileSettings, setIsSavingProfileSettings] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
     const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
@@ -173,6 +201,22 @@ export default function App({ currentUser, onSignOut }) {
     const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
     const successFeedbackSignatureRef = useRef("");
     const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
+
+    useEffect(() => {
+        if (!openSignupSetupOnEntry) return;
+        const defaultProgram = String(programCode || PROGRAM_OPTIONS?.[0]?.code || "").trim() || "066 937";
+        setSignupSetupProgramCode(defaultProgram);
+        setSignupSetupStartSeason(TERM_WINTER);
+        setSignupSetupStartYear(new Date().getFullYear());
+        setSignupSetupFocus(defaultProgram === BACHELOR_PROGRAM_CODE ? (selectedFocus || "") : "");
+        setIsSignupSetupOpen(true);
+        onSignupSetupPromptConsumed?.();
+    }, [
+        openSignupSetupOnEntry,
+        onSignupSetupPromptConsumed,
+        programCode,
+        selectedFocus,
+    ]);
     const setProgramRuleCheckState = useCallback((targetProgramCode, updater) => {
         if (!targetProgramCode) return;
         setRuleCheckStateByProgram((prev) => {
@@ -247,7 +291,7 @@ export default function App({ currentUser, onSignOut }) {
 
     useEffect(() => {
         latestGraphSnapshotRef.current = null;
-    }, [programCode]);
+    }, [programCode, setProgramCode]);
 
     useEffect(() => {
         pendingInitialSyncProgramRef.current = programCode;
@@ -256,6 +300,11 @@ export default function App({ currentUser, onSignOut }) {
     useEffect(() => {
         setDragPreviewSemesterCount(null);
     }, [programCode]);
+
+    useEffect(() => {
+        setPendingCourseTermUpdateByCode({});
+        setProfileSearch("");
+    }, [programCode, isProfileOpen]);
 
     // Fetch & normalize catalog whenever programCode changes
     useEffect(() => {
@@ -274,6 +323,50 @@ export default function App({ currentUser, onSignOut }) {
                 setCatalogError(String(e?.message || e));
             } finally {
                 if (!cancelled) setLoadingCatalog(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [programCode]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const payload = await fetchProfileSettings(programCode);
+                if (cancelled) return;
+                const startTerm = payload?.start_term && typeof payload.start_term === "object"
+                    ? {
+                        season: normalizeStartSeason(payload.start_term.season),
+                        year: Number(payload.start_term.year) || new Date().getFullYear(),
+                    }
+                    : null;
+                const overridesRaw =
+                    payload?.course_term_overrides && typeof payload.course_term_overrides === "object"
+                        ? payload.course_term_overrides
+                        : {};
+                const normalizedOverrides = Object.fromEntries(
+                    Object.entries(overridesRaw)
+                        .map(([code, term]) => [String(code || "").trim(), normalizeTermAvailability(term)])
+                        .filter(([code]) => Boolean(code))
+                );
+                const nextLockedProgramCode = String(payload?.locked_program_code || "").trim() || null;
+                setLockedProgramCode(nextLockedProgramCode);
+                if (nextLockedProgramCode && nextLockedProgramCode !== programCode) {
+                    setProgramCode?.(nextLockedProgramCode);
+                }
+                setProfileSettingsByProgram((prev) => ({
+                    ...(prev || {}),
+                    [programCode]: {
+                        startTerm,
+                        startTermLocked: Boolean(payload?.start_term_locked ?? startTerm),
+                        courseTermOverrides: normalizedOverrides,
+                    },
+                }));
+            } catch (error) {
+                if (cancelled) return;
+                console.error("Failed to load profile settings", error);
             }
         })();
         return () => {
@@ -444,6 +537,74 @@ export default function App({ currentUser, onSignOut }) {
         })),
         [activeSemesterCount, maxSemesterCount]
     );
+    const profileSettingsForProgram = profileSettingsByProgram?.[programCode] ?? {};
+    const startTermSeason = normalizeStartSeason(profileSettingsForProgram?.startTerm?.season ?? TERM_WINTER);
+    const startTermYear = Number(profileSettingsForProgram?.startTerm?.year) || new Date().getFullYear();
+    const isStartTermLocked = Boolean(profileSettingsForProgram?.startTermLocked);
+    const isProgramLocked = Boolean(String(lockedProgramCode || "").trim());
+    const courseTermOverrides = profileSettingsForProgram?.courseTermOverrides ?? {};
+
+    const effectiveCourseTermByCode = useMemo(() => {
+        const map = {};
+        for (const subject of Array.isArray(catalog) ? catalog : []) {
+            for (const module of Array.isArray(subject?.modules) ? subject.modules : []) {
+                for (const course of Array.isArray(module?.courses) ? module.courses : []) {
+                    const code = String(course?.code || "").trim();
+                    if (!code) continue;
+                    map[code] = normalizeTermAvailability(course?.termAvailability ?? TERM_BOTH);
+                }
+            }
+        }
+        for (const [code, term] of Object.entries(courseTermOverrides || {})) {
+            const normalizedCode = String(code || "").trim();
+            if (!normalizedCode) continue;
+            map[normalizedCode] = normalizeTermAvailability(term);
+        }
+        return map;
+    }, [catalog, courseTermOverrides]);
+
+    const termAvailabilityForCode = useCallback((courseCode) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return TERM_BOTH;
+        return normalizeTermAvailability(effectiveCourseTermByCode?.[code] ?? TERM_BOTH);
+    }, [effectiveCourseTermByCode]);
+
+    const isCourseAllowedInLane = useCallback((courseCode, laneIndex) => {
+        const term = termAvailabilityForCode(courseCode);
+        return isLaneAllowedForTerm(term, startTermSeason, laneIndex);
+    }, [startTermSeason, termAvailabilityForCode]);
+
+    const firstAllowedLaneForCourse = useCallback((courseCode, preferredLane) => {
+        const preferred = Math.max(0, Math.min(Number(preferredLane) || 0, maxSemesterCount - 1));
+        const term = termAvailabilityForCode(courseCode);
+        const forward = firstAllowedLaneAtOrAfter(
+            term,
+            startTermSeason,
+            preferred,
+            maxSemesterCount - 1
+        );
+        if (forward != null) return forward;
+        for (let idx = preferred - 1; idx >= 0; idx -= 1) {
+            if (isLaneAllowedForTerm(term, startTermSeason, idx)) return idx;
+        }
+        return null;
+    }, [maxSemesterCount, startTermSeason, termAvailabilityForCode]);
+
+    const validSemestersForCourse = useCallback((courseCode) => {
+        return sidebarSemesters.filter((semester) => {
+            const laneIndex = (Number(semester?.id) || 1) - 1;
+            return isCourseAllowedInLane(courseCode, laneIndex);
+        });
+    }, [isCourseAllowedInLane, sidebarSemesters]);
+
+    const validSemestersForModule = useCallback((courses) => {
+        const codes = (Array.isArray(courses) ? courses : []).map((course) => course?.code).filter(Boolean);
+        if (!codes.length) return [];
+        return sidebarSemesters.filter((semester) => {
+            const laneIndex = (Number(semester?.id) || 1) - 1;
+            return codes.every((code) => isCourseAllowedInLane(code, laneIndex));
+        });
+    }, [isCourseAllowedInLane, sidebarSemesters]);
 
     const plannedEctsBySemester = useMemo(() => {
         const out = {};
@@ -657,6 +818,51 @@ export default function App({ currentUser, onSignOut }) {
         setNeedsPersist(true);
     }, [setNodes]);
 
+    const rollbackMovedCourses = useCallback((change) => {
+        const movedItems = Array.isArray(change?.moved) ? change.moved : [];
+        if (!movedItems.length) return;
+
+        const byId = new Map();
+        const byCode = new Map();
+        for (const item of movedItems) {
+            const id = String(item?.id || "").trim();
+            const code = String(item?.code || "").trim();
+            const fromLane = Number(item?.fromLaneIndex);
+            if (!Number.isInteger(fromLane) || fromLane < 0) continue;
+            if (id) byId.set(id, fromLane);
+            if (code && !byCode.has(code)) byCode.set(code, fromLane);
+        }
+        if (!byId.size && !byCode.size) return;
+
+        setNodes((prev) => {
+            const affectedGroupIds = new Set();
+            const next = prev.map((node) => {
+                if (node?.type !== "course") return node;
+                const nodeId = String(node?.id || "").trim();
+                const nodeCode = String(node?.data?.code || "").trim();
+                const fromLane = byId.has(nodeId)
+                    ? byId.get(nodeId)
+                    : (nodeCode && byCode.has(nodeCode) ? byCode.get(nodeCode) : null);
+                if (!Number.isInteger(fromLane) || fromLane < 0) return node;
+                if (node?.data?.groupId) affectedGroupIds.add(node.data.groupId);
+                return {
+                    ...node,
+                    position: {
+                        ...node.position,
+                        x: centerX(fromLane),
+                    },
+                };
+            });
+
+            let resolved = next;
+            for (const groupId of affectedGroupIds) {
+                resolved = recomputeGroupFromChildren(resolved, groupId);
+            }
+            return resolveLaneCollisions(resolved);
+        });
+        setNeedsPersist(true);
+    }, [centerX, recomputeGroupFromChildren, resolveLaneCollisions, setNodes]);
+
     const rollbackCourseStatusToggle = useCallback((change) => {
         if (change?.type !== "course_status_toggled") return;
         const courseCode = change?.courseCode;
@@ -739,9 +945,14 @@ export default function App({ currentUser, onSignOut }) {
         if (!courseCode || getCourseStatus(courseCode) !== "todo") return false;
 
         const allowDirect = Boolean(options?.allowDirectLaneSelection);
-        const laneIndex = allowDirect
+        const rawLaneIndex = allowDirect
             ? Math.max(0, Math.min(Number(requestedLaneIndex) || 0, maxSemesterCount - 1))
             : clampPlacementLane(requestedLaneIndex);
+        const laneIndex = allowDirect
+            ? rawLaneIndex
+            : firstAllowedLaneForCourse(courseCode, rawLaneIndex);
+        if (laneIndex == null) return false;
+        if (allowDirect && !isCourseAllowedInLane(courseCode, laneIndex)) return false;
         const x = centerX(laneIndex);
         const now = Date.now();
         const id = `${courseCode}-${now}-graph`;
@@ -801,7 +1012,7 @@ export default function App({ currentUser, onSignOut }) {
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+    }, [catalog, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
 
     const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex, options = null) => {
         const variantResolution = resolveModuleVariantCourses(modulePayload, options?.variantId ?? null);
@@ -825,9 +1036,30 @@ export default function App({ currentUser, onSignOut }) {
             .filter((code) => code && !codes.includes(code));
 
         const allowDirect = Boolean(options?.allowDirectLaneSelection);
-        const laneIndex = allowDirect
+        const rawLaneIndex = allowDirect
             ? Math.max(0, Math.min(Number(requestedLaneIndex) || 0, maxSemesterCount - 1))
             : clampPlacementLane(requestedLaneIndex);
+        const allAllowedAtLane = (laneIdx) => codes.every((code) => isCourseAllowedInLane(code, laneIdx));
+        let laneIndex = rawLaneIndex;
+        if (!allowDirect) {
+            laneIndex = null;
+            for (let idx = rawLaneIndex; idx <= maxSemesterCount - 1; idx += 1) {
+                if (allAllowedAtLane(idx)) {
+                    laneIndex = idx;
+                    break;
+                }
+            }
+            if (laneIndex == null) {
+                for (let idx = rawLaneIndex - 1; idx >= 0; idx -= 1) {
+                    if (allAllowedAtLane(idx)) {
+                        laneIndex = idx;
+                        break;
+                    }
+                }
+            }
+        }
+        if (laneIndex == null) return false;
+        if (allowDirect && !allAllowedAtLane(laneIndex)) return false;
         const x = centerX(laneIndex);
         const y = Math.max(144, MIN_GROUP_CHILD_Y);
         const now = Date.now();
@@ -936,7 +1168,7 @@ export default function App({ currentUser, onSignOut }) {
             setNeedsPersist(true);
         }
         return true;
-    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, clampPlacementLane, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
+    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, clampPlacementLane, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
 
     const toggleGraphCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
@@ -1015,7 +1247,9 @@ export default function App({ currentUser, onSignOut }) {
 
     const applyBachelorPrefilledPlan = useCallback((focusName) => {
         if (programCode !== BACHELOR_PROGRAM_CODE) return false;
-        const { plannedCourses, missingAliases } = buildBachelorPrefillPlan(catalog, focusName);
+        const { plannedCourses, missingAliases } = buildBachelorPrefillPlan(catalog, focusName, {
+            startSeason: startTermSeason,
+        });
         if (!plannedCourses.length) {
             setStickyViolation({
                 message: "Prebuilt bachelor plan could not be applied (no matching catalog courses found).",
@@ -1057,8 +1291,14 @@ export default function App({ currentUser, onSignOut }) {
         for (const item of plannedCourses) {
             const semester = Number(item?.semester);
             if (!Number.isInteger(semester) || semester < 1 || semester > maxSemesterCount) continue;
-            if (!bySemester.has(semester)) bySemester.set(semester, []);
-            bySemester.get(semester).push(item);
+            const preferredLane = semester - 1;
+            const targetLane = item?.prefillFixedSemester
+                ? preferredLane
+                : firstAllowedLaneForCourse(item?.code, preferredLane);
+            if (targetLane == null) continue;
+            const targetSemester = targetLane + 1;
+            if (!bySemester.has(targetSemester)) bySemester.set(targetSemester, []);
+            bySemester.get(targetSemester).push(item);
         }
 
         const now = Date.now();
@@ -1201,6 +1441,7 @@ export default function App({ currentUser, onSignOut }) {
         MIN_GROUP_CHILD_Y,
         catalog,
         doneCourseCodes,
+        firstAllowedLaneForCourse,
         laneNodes,
         maxSemesterCount,
         programCode,
@@ -1208,6 +1449,7 @@ export default function App({ currentUser, onSignOut }) {
         removeCourseNode,
         setCoursesFromNodes,
         setNodes,
+        startTermSeason,
         subjectColors,
         toggleCourseDone,
         toggleModuleDoneCodes,
@@ -1216,7 +1458,9 @@ export default function App({ currentUser, onSignOut }) {
 
     const applyMasterPrefilledPlan = useCallback(() => {
         if (programCode !== MASTER_PROGRAM_CODE) return false;
-        const { plannedCourses, missingAliases } = buildMasterPrefillPlan(catalog);
+        const { plannedCourses, missingAliases } = buildMasterPrefillPlan(catalog, {
+            startSeason: startTermSeason,
+        });
         if (!plannedCourses.length) {
             setStickyViolation({
                 message: "Prebuilt master plan could not be applied (no matching catalog courses found).",
@@ -1231,8 +1475,12 @@ export default function App({ currentUser, onSignOut }) {
         for (const item of plannedCourses) {
             const semester = Number(item?.semester);
             if (!Number.isInteger(semester) || semester < 1 || semester > maxSemesterCount) continue;
-            if (!bySemester.has(semester)) bySemester.set(semester, []);
-            bySemester.get(semester).push(item);
+            const preferredLane = semester - 1;
+            const targetLane = firstAllowedLaneForCourse(item?.code, preferredLane);
+            if (targetLane == null) continue;
+            const targetSemester = targetLane + 1;
+            if (!bySemester.has(targetSemester)) bySemester.set(targetSemester, []);
+            bySemester.get(targetSemester).push(item);
         }
 
         const now = Date.now();
@@ -1302,12 +1550,14 @@ export default function App({ currentUser, onSignOut }) {
     }, [
         catalog,
         doneCourseCodes,
+        firstAllowedLaneForCourse,
         laneNodes,
         maxSemesterCount,
         programCode,
         removeCourseNode,
         setCoursesFromNodes,
         setNodes,
+        startTermSeason,
         subjectColors,
         toggleCourseDone,
         updateCourseEcts,
@@ -1317,6 +1567,11 @@ export default function App({ currentUser, onSignOut }) {
      * Group drag mechanics *
      ************************/
     const onNodeDragStart = useCallback((_, node) => {
+        nodeDragInProgressRef.current = true;
+        nodeDragStartPosRef.current.set(node?.id, {
+            x: Number(node?.position?.x ?? 0),
+            y: Number(node?.position?.y ?? 0),
+        });
         if (node?.type !== "moduleBg") return;
         groupDragRef.current.set(node.id, { lastX: node.position.x, lastY: node.position.y });
     }, []);
@@ -1440,6 +1695,10 @@ export default function App({ currentUser, onSignOut }) {
                     changeSnapshot?.type === "plan_updated" &&
                     Array.isArray(changeSnapshot?.added) &&
                     changeSnapshot.added.length > 0;
+                const isMoveChange =
+                    changeSnapshot?.type === "plan_updated" &&
+                    Array.isArray(changeSnapshot?.moved) &&
+                    changeSnapshot.moved.length > 0;
                 if (isAddChange && response?.ok === false) {
                     setStickyViolation({
                         message: response?.message || "Rule violation: change rejected.",
@@ -1447,6 +1706,14 @@ export default function App({ currentUser, onSignOut }) {
                         tone: "error",
                     });
                     rollbackAddedCourses(changeSnapshot);
+                }
+                if (isMoveChange && response?.ok === false) {
+                    setStickyViolation({
+                        message: response?.message || "Rule violation: change rejected.",
+                        until: Date.now() + 5000,
+                        tone: "error",
+                    });
+                    rollbackMovedCourses(changeSnapshot);
                 }
                 const isStatusToggleChange = changeSnapshot?.type === "course_status_toggled";
                 if (isStatusToggleChange && response?.ok === false) {
@@ -1473,7 +1740,7 @@ export default function App({ currentUser, onSignOut }) {
                     lastUpdatedAt: Date.now(),
                 }));
             });
-    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackCourseStatusToggle, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, setProgramRuleCheckState]);
+    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackMovedCourses, rollbackCourseStatusToggle, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, setProgramRuleCheckState]);
 
     // Initial sync for current program so dashboard has data before first edit.
     useEffect(() => {
@@ -1531,9 +1798,11 @@ export default function App({ currentUser, onSignOut }) {
      * Snap & collision resolve *
      ***************************/
     const onNodeDragStop = useCallback((_, node) => {
+        nodeDragInProgressRef.current = false;
         setDragPreviewSemesterCount(null);
         const snappedYRaw = Math.round(node.position.y / GRID_SIZE) * GRID_SIZE;
         const snappedY = Math.max(0, snappedYRaw);
+        let invalidPlacementAttempted = false;
 
         // If a whole module group was dragged: shift children by the snap delta, snap the group,
         // then recompute the group bbox, and resolve collisions.
@@ -1544,7 +1813,11 @@ export default function App({ currentUser, onSignOut }) {
                 const dySnap = clampedGroupY - node.position.y;
                 const moved = prev.map((n) => {
                     if (n.type === "course" && n.data?.groupId === node.id) {
-                        const targetLane = clampPlacementLane(laneIndexFromX(n.position.x, maxSemesterCount - 1));
+                        const preferredLane = clampPlacementLane(laneIndexFromX(n.position.x, maxSemesterCount - 1));
+                        const targetLane = firstAllowedLaneForCourse(n?.data?.code, preferredLane) ?? preferredLane;
+                        if (!isCourseAllowedInLane(n?.data?.code, preferredLane) && targetLane !== preferredLane) {
+                            invalidPlacementAttempted = true;
+                        }
                         return {
                             ...n,
                             position: {
@@ -1559,14 +1832,37 @@ export default function App({ currentUser, onSignOut }) {
                 return resolveLaneCollisions(sized);
             });
             groupDragRef.current.delete(node.id);
+            nodeDragStartPosRef.current.delete(node?.id);
             return;
         }
 
         // Course inside a group → snap only the course, then recompute the group bbox
         if (node?.type === "course" && node?.data?.groupId) {
             const groupId = node.data.groupId;
+            const startPos = nodeDragStartPosRef.current.get(node?.id);
+            const preferredLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
+            const invalidDrop = !isCourseAllowedInLane(node?.data?.code, preferredLane);
+            if (invalidDrop && startPos) {
+                setNodes((prev) => {
+                    const reverted = prev.map((n) =>
+                        n.id === node.id ? { ...n, position: { x: startPos.x, y: startPos.y } } : n
+                    );
+                    const stacked = resolveGroupCourseOverlaps(reverted, groupId);
+                    return resolveLaneCollisions(recomputeGroupFromChildren(stacked, groupId));
+                });
+                setStickyViolation({
+                    message: "This course is not offered in that semester.",
+                    until: Date.now() + 3500,
+                    tone: "error",
+                });
+                nodeDragStartPosRef.current.delete(node?.id);
+                return;
+            }
             setNodes((prev) => {
-                const targetLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
+                const targetLane = firstAllowedLaneForCourse(node?.data?.code, preferredLane) ?? preferredLane;
+                if (!isCourseAllowedInLane(node?.data?.code, preferredLane) && targetLane !== preferredLane) {
+                    invalidPlacementAttempted = true;
+                }
                 const targetLaneX = centerX(targetLane);
                 const snappedGroupChildY = Math.max(MIN_GROUP_CHILD_Y, snappedY);
                 const updated = prev.map((n) =>
@@ -1575,23 +1871,160 @@ export default function App({ currentUser, onSignOut }) {
                 const stacked = resolveGroupCourseOverlaps(updated, groupId);
                 return resolveLaneCollisions(recomputeGroupFromChildren(stacked, groupId));
             });
+            nodeDragStartPosRef.current.delete(node?.id);
             return;
         }
 
         // All other nodes: normal snapping + collision resolution
-        const li = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
+        const preferredLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
+        const startPos = nodeDragStartPosRef.current.get(node?.id);
+        if (node?.type === "course" && !isCourseAllowedInLane(node?.data?.code, preferredLane) && startPos) {
+            setNodes((prev) => {
+                const next = prev.map((n) => (
+                    n.id === node.id ? { ...n, position: { x: startPos.x, y: startPos.y } } : n
+                ));
+                return resolveLaneCollisions(next);
+            });
+            setStickyViolation({
+                message: "This course is not offered in that semester.",
+                until: Date.now() + 3500,
+                tone: "error",
+            });
+            nodeDragStartPosRef.current.delete(node?.id);
+            return;
+        }
+        const li = node?.type === "course"
+            ? (firstAllowedLaneForCourse(node?.data?.code, preferredLane) ?? preferredLane)
+            : preferredLane;
+        if (node?.type === "course" && !isCourseAllowedInLane(node?.data?.code, preferredLane) && li !== preferredLane) {
+            invalidPlacementAttempted = true;
+        }
         const snappedX = centerX(li);
         setNodes((prev) => {
             const next = prev.map((n) => (n.id === node.id ? { ...n, position: { x: snappedX, y: snappedY } } : n));
             return resolveLaneCollisions(next);
         });
-    }, [MIN_GROUP_CHILD_Y, MIN_MODULE_GROUP_TOP_Y, clampPlacementLane, maxSemesterCount, setNodes]);
+        if (invalidPlacementAttempted) {
+            setStickyViolation({
+                message: "This course is not offered in that semester.",
+                until: Date.now() + 3500,
+                tone: "error",
+            });
+        }
+        nodeDragStartPosRef.current.delete(node?.id);
+    }, [MIN_GROUP_CHILD_Y, MIN_MODULE_GROUP_TOP_Y, clampPlacementLane, firstAllowedLaneForCourse, isCourseAllowedInLane, laneIndexFromX, maxSemesterCount, setNodes, setStickyViolation]);
 
     // Merge: run drag-stop logic, then schedule a persist
     const onNodeDragStopMerged = useCallback((evt, node) => {
         onNodeDragStop(evt, node);
         schedulePersist();
     }, [onNodeDragStop, schedulePersist]);
+
+    // Strict policy: keep plan always term-valid.
+    // If start term or course-term flags change, auto-shift invalid courses/modules
+    // to the next valid semester immediately.
+    useEffect(() => {
+        if (!plannerHydrated) return;
+        if (nodeDragInProgressRef.current) return;
+        if (!Array.isArray(nodes) || nodes.length === 0) return;
+        let shiftedCount = 0;
+        const maxLane = Math.max(0, maxSemesterCount - 1);
+        const next = nodes.map((node) => ({ ...node, position: { ...(node?.position || {}) } }));
+        const byId = new Map(next.map((node) => [node.id, node]));
+
+        const findAnyAllowedLane = (code, preferredLane) => {
+            const forward = firstAllowedLaneForCourse(code, preferredLane);
+            if (forward != null) return forward;
+            const term = termAvailabilityForCode(code);
+            const preferred = Math.max(0, Math.min(Number(preferredLane) || 0, maxLane));
+            for (let idx = preferred - 1; idx >= 0; idx -= 1) {
+                if (isLaneAllowedForTerm(term, startTermSeason, idx)) return idx;
+            }
+            return null;
+        };
+
+        const groupIds = [...new Set(
+            next
+                .filter((node) => node?.type === "course" && node?.data?.groupId)
+                .map((node) => node.data.groupId)
+        )];
+        const movedGroups = new Set();
+
+        for (const groupId of groupIds) {
+            const children = next.filter((node) => node?.type === "course" && node?.data?.groupId === groupId);
+            if (!children.length) continue;
+            let movedAnyChildInGroup = false;
+            for (const child of children) {
+                const code = child?.data?.code;
+                if (!code) continue;
+                const currentLane = Math.max(0, Math.min(laneIndexFromX(child?.position?.x ?? 0, maxLane), maxLane));
+                if (isCourseAllowedInLane(code, currentLane)) continue;
+                const targetLane = findAnyAllowedLane(code, currentLane);
+                if (targetLane == null || targetLane === currentLane) continue;
+                const target = byId.get(child.id);
+                if (!target) continue;
+                target.position.x = centerX(targetLane);
+                shiftedCount += 1;
+                movedAnyChildInGroup = true;
+            }
+            if (movedAnyChildInGroup) movedGroups.add(groupId);
+        }
+
+        for (const node of next) {
+            if (node?.type !== "course") continue;
+            if (node?.data?.groupId) continue;
+            const code = node?.data?.code;
+            if (!code) continue;
+            const currentLane = Math.max(0, Math.min(laneIndexFromX(node?.position?.x ?? 0, maxLane), maxLane));
+            if (isCourseAllowedInLane(code, currentLane)) continue;
+            const targetLane = findAnyAllowedLane(code, currentLane);
+            if (targetLane == null || targetLane === currentLane) continue;
+            node.position.x = centerX(targetLane);
+            shiftedCount += 1;
+        }
+
+        let resolved = next;
+        for (const groupId of movedGroups) {
+            resolved = recomputeGroupFromChildren(resolved, groupId);
+        }
+        resolved = resolveLaneCollisions(resolved);
+
+        const changed = resolved.some((node, idx) => {
+            const before = nodes[idx];
+            if (!before) return true;
+            return Number(before?.position?.x ?? 0) !== Number(node?.position?.x ?? 0);
+        });
+        if (!changed) return;
+
+        setNodes(resolved);
+        setCoursesFromNodes(resolved.filter((node) => node.type !== "lane"));
+        setNeedsPersist(false);
+        if (shiftedCount > 0) {
+            setStickyViolation({
+                message: `Auto-shifted ${shiftedCount} course${shiftedCount === 1 ? "" : "s"} to valid semesters.`,
+                until: Date.now() + 3200,
+                tone: "success",
+            });
+        }
+    }, [
+        centerX,
+        laneIndexFromX,
+        nodes,
+        plannerHydrated,
+        startTermSeason,
+        effectiveCourseTermByCode,
+        firstAllowedLaneForCourse,
+        isLaneAllowedForTerm,
+        isCourseAllowedInLane,
+        maxSemesterCount,
+        recomputeGroupFromChildren,
+        resolveLaneCollisions,
+        setCoursesFromNodes,
+        setNeedsPersist,
+        setNodes,
+        setStickyViolation,
+        termAvailabilityForCode,
+    ]);
 
     // When dragging a multi-selection, ensure all affected module backgrounds follow
     // moved child courses as a final reconciliation step.
@@ -1647,6 +2080,7 @@ export default function App({ currentUser, onSignOut }) {
                 maxLaneIndex: Math.min(maxSemesterCount - 1, activeSemesterCount),
             });
             const now = Date.now();
+            const dropLaneIndex = Math.max(0, Math.min(laneIndexFromX(x, maxSemesterCount - 1), maxSemesterCount - 1));
 
             // A) Module with >= 2 courses → create group + children
             if (payload?.kind === "module" && Array.isArray(payload.courses) && payload.courses.length >= 2) {
@@ -1656,6 +2090,14 @@ export default function App({ currentUser, onSignOut }) {
                 if (!moduleCourses.length) return;
                 if (moduleCourses.length === 1) {
                     const single = moduleCourses[0];
+                    if (!isCourseAllowedInLane(single?.code, dropLaneIndex)) {
+                        setStickyViolation({
+                            message: "This course is not offered in that semester.",
+                            until: Date.now() + 3500,
+                            tone: "error",
+                        });
+                        return;
+                    }
                     const singlePayload = {
                         code: single?.code ?? payload?.code,
                         name: single?.name ?? payload?.name,
@@ -1701,6 +2143,15 @@ export default function App({ currentUser, onSignOut }) {
                     return;
                 }
                 const groupId = `mod-${now}`;
+                const moduleCodes = moduleCourses.map((course) => course?.code).filter(Boolean);
+                if (!moduleCodes.every((courseCode) => isCourseAllowedInLane(courseCode, dropLaneIndex))) {
+                    setStickyViolation({
+                        message: "At least one module course is not offered in that semester.",
+                        until: Date.now() + 3500,
+                        tone: "error",
+                    });
+                    return;
+                }
                 const groupExamSubject =
                     getExamSubjectForCode(catalog, payload.code) ||
                     getExamSubjectForCode(catalog, moduleCourses?.[0]?.code) ||
@@ -1784,6 +2235,14 @@ export default function App({ currentUser, onSignOut }) {
 
             // B) Single course card (or module with a single course treated as course)
             const id = `${payload.code}-${now}`;
+            if (!isCourseAllowedInLane(payload?.code, dropLaneIndex)) {
+                setStickyViolation({
+                    message: "This course is not offered in that semester.",
+                    until: Date.now() + 3500,
+                    tone: "error",
+                });
+                return;
+            }
             const examSubject = getExamSubjectForCode(catalog, payload.code);
             const resolvedSubjectColor =
                 payload.subjectColor ||
@@ -1818,7 +2277,7 @@ export default function App({ currentUser, onSignOut }) {
             });
             schedulePersist();
         },
-        [MIN_GROUP_CHILD_Y, activeSemesterCount, catalog, getCourseStatus, maxSemesterCount, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
+        [MIN_GROUP_CHILD_Y, activeSemesterCount, catalog, getCourseStatus, isCourseAllowedInLane, laneIndexFromX, maxSemesterCount, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
     );
 
     useEffect(() => {
@@ -1987,6 +2446,194 @@ export default function App({ currentUser, onSignOut }) {
      * Sidebar expand/collapse (per subject)
      ***************************************/
     const [expandedPf, setExpandedPf] = useState(new Set());
+    const catalogCourseRows = useMemo(() => {
+        const rows = [];
+        const seen = new Set();
+        for (const subject of Array.isArray(catalog) ? catalog : []) {
+            const subjectName = subject?.pruefungsfach ?? null;
+            for (const module of Array.isArray(subject?.modules) ? subject.modules : []) {
+                for (const course of Array.isArray(module?.courses) ? module.courses : []) {
+                    const code = String(course?.code || "").trim();
+                    if (!code || seen.has(code)) continue;
+                    seen.add(code);
+                    rows.push({
+                        code,
+                        title: course?.name || code,
+                        type: course?.type || "-",
+                        examSubject: subjectName,
+                    });
+                }
+            }
+        }
+        rows.sort((a, b) => a.code.localeCompare(b.code));
+        return rows;
+    }, [catalog]);
+    const filteredCatalogCourseRows = useMemo(() => {
+        const needle = String(profileSearch || "").trim().toLowerCase();
+        if (!needle) return catalogCourseRows;
+        return catalogCourseRows.filter((row) =>
+            String(row?.code || "").toLowerCase().includes(needle) ||
+            String(row?.title || "").toLowerCase().includes(needle)
+        );
+    }, [catalogCourseRows, profileSearch]);
+    const pendingTermForCode = useCallback((courseCode) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return TERM_BOTH;
+        if (pendingCourseTermUpdateByCode?.[code]) {
+            return normalizeTermAvailability(pendingCourseTermUpdateByCode[code]);
+        }
+        return termAvailabilityForCode(code);
+    }, [pendingCourseTermUpdateByCode, termAvailabilityForCode]);
+    const setPendingTermForCode = useCallback((courseCode, termAvailability) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return;
+        const normalized = normalizeTermAvailability(termAvailability);
+        setPendingCourseTermUpdateByCode((prev) => ({
+            ...(prev || {}),
+            [code]: normalized,
+        }));
+    }, []);
+    const saveStartTermSetting = useCallback(async (season, year) => {
+        if (isStartTermLocked) return;
+        const normalizedSeason = normalizeStartSeason(season);
+        const normalizedYear = Number(year) || new Date().getFullYear();
+        setIsSavingProfileSettings(true);
+        try {
+            await saveStartTerm({
+                programCode,
+                season: normalizedSeason,
+                year: normalizedYear,
+            });
+            setProfileSettingsByProgram((prev) => ({
+                ...(prev || {}),
+                [programCode]: {
+                    ...(prev?.[programCode] || {}),
+                    startTerm: { season: normalizedSeason, year: normalizedYear },
+                    startTermLocked: true,
+                    courseTermOverrides: prev?.[programCode]?.courseTermOverrides || {},
+                },
+            }));
+        } catch (error) {
+            console.error("Failed to save start term", error);
+            setStickyViolation({
+                message: String(error?.message || "").includes("409")
+                    ? "Start semester is locked and cannot be changed anymore."
+                    : "Could not save start term settings.",
+                until: Date.now() + 4000,
+                tone: "error",
+            });
+        } finally {
+            setIsSavingProfileSettings(false);
+        }
+    }, [isStartTermLocked, programCode]);
+    const saveSignupSetup = useCallback(async () => {
+        const selectedProgramCode = String(signupSetupProgramCode || "").trim();
+        if (!selectedProgramCode) return;
+        const normalizedSeason = normalizeStartSeason(signupSetupStartSeason);
+        const normalizedYear = Number(signupSetupStartYear) || new Date().getFullYear();
+        setIsSavingSignupSetup(true);
+        try {
+            await saveStartTerm({
+                programCode: selectedProgramCode,
+                season: normalizedSeason,
+                year: normalizedYear,
+            });
+            setLockedProgramCode(selectedProgramCode);
+            setProgramCode?.(selectedProgramCode);
+            if (selectedProgramCode === BACHELOR_PROGRAM_CODE) {
+                setSelectedFocusForProgram?.(selectedProgramCode, signupSetupFocus || "");
+            } else {
+                setSelectedFocusForProgram?.(selectedProgramCode, "");
+            }
+            setProfileSettingsByProgram((prev) => ({
+                ...(prev || {}),
+                [selectedProgramCode]: {
+                    ...(prev?.[selectedProgramCode] || {}),
+                    startTerm: { season: normalizedSeason, year: normalizedYear },
+                    startTermLocked: true,
+                    courseTermOverrides: prev?.[selectedProgramCode]?.courseTermOverrides || {},
+                },
+            }));
+            const snapshot = buildPersistSnapshot();
+            const nextSnapshot = {
+                ...(snapshot || {}),
+                programCode: selectedProgramCode,
+                selectedFocusByProgram: {
+                    ...((snapshot && snapshot.selectedFocusByProgram) || {}),
+                    [selectedProgramCode]: selectedProgramCode === BACHELOR_PROGRAM_CODE ? (signupSetupFocus || "") : "",
+                },
+            };
+            await savePlannerState(nextSnapshot);
+            setIsSignupSetupOpen(false);
+        } catch (error) {
+            console.error("Failed to save signup setup", error);
+            setStickyViolation({
+                message: String(error?.message || "").includes("409")
+                    ? "Program/start are already locked and cannot be changed."
+                    : "Could not save signup setup.",
+                until: Date.now() + 4000,
+                tone: "error",
+            });
+        } finally {
+            setIsSavingSignupSetup(false);
+        }
+    }, [
+        buildPersistSnapshot,
+        setProgramCode,
+        setSelectedFocusForProgram,
+        setStickyViolation,
+        signupSetupFocus,
+        signupSetupProgramCode,
+        signupSetupStartSeason,
+        signupSetupStartYear,
+    ]);
+    const resetSignupSetupDraft = useCallback(() => {
+        const defaultProgram = String(PROGRAM_OPTIONS?.[0]?.code || "066 937").trim();
+        setSignupSetupProgramCode(defaultProgram);
+        setSignupSetupStartSeason(TERM_WINTER);
+        setSignupSetupStartYear(new Date().getFullYear());
+        setSignupSetupFocus("");
+    }, []);
+    const savePendingCourseTerms = useCallback(async () => {
+        const updates = Object.entries(pendingCourseTermUpdateByCode || {})
+            .map(([courseCode, termAvailability]) => ({
+                courseCode,
+                termAvailability: normalizeTermAvailability(termAvailability),
+            }))
+            .filter((item) => Boolean(item.courseCode));
+        if (!updates.length) return;
+        setIsSavingProfileSettings(true);
+        try {
+            await saveCourseTerms({
+                programCode,
+                updates,
+            });
+            setProfileSettingsByProgram((prev) => {
+                const current = prev?.[programCode] || {};
+                const nextOverrides = { ...(current?.courseTermOverrides || {}) };
+                for (const update of updates) {
+                    nextOverrides[update.courseCode] = update.termAvailability;
+                }
+                return {
+                    ...(prev || {}),
+                    [programCode]: {
+                        ...current,
+                        courseTermOverrides: nextOverrides,
+                    },
+                };
+            });
+            setPendingCourseTermUpdateByCode({});
+        } catch (error) {
+            console.error("Failed to save course term settings", error);
+            setStickyViolation({
+                message: "Could not save course term settings.",
+                until: Date.now() + 4000,
+                tone: "error",
+            });
+        } finally {
+            setIsSavingProfileSettings(false);
+        }
+    }, [pendingCourseTermUpdateByCode, programCode]);
     const togglePf = useCallback((name) => {
         setExpandedPf((prev) => {
             const next = new Set(prev);
@@ -2291,6 +2938,166 @@ export default function App({ currentUser, onSignOut }) {
             </button>
         </div>
     );
+    const signupSetupModalNode = isSignupSetupOpen ? (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 45,
+                background: "rgba(15, 23, 42, 0.32)",
+                display: "grid",
+                placeItems: "center",
+                padding: 16,
+            }}
+        >
+            <div
+                style={{
+                    width: 420,
+                    maxWidth: "100%",
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 10,
+                    padding: 12,
+                    display: "grid",
+                    gap: 10,
+                    boxShadow: "0 20px 42px rgba(15, 23, 42, 0.2)",
+                }}
+            >
+                <div style={{ fontSize: 14, color: "#111827", fontWeight: 700 }}>Complete Signup Setup</div>
+                <div style={{ fontSize: 13, color: "#111827" }}>
+                    Name: <strong>{currentUser?.username || "user"}</strong>
+                </div>
+                <div style={{ display: "grid", gap: 4 }}>
+                    <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
+                    <select
+                        value={signupSetupProgramCode}
+                        onChange={(e) => setSignupSetupProgramCode(e.target.value)}
+                        disabled={isSavingSignupSetup}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontWeight: 600,
+                            width: "100%",
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        {(PROGRAM_OPTIONS || []).map((opt) => (
+                            <option key={opt.code} value={opt.code}>
+                                {opt.label} ({opt.code})
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                {signupSetupProgramCode === BACHELOR_PROGRAM_CODE && (
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
+                        <select
+                            value={signupSetupFocus || ""}
+                            onChange={(e) => setSignupSetupFocus(e.target.value)}
+                            disabled={isSavingSignupSetup}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                boxSizing: "border-box",
+                            }}
+                        >
+                            <option value="">Select focus area</option>
+                            {(BACHELOR_FOCUS_OPTIONS || []).map((focus) => (
+                                <option key={focus} value={focus}>
+                                    {focus}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+                <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Start Semester</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
+                        <select
+                            value={signupSetupStartSeason}
+                            onChange={(e) => setSignupSetupStartSeason(normalizeStartSeason(e.target.value))}
+                            disabled={isSavingSignupSetup}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                boxSizing: "border-box",
+                            }}
+                        >
+                            <option value={TERM_WINTER}>Winter</option>
+                            <option value={TERM_SUMMER}>Summer</option>
+                        </select>
+                        <input
+                            type="number"
+                            min={1900}
+                            max={2600}
+                            value={signupSetupStartYear}
+                            onChange={(e) => setSignupSetupStartYear(Number(e.target.value))}
+                            disabled={isSavingSignupSetup}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                boxSizing: "border-box",
+                            }}
+                        />
+                        <div style={{ alignSelf: "center", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                            S1: {laneSeason(signupSetupStartSeason, 0)}
+                        </div>
+                    </div>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <button
+                        type="button"
+                        onClick={resetSignupSetupDraft}
+                        disabled={isSavingSignupSetup}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            color: "#111827",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                        }}
+                    >
+                        Reset
+                    </button>
+                    <button
+                        type="button"
+                        onClick={saveSignupSetup}
+                        disabled={isSavingSignupSetup}
+                        style={{
+                            border: "1px solid #1d4ed8",
+                            background: isSavingSignupSetup ? "#93c5fd" : "#2563eb",
+                            color: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                        }}
+                    >
+                        {isSavingSignupSetup ? "Saving..." : "Save"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    ) : null;
+
     const profileModalNode = isProfileOpen ? (
         <div
             style={{
@@ -2341,14 +3148,17 @@ export default function App({ currentUser, onSignOut }) {
                     <select
                         value={programCode}
                         onChange={(e) => setProgramCode?.(e.target.value)}
+                        disabled={isProgramLocked}
                         style={{
                             border: "1px solid #d1d5db",
-                            background: "#ffffff",
+                            background: isProgramLocked ? "#f3f4f6" : "#ffffff",
+                            color: isProgramLocked ? "#6b7280" : "#111827",
                             borderRadius: 8,
                             padding: "8px 10px",
                             fontWeight: 600,
                             width: "100%",
                             boxSizing: "border-box",
+                            cursor: isProgramLocked ? "not-allowed" : "default",
                         }}
                     >
                         {(PROGRAM_OPTIONS || []).map((opt) => (
@@ -2357,6 +3167,11 @@ export default function App({ currentUser, onSignOut }) {
                             </option>
                         ))}
                     </select>
+                    {isProgramLocked && (
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>
+                            Study program is locked after signup setup.
+                        </div>
+                    )}
                 </div>
                 {programCode === BACHELOR_PROGRAM_CODE && (
                     <div style={{ display: "grid", gap: 4 }}>
@@ -2383,6 +3198,135 @@ export default function App({ currentUser, onSignOut }) {
                         </select>
                     </div>
                 )}
+                <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Start Semester</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
+                        <select
+                            value={startTermSeason}
+                            onChange={(e) => saveStartTermSetting(e.target.value, startTermYear)}
+                            disabled={isSavingProfileSettings || isStartTermLocked}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: (isSavingProfileSettings || isStartTermLocked) ? "#f3f4f6" : "#ffffff",
+                                color: (isSavingProfileSettings || isStartTermLocked) ? "#6b7280" : "#111827",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                boxSizing: "border-box",
+                                cursor: (isSavingProfileSettings || isStartTermLocked) ? "not-allowed" : "default",
+                            }}
+                        >
+                            <option value={TERM_WINTER}>Winter</option>
+                            <option value={TERM_SUMMER}>Summer</option>
+                        </select>
+                        <input
+                            type="number"
+                            min={1900}
+                            max={2600}
+                            value={startTermYear}
+                            onChange={(e) => saveStartTermSetting(startTermSeason, Number(e.target.value))}
+                            disabled={isSavingProfileSettings || isStartTermLocked}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: (isSavingProfileSettings || isStartTermLocked) ? "#f3f4f6" : "#ffffff",
+                                color: (isSavingProfileSettings || isStartTermLocked) ? "#6b7280" : "#111827",
+                                borderRadius: 8,
+                                padding: "8px 10px",
+                                fontWeight: 600,
+                                width: "100%",
+                                boxSizing: "border-box",
+                                cursor: (isSavingProfileSettings || isStartTermLocked) ? "not-allowed" : "default",
+                            }}
+                        />
+                        <div style={{ alignSelf: "center", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
+                            S1: {laneSeason(startTermSeason, 0)}
+                        </div>
+                    </div>
+                    {isStartTermLocked && (
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>
+                            Start semester is locked after initial setup.
+                        </div>
+                    )}
+                </div>
+                <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Course Semester Availability</div>
+                        <button
+                            onClick={savePendingCourseTerms}
+                            disabled={isSavingProfileSettings || Object.keys(pendingCourseTermUpdateByCode || {}).length === 0}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "5px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                opacity: (isSavingProfileSettings || Object.keys(pendingCourseTermUpdateByCode || {}).length === 0) ? 0.5 : 1,
+                            }}
+                        >
+                            Save Flags
+                        </button>
+                    </div>
+                    <input
+                        type="text"
+                        placeholder="Search by code/title..."
+                        value={profileSearch}
+                        onChange={(e) => setProfileSearch(e.target.value)}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            fontSize: 12,
+                        }}
+                    />
+                    <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 8 }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                            <thead>
+                                <tr style={{ background: "#f9fafb" }}>
+                                    <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Title</th>
+                                    <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Type</th>
+                                    <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Term</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredCatalogCourseRows.map((row) => (
+                                    <tr key={`profile-course-${row.code}`}>
+                                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
+                                            <div style={{ color: "#6b7280" }}>{row.title}</div>
+                                        </td>
+                                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6", color: "#6b7280", whiteSpace: "nowrap" }}>
+                                            {row.type || "-"}
+                                        </td>
+                                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
+                                            <select
+                                                value={pendingTermForCode(row.code)}
+                                                onChange={(e) => setPendingTermForCode(row.code, e.target.value)}
+                                                style={{
+                                                    border: "1px solid #d1d5db",
+                                                    borderRadius: 6,
+                                                    padding: "4px 6px",
+                                                    background: "#ffffff",
+                                                }}
+                                            >
+                                                <option value={TERM_BOTH}>Both</option>
+                                                <option value={TERM_WINTER}>Winter</option>
+                                                <option value={TERM_SUMMER}>Summer</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {filteredCatalogCourseRows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={3} style={{ padding: "8px", color: "#6b7280" }}>No courses found.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
                 <div style={{ display: "grid", gap: 8 }}>
                     <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Rulecheck Semester Load</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -3530,6 +4474,7 @@ export default function App({ currentUser, onSignOut }) {
                 {plannerNotificationsNode}
                 {topActionsNode}
                 {profileModalNode}
+                {signupSetupModalNode}
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <CurriculumGraphView
                         catalog={catalog}
@@ -3551,6 +4496,9 @@ export default function App({ currentUser, onSignOut }) {
                         onToggleModuleDone={toggleGraphModuleDone}
                         onRemoveFromPlan={removeGraphCourseFromPlan}
                         onRemoveModuleFromPlan={removeGraphModuleFromPlan}
+                        semesterOptions={sidebarSemesters}
+                        getValidSemestersForCourse={validSemestersForCourse}
+                        getValidSemestersForModule={validSemestersForModule}
                         graphViewState={graphViewState}
                         setGraphViewState={setGraphViewState}
                         graphStateReady={plannerHydrated && plannerLoadOk}
@@ -3579,6 +4527,7 @@ export default function App({ currentUser, onSignOut }) {
             {plannerNotificationsNode}
             {topActionsNode}
             {profileModalNode}
+            {signupSetupModalNode}
             <div
                 style={{
                     position: "absolute",
@@ -3659,6 +4608,8 @@ export default function App({ currentUser, onSignOut }) {
                     onRemoveCourseFromPlan={removeGraphCourseFromPlan}
                     onRemoveModuleFromPlan={removeGraphModuleFromPlan}
                     semesterOptions={sidebarSemesters}
+                    getValidSemestersForCourse={validSemestersForCourse}
+                    getValidSemestersForModule={validSemestersForModule}
                     width={SIDEBAR_WIDTH}
                     leftOffset={SIDEBAR_LEFT_OFFSET}
                     topOffset={TABLE_SIDEBAR_TOP_OFFSET}

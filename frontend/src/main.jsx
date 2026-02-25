@@ -13,6 +13,8 @@ if (!container) {
 
 function Root() {
     const [user, setUser] = useState(null);
+    const [initialProgramCode, setInitialProgramCode] = useState("066 937");
+    const [openSignupSetupOnEntry, setOpenSignupSetupOnEntry] = useState(false);
     const [loading, setLoading] = useState(true);
     const [authError, setAuthError] = useState("");
 
@@ -54,8 +56,10 @@ function Root() {
                         {authError}
                     </div>
                 )}
-                <AuthGate onAuthenticated={(nextUser) => {
+                <AuthGate onAuthenticated={(nextUser, authContext = null) => {
                     setAuthError("");
+                    if (authContext?.programCode) setInitialProgramCode(authContext.programCode);
+                    setOpenSignupSetupOnEntry(Boolean(authContext?.openSignupSetupOnEntry));
                     setUser(nextUser);
                 }} />
             </>
@@ -63,12 +67,15 @@ function Root() {
     }
 
     return (
-        <ProgramProvider>
+        <ProgramProvider initialProgramCode={initialProgramCode}>
             <App
                 currentUser={user}
+                openSignupSetupOnEntry={openSignupSetupOnEntry}
+                onSignupSetupPromptConsumed={() => setOpenSignupSetupOnEntry(false)}
                 onSignOut={async () => {
                     await signOut().catch(() => null);
                     setAuthError("");
+                    setOpenSignupSetupOnEntry(false);
                     setUser(null);
                 }}
             />

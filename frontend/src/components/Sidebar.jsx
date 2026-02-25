@@ -10,7 +10,7 @@ import {
     stateVisualByStatus,
 } from "../utils/courseVisuals.js";
 import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
-import { displayCourseHeader, displayCourseTitle, displayModuleHeader, displayShortCode } from "../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
@@ -30,6 +30,8 @@ export default function Sidebar({
     onRemoveCourseFromPlan,
     onRemoveModuleFromPlan,
     semesterOptions,
+    getValidSemestersForCourse,
+    getValidSemestersForModule,
     width = 300,
     topOffset = 56,
     bottomOffset = 84,
@@ -58,6 +60,20 @@ export default function Sidebar({
     const plusSemesters = semesters.filter((s) => s?.isPlus);
     const visibleSemesters = [...baseSemesters, ...plusSemesters.slice(0, plusRevealCount)];
     const canRevealMoreSemesters = plusRevealCount < plusSemesters.length;
+    const semestersForCourse = (courseCode) => {
+        if (typeof getValidSemestersForCourse !== "function") return visibleSemesters;
+        const allowed = getValidSemestersForCourse(courseCode);
+        if (!Array.isArray(allowed)) return [];
+        const allowedIds = new Set(allowed.map((semester) => Number(semester?.id)).filter(Number.isFinite));
+        return visibleSemesters.filter((semester) => allowedIds.has(Number(semester?.id)));
+    };
+    const semestersForModule = (courses) => {
+        if (typeof getValidSemestersForModule !== "function") return visibleSemesters;
+        const allowed = getValidSemestersForModule(courses);
+        if (!Array.isArray(allowed)) return [];
+        const allowedIds = new Set(allowed.map((semester) => Number(semester?.id)).filter(Number.isFinite));
+        return visibleSemesters.filter((semester) => allowedIds.has(Number(semester?.id)));
+    };
     useEffect(() => {
         if (!menuState?.key) return;
         const isInsideOpenMenuContext = (node) => {
@@ -314,10 +330,7 @@ export default function Sidebar({
                                                         overflow: "visible",
                                                     }}
                                                 >
-                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                            {displayShortCode(moduleCodeFallback, mod?.name)}
-                                                        </div>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                             {(standaloneStatus === "in_plan" || standaloneStatus === "done") && (
                                                                 <button
@@ -352,7 +365,7 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {visibleSemesters.map((semester) => (
+                                                                    {semestersForCourse(moduleCodeFallback).map((semester) => (
                                                                         <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.(standalonePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
                                                                     {canRevealMoreSemesters && (
@@ -463,7 +476,7 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {visibleSemesters.map((semester) => (
+                                                                    {semestersForCourse(course.code ?? mod.code).map((semester) => (
                                                                         <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, type: course.type ?? null, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
                                                                     {canRevealMoreSemesters && (
@@ -522,6 +535,14 @@ export default function Sidebar({
                                         const variantOptions = Array.isArray(moduleVariantResolution?.variantOptions)
                                             ? moduleVariantResolution.variantOptions
                                             : [];
+                                        const activeVariantCourses = (() => {
+                                            if (!hasSplitVariants) return modulePayload?.courses || [];
+                                            if (!menuState?.variantId) return modulePayload?.courses || [];
+                                            const resolved = resolveModuleVariantCourses(modulePayload, menuState.variantId);
+                                            return Array.isArray(resolved?.selectedCourses) && resolved.selectedCourses.length > 0
+                                                ? resolved.selectedCourses
+                                                : (modulePayload?.courses || []);
+                                        })();
                                         const variantDragPayload = (variantId) => {
                                             const resolved = resolveModuleVariantCourses(modulePayload, variantId);
                                             if (!resolved?.isSplitModule) return modulePayload;
@@ -593,8 +614,7 @@ export default function Sidebar({
                                                         borderTopRightRadius: 10,
                                                     }}
                                                 >
-                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ fontSize: 11, color: isGroupDone ? "#9ca3af" : "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayModuleHeader(mod?.code, mod?.name, courses.map((c) => c?.code).filter(Boolean))}</div>
+                                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                             {(groupStatus === "in_plan" || groupStatus === "done") && (
                                                                 <button
@@ -643,7 +663,7 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {visibleSemesters.map((semester) => (
+                                                                    {semestersForModule(activeVariantCourses).map((semester) => (
                                                                         <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                     ))}
                                                                     {canRevealMoreSemesters && (
@@ -786,7 +806,7 @@ export default function Sidebar({
                                                                         )}
                                                                         {menuState.view === "semesters" && (
                                                                             <>
-                                                                                {visibleSemesters.map((semester) => (
+                                                                                {semestersForModule(activeVariantCourses).map((semester) => (
                                                                                     <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
                                                                                 ))}
                                                                                 {canRevealMoreSemesters && (

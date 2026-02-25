@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { applyNodeChanges, Background, ControlButton, Controls, MarkerType, MiniMap, SelectionMode, useNodesState } from "reactflow";
 import "reactflow/dist/style.css";
-import { CARD_WIDTH, NODE_HEIGHT, SEMESTERS } from "../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../utils/constants.js";
 import {
     GraphCourseNode,
     GraphModuleNode,
@@ -336,6 +336,9 @@ function layoutTree(root, collapsedIds, options = {}) {
     const onRemoveFromPlan = options?.onRemoveFromPlan;
     const onRemoveModuleFromPlan = options?.onRemoveModuleFromPlan;
     const programCode = options?.programCode ?? "";
+    const semesterOptions = Array.isArray(options?.semesterOptions) ? options.semesterOptions : [];
+    const getValidSemestersForCourse = options?.getValidSemestersForCourse;
+    const getValidSemestersForModule = options?.getValidSemestersForModule;
     const nodes = [];
     const edges = [];
     let leafIndex = 0;
@@ -368,6 +371,20 @@ function layoutTree(root, collapsedIds, options = {}) {
             else if (statuses.some((s) => s === "in_plan" || s === "done")) status = "in_plan";
             else status = "todo";
         }
+        const semestersForCourse =
+            typeof getValidSemestersForCourse === "function" && node?.courseCode
+                ? (getValidSemestersForCourse(node.courseCode) || [])
+                : semesterOptions;
+        const moduleCourseList =
+            Array.isArray(node?.modulePayload?.courses) && node.modulePayload.courses.length > 0
+                ? node.modulePayload.courses
+                : (Array.isArray(node?.moduleCourseCodes)
+                    ? node.moduleCourseCodes.map((code) => ({ code }))
+                    : []);
+        const semestersForModule =
+            typeof getValidSemestersForModule === "function"
+                ? (getValidSemestersForModule(moduleCourseList) || [])
+                : semesterOptions;
         nodes.push({
             id: node.id,
             type: nodeTypeForLevel(node.level),
@@ -391,7 +408,7 @@ function layoutTree(root, collapsedIds, options = {}) {
                 courseType: node?.courseType ?? null,
                 onAddToPlan: (node.level === "course" || node.level === "courseDirect") ? onAddToPlan : null,
                 onToggleDone: (node.level === "course" || node.level === "courseDirect") ? onToggleDone : null,
-                semesters: (node.level === "course" || node.level === "courseDirect") ? SEMESTERS : null,
+                semesters: (node.level === "course" || node.level === "courseDirect") ? semestersForCourse : null,
                 modulePayload: node?.modulePayload ?? null,
                 moduleCourseCodes: node?.moduleCourseCodes ?? null,
                 moduleCode: node?.moduleCode ?? null,
@@ -404,7 +421,7 @@ function layoutTree(root, collapsedIds, options = {}) {
                 onToggleModuleDone: node.level === "module" ? onToggleModuleDone : null,
                 onRemoveFromPlan: (node.level === "course" || node.level === "courseDirect") ? onRemoveFromPlan : null,
                 onRemoveModuleFromPlan: (node.level === "module" || node.level === "course") ? onRemoveModuleFromPlan : null,
-                semestersForModule: node.level === "module" ? SEMESTERS : null,
+                semestersForModule: node.level === "module" ? semestersForModule : null,
             },
             sourcePosition: "right",
             targetPosition: "left",
@@ -577,6 +594,9 @@ export default function CurriculumGraphView({
     onToggleModuleDone,
     onRemoveFromPlan,
     onRemoveModuleFromPlan,
+    semesterOptions,
+    getValidSemestersForCourse,
+    getValidSemestersForModule,
     graphViewState,
     setGraphViewState,
     ruleFeedback,
@@ -763,6 +783,9 @@ export default function CurriculumGraphView({
             onToggleModuleDone,
             onRemoveFromPlan,
             onRemoveModuleFromPlan,
+            semesterOptions,
+            getValidSemestersForCourse,
+            getValidSemestersForModule,
             programCode,
         });
     }, [
@@ -775,6 +798,9 @@ export default function CurriculumGraphView({
         onToggleModuleDone,
         onRemoveFromPlan,
         onRemoveModuleFromPlan,
+        semesterOptions,
+        getValidSemestersForCourse,
+        getValidSemestersForModule,
         programCode,
     ]);
     const subjectOrder = useMemo(

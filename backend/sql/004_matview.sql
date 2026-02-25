@@ -12,6 +12,7 @@ WITH courses AS (
                         'ects',              c.ects,
                         'type',              c.type,
                         'language',          c.language,
+                        'term_availability', c.term_availability,
                         'is_core_to_module', mc.is_core_to_module,
                         'tags',              ARRAY_REMOVE(ARRAY[c.type, c.language], NULL)
                 )

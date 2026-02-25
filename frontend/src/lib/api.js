@@ -118,3 +118,51 @@ export async function savePlannerState(state) {
     });
     return parseJsonOrError(res, "Save planner state failed");
 }
+
+export async function fetchProfileSettings(programCode) {
+    const url = new URL("/profile-settings", BASE);
+    if (programCode) url.searchParams.set("program_code", programCode);
+    const res = await fetch(url.toString(), {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+    });
+    return parseJsonOrError(res, "Fetch profile settings failed");
+}
+
+export async function saveStartTerm({ programCode, season, year }) {
+    const url = new URL("/profile-settings/start-term", BASE);
+    const res = await fetch(url.toString(), {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({
+            program_code: programCode,
+            season,
+            year,
+        }),
+    });
+    return parseJsonOrError(res, "Save start term failed");
+}
+
+export async function saveCourseTerms({ programCode, updates }) {
+    const url = new URL("/profile-settings/course-terms", BASE);
+    const res = await fetch(url.toString(), {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({
+            program_code: programCode,
+            updates: Array.isArray(updates) ? updates.map((item) => ({
+                course_code: item.courseCode,
+                term_availability: item.termAvailability,
+            })) : [],
+        }),
+    });
+    return parseJsonOrError(res, "Save course terms failed");
+}

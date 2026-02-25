@@ -28,6 +28,14 @@ COMMIT;
 
 
 CREATE TYPE module_category AS ENUM ('mandatory', 'core', 'elective');
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'term_availability') THEN
+        CREATE TYPE term_availability AS ENUM ('winter', 'summer', 'both');
+    END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS module (
                                       id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
                                       program_id uuid NOT NULL REFERENCES study_program(id),
@@ -46,6 +54,7 @@ CREATE TABLE IF NOT EXISTS course (
                                       type text,
                                       ects numeric(5,1),
                                       language text,
+                                      term_availability term_availability NOT NULL DEFAULT 'both',
                                       attributes jsonb DEFAULT '{}'
 );
 COMMIT;

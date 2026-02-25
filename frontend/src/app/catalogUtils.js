@@ -75,6 +75,7 @@ export function normalizeCatalog(raw) {
                         code: c.code ?? "",
                         ects: Number(c.ects) || null,
                         type: c.type ?? null,
+                        termAvailability: c.term_availability ?? "both",
                     })),
                 };
             }),

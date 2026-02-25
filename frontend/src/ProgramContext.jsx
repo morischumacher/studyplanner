@@ -223,8 +223,11 @@ function diffPlannedCourses(prevBySemester, nextBySemester, minCount, maxCount) 
     return { type: "plan_updated", added, removed, moved, updated };
 }
 
-export function ProgramProvider({ children }) {
-    const [programCode, setProgramCode] = useState("066 937");
+export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
+    const [programCode, setProgramCode] = useState(() => {
+        const next = String(initialProgramCode || "").trim();
+        return next || "066 937";
+    });
     const [coursesByProgram, setCoursesByProgram] = useState({});
     const [doneByProgram, setDoneByProgram] = useState({});
     const [lastPlanChange, setLastPlanChange] = useState(null);
@@ -328,6 +331,19 @@ export function ProgramProvider({ children }) {
         if (programCode !== BACHELOR_PROGRAM_CODE) return;
         setLastPlanChange({ id: Date.now(), type: "focus_updated", selectedFocus: nextValue || null });
     }, [programCode]);
+
+    const setSelectedFocusForProgram = useCallback((targetProgramCode, focusName) => {
+        const key = String(targetProgramCode || "").trim();
+        if (!key) return;
+        const nextValue = typeof focusName === "string" ? focusName : "";
+        setSelectedFocusByProgram((prev) => {
+            const current = prev?.[key] ?? "";
+            if (current === nextValue) return prev;
+            return { ...prev, [key]: nextValue };
+        });
+        if (key !== BACHELOR_PROGRAM_CODE) return;
+        setLastPlanChange({ id: Date.now(), type: "focus_updated", selectedFocus: nextValue || null });
+    }, []);
 
     const setGraphViewState = useCallback((nextStateOrUpdater) => {
         setGraphViewByProgram((prev) => {
@@ -494,6 +510,7 @@ export function ProgramProvider({ children }) {
         doneCourseCodes,
         selectedFocus,
         setSelectedFocus,
+        setSelectedFocusForProgram,
         setCourseDone,
         getCourseStatus,
         lastPlanChange,
@@ -513,6 +530,7 @@ export function ProgramProvider({ children }) {
         doneCourseCodes,
         selectedFocus,
         setSelectedFocus,
+        setSelectedFocusForProgram,
         setCourseDone,
         getCourseStatus,
         lastPlanChange,

@@ -134,6 +134,32 @@ const FOCUS_EXCLUSIONS = {
     ],
 };
 
+const SUMMER_SWAP_MAP = {
+    1: 2,
+    2: 1,
+    3: 4,
+    4: 3,
+    5: 6,
+    6: 5,
+};
+
+const SUMMER_LOCKED_ALIAS_SET = new Set([
+    "Wissenschaftliches Arbeiten",
+    "Bachelorarbeit",
+    "Bachelorarbeit für Informatik und Wirtschaftsinformatik",
+].map((entry) => normalizeText(entry)));
+
+const STRICT_FIXED_ALIAS_SEMESTER = new Map([
+    [normalizeText("Einführung in die Programmierung 1"), 1],
+    [normalizeText("Einführung in die Programmierung 2"), 2],
+]);
+
+const SUMMER_FIRST_SEMESTER_ALIAS_SET = new Set([
+    "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (VU)",
+    "Algebra und Diskrete Mathematik (VU)",
+    "Algebra und Diskrete Mathematik",
+].map((entry) => normalizeText(entry)));
+
 function normalizeText(value) {
     return String(value || "")
         .normalize("NFKD")
@@ -231,14 +257,57 @@ function findBestCourse(catalogEntries, aliases, desiredEcts, usedCodes) {
     return best;
 }
 
-export function buildBachelorPrefillPlan(catalog, selectedFocus) {
+function isSummerStart(startSeason) {
+    return normalizeText(startSeason) === "summer";
+}
+
+function isSummerSwapLocked(aliases) {
+    const list = Array.isArray(aliases) ? aliases : [];
+    return list.some((alias) => SUMMER_LOCKED_ALIAS_SET.has(normalizeText(alias)));
+}
+
+function resolveStrictFixedSemester(aliases) {
+    const list = Array.isArray(aliases) ? aliases : [];
+    for (const alias of list) {
+        const fixed = STRICT_FIXED_ALIAS_SEMESTER.get(normalizeText(alias));
+        if (Number.isInteger(fixed)) return fixed;
+    }
+    return null;
+}
+
+function isSummerFirstSemesterLocked(aliases) {
+    const list = Array.isArray(aliases) ? aliases : [];
+    return list.some((alias) => SUMMER_FIRST_SEMESTER_ALIAS_SET.has(normalizeText(alias)));
+}
+
+function remapSemesterForStart(semester, aliases, startSeason) {
+    const sem = Number(semester);
+    if (!Number.isInteger(sem) || sem < 1) return sem;
+    const strictFixed = resolveStrictFixedSemester(aliases);
+    if (Number.isInteger(strictFixed)) return strictFixed;
+    if (!isSummerStart(startSeason)) return sem;
+    if (isSummerFirstSemesterLocked(aliases)) return 1;
+    if (isSummerSwapLocked(aliases)) return sem;
+    return SUMMER_SWAP_MAP[sem] || sem;
+}
+
+export function buildBachelorPrefillPlan(catalog, selectedFocus, options = {}) {
+    const startSeason = options?.startSeason;
     const focusKey = resolveFocusKey(selectedFocus);
     const additions = FOCUS_ADDITIONS[focusKey] || FOCUS_ADDITIONS.general;
     const exclusions = new Set((FOCUS_EXCLUSIONS[focusKey] || []).map(normalizeText));
-    const template = [...BASELINE_PLAN, ...additions].filter((item) => {
-        const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
-        return !aliases.some((alias) => exclusions.has(normalizeText(alias)));
-    });
+    const template = [...BASELINE_PLAN, ...additions]
+        .filter((item) => {
+            const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+            return !aliases.some((alias) => exclusions.has(normalizeText(alias)));
+        })
+        .map((item) => {
+            const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+            return {
+                ...item,
+                semester: remapSemesterForStart(item?.semester, aliases, startSeason),
+            };
+        });
     const catalogEntries = flattenCatalogCourses(catalog);
     const usedCodes = new Set();
     const plannedCourses = [];
@@ -246,6 +315,7 @@ export function buildBachelorPrefillPlan(catalog, selectedFocus) {
 
     for (const item of template) {
         const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
+        const strictFixedSemester = resolveStrictFixedSemester(aliases);
         const ects = Number(item?.ects);
         const desiredEcts = Number.isFinite(ects) ? ects : null;
         const match = findBestCourse(catalogEntries, aliases, desiredEcts, usedCodes);
@@ -256,6 +326,7 @@ export function buildBachelorPrefillPlan(catalog, selectedFocus) {
         usedCodes.add(match.code);
         plannedCourses.push({
             semester: Number(item.semester),
+            prefillFixedSemester: Number.isInteger(strictFixedSemester),
             code: match.code,
             name: match.name,
             ects: match.ects,

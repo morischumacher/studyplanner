@@ -15,9 +15,13 @@ export default function AuthGate({ onAuthenticated }) {
         setSubmitting(true);
         setError("");
         try {
-            const apiCall = mode === "signin" ? signIn : signUp;
-            const result = await apiCall(username.trim(), password);
-            onAuthenticated?.(result?.user ?? null);
+            if (mode === "signin") {
+                const result = await signIn(username.trim(), password);
+                onAuthenticated?.(result?.user ?? null);
+            } else {
+                const result = await signUp(username.trim(), password);
+                onAuthenticated?.(result?.user ?? null, { openSignupSetupOnEntry: true });
+            }
         } catch (e) {
             setError(String(e?.message || e));
         } finally {

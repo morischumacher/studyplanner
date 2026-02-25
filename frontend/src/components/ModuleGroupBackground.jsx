@@ -7,7 +7,7 @@ import {
 import { colorForType } from "../utils/constants.js";
 import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../utils/examSubjectColors.js";
 import { mapTypeForProgram, stateVisualByStatus } from "../utils/courseVisuals.js";
-import { displayCourseTitle, displayModuleHeader } from "../utils/courseCodeDisplay.js";
+import { displayCourseTitle } from "../utils/courseCodeDisplay.js";
 
 /** ModuleGroupBackground — soft panel wrapping a set of course nodes. */
 export default function ModuleGroupBackground({ data }) {
@@ -22,7 +22,6 @@ export default function ModuleGroupBackground({ data }) {
         subjectColor,
         programCode,
         status = "in_plan",
-        moduleCode,
         moduleCourseCount,
         moduleEcts,
         moduleCourseCodes,
@@ -40,7 +39,6 @@ export default function ModuleGroupBackground({ data }) {
     const statusTextColor = status === "done" ? "#166534" : (status === "in_plan" ? "#1d4ed8" : "#4b5563");
     const panelFill = visualStatus === "todo" ? moduleColor : stateMeta.background;
     const isDone = status === "done";
-    const headerCode = displayModuleHeader(moduleCode, title, moduleCourseCodes);
 
     useEffect(() => {
         if (!isMenuOpen) return;
@@ -93,7 +91,7 @@ export default function ModuleGroupBackground({ data }) {
                     height: MODULE_HEADER_HEIGHT - 10,
                     display: "grid",
                     alignContent: "space-between",
-                    gap: 4,
+                    gap: 2,
                     color: "#111827",
                     fontWeight: 700,
                     fontSize: 13,
@@ -102,10 +100,7 @@ export default function ModuleGroupBackground({ data }) {
                     padding: "6px 8px",
                 }}
             >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <div style={{ fontSize: 11, color: isDone ? "#9ca3af" : "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                        {headerCode}
-                    </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                         {onToggleModuleDone && (status === "in_plan" || status === "done") && (
                             <button
@@ -225,11 +220,11 @@ export default function ModuleGroupBackground({ data }) {
                     style={{
                         display: "-webkit-box",
                         WebkitBoxOrient: "vertical",
-                        WebkitLineClamp: 2,
+                        WebkitLineClamp: 1,
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         lineHeight: 1.25,
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: 700,
                         color: isDone ? "#6b7280" : "#111827",
                     }}
@@ -239,7 +234,7 @@ export default function ModuleGroupBackground({ data }) {
                 <div
                     style={{
                         color: isDone ? "#9ca3af" : "#6b7280",
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: 600,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
