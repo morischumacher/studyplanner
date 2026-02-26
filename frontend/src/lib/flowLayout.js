@@ -59,6 +59,11 @@ export function recomputeGroupFromChildren(nodes, groupId) {
                     moduleEcts: Number(n?.data?.moduleEcts ?? 0) || moduleEctsFromChildren || null,
                     moduleCourseCodes,
                     status: groupStatus,
+                    childPositions: children.map((c) => ({
+                        x: c.position.x,
+                        y: c.position.y,
+                        laneIndex: laneIdx(c),
+                    })),
                 },
             }
             : n
