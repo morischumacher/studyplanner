@@ -17,9 +17,9 @@ export default function GraphCourseNode({ data }) {
     const isDone = status === "done";
     const isInPlan = status === "in_plan";
     const stateMeta = stateVisualByStatus(visualStatus);
-    const cardBackground = status === "todo" ? "#ffffff" : stateMeta.background;
+    const cardBackground = stateMeta.background;
     const typeMeta = mapTypeForProgram(data?.category, data?.programCode);
-    const typeShadow = layeredTypeShadow(color, typeMeta.layers, cardBackground || "transparent");
+    const typeShadow = layeredTypeShadow(color, typeMeta.layers, stateMeta.background || "transparent");
     const cardBorderColor = isDone ? color : (stateMeta.borderColor || color);
     const stateShadow = isDone ? "none" : stateMeta.extraShadow;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -27,6 +27,7 @@ export default function GraphCourseNode({ data }) {
     const menuRef = useRef(null);
     const rootRef = useRef(null);
     const courseCode = data?.courseCode;
+    const isChildCourse = Boolean(data?.parentModulePayload || data?.groupId);
     const notes = String(data?.notes ?? "");
     const estimatedHours = String(data?.estimatedHours ?? "");
     const grade = String(data?.grade ?? "");
@@ -49,7 +50,7 @@ export default function GraphCourseNode({ data }) {
                 nodeEl.style.zIndex = "";
             };
         }
-        nodeEl.style.zIndex = "";
+        return undefined;
     }, [isMenuOpen]);
 
     const statusStyle = (() => {
@@ -114,7 +115,7 @@ export default function GraphCourseNode({ data }) {
                             >
                                 i
                             </button>
-                            {status === "todo" && (
+                            {((status === "todo" || status === "parked") || isChildCourse) && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -125,9 +126,9 @@ export default function GraphCourseNode({ data }) {
                                     title="Add to plan"
                                     aria-label="Add to plan"
                                     style={{
-                                        border: "1px solid #60a5fa",
-                                        background: "#eff6ff",
-                                        color: "#1d4ed8",
+                                        border: `1px solid ${cardBorderColor}`,
+                                        background: "#ffffff",
+                                        color: "#111827",
                                         borderRadius: 6,
                                         fontSize: 12,
                                         width: 24,
@@ -139,7 +140,7 @@ export default function GraphCourseNode({ data }) {
                                     +
                                 </button>
                             )}
-                            {(isInPlan || isDone) && (
+                            {(isInPlan || isDone) && !isChildCourse && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -162,7 +163,7 @@ export default function GraphCourseNode({ data }) {
                                     ✓
                                 </button>
                             )}
-                            {(isInPlan || isDone) && (
+                            {(isInPlan || isDone || status === "parked") && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -215,12 +216,18 @@ export default function GraphCourseNode({ data }) {
                             >
                                 {menuView === "semesters" && (
                                     <>
-                                        {(Array.isArray(data?.semesters) ? data.semesters : []).map((semester) => (
+                                        {(Array.isArray(data?.semesters) ? data.semesters : []).map((semester) => {
+                                            const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                            const disableChoice = status === "parked" && isParkingChoice;
+                                            return (
                                             <button
                                                 key={semester.id}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const laneIndex = (Number(semester.id) || 1) - 1;
+                                                    if (disableChoice) return;
+                                                    const laneIndex = Number.isFinite(Number(semester?.laneIndex))
+                                                        ? Number(semester.laneIndex)
+                                                        : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0);
                                                     if (data?.parentModulePayload && data?.onAddModuleToPlan) {
                                                         const confirmed = window.confirm(
                                                             `${data?.courseCode || "This course"} belongs to a module. Adding it will automatically add all module courses. Continue?`
@@ -240,11 +247,13 @@ export default function GraphCourseNode({ data }) {
                                                     setIsMenuOpen(false);
                                                     setMenuView(null);
                                                 }}
-                                                style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#ffffff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                                disabled={disableChoice}
+                                                style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#ffffff", cursor: disableChoice ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, color: disableChoice ? "#9ca3af" : "#111827" }}
                                             >
                                                 {semester.title}
                                             </button>
-                                        ))}
+                                            );
+                                        })}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -349,7 +358,7 @@ export default function GraphCourseNode({ data }) {
                         textTransform: "lowercase",
                     }}
                 >
-                    {status === "done" ? "done" : (status === "in_plan" ? "planned" : "not planned")}
+                    {status === "done" ? "done" : (status === "in_plan" ? "planned" : (status === "parked" ? "parked" : "not planned"))}
                 </div>
             </div>
         </div>

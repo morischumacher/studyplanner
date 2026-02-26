@@ -15,7 +15,7 @@ import {
 export function laneIdx(node) {
     const span = LANE_WIDTH + LANE_GAP;
     const idx = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
-    return Math.max(0, idx);
+    return Math.max(-1, idx);
 }
 
 export function recomputeGroupFromChildren(nodes, groupId) {
@@ -34,7 +34,11 @@ export function recomputeGroupFromChildren(nodes, groupId) {
     const statuses = children.map((c) => c?.data?.status ?? "in_plan");
     const groupStatus = statuses.every((s) => s === "done")
         ? "done"
-        : (statuses.some((s) => s === "in_plan" || s === "done") ? "in_plan" : "todo");
+        : (
+            statuses.every((s) => s === "parked")
+                ? "parked"
+                : (statuses.some((s) => s === "in_plan" || s === "done") ? "in_plan" : "todo")
+        );
     const moduleEctsFromChildren = children.reduce((sum, c) => sum + Number(c?.data?.ects || 0), 0);
     const moduleCourseCodes = children.map((c) => c?.data?.code).filter(Boolean);
     const height = maxY - minY + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT + MODULE_BOTTOM_PADDING;
@@ -117,7 +121,7 @@ function coveredLaneIndicesForNode(n, maxSemesterCount) {
     const laneFromX = (x) => {
         const span = LANE_WIDTH + LANE_GAP;
         const idx = Math.floor((Number(x) + LANE_GAP * 0.5) / span);
-        return Math.max(0, Math.min(maxSemesterCount - 1, idx));
+        return Math.max(-1, Math.min(maxSemesterCount - 1, idx));
     };
     const start = laneFromX(box.x1);
     const end = laneFromX(Math.max(box.x1, box.x2 - 1));
@@ -189,6 +193,24 @@ function pushStandaloneCoursesBelowModuleBackgrounds(allNodes) {
     return nodes;
 }
 
+function enforceStackingOrder(allNodes) {
+    return allNodes.map((node) => {
+        if (node?.type === "lane") {
+            if (node?.zIndex === 0) return node;
+            return { ...node, zIndex: 0 };
+        }
+        if (node?.type === "moduleBg") {
+            if (node?.zIndex === 1) return node;
+            return { ...node, zIndex: 1 };
+        }
+        if (node?.type === "course") {
+            if (node?.zIndex === 10) return node;
+            return { ...node, zIndex: 10 };
+        }
+        return node;
+    });
+}
+
 export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
     const candidates = nodes
@@ -234,7 +256,7 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
         placed.push(candidate.id);
     }
 
-    return enforceModuleHeaderClearance(nodes, minModuleGroupTopY);
+    return enforceStackingOrder(enforceModuleHeaderClearance(nodes, minModuleGroupTopY));
 }
 
 export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
@@ -277,5 +299,5 @@ export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGro
     }
 
     const headerSafe = enforceModuleHeaderClearance(nodes, minModuleGroupTopY);
-    return pushStandaloneCoursesBelowModuleBackgrounds(headerSafe);
+    return enforceStackingOrder(pushStandaloneCoursesBelowModuleBackgrounds(headerSafe));
 }

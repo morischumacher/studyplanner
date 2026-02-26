@@ -4,6 +4,7 @@ import { BACHELOR_PROGRAM_CODE, semesterBoundsForProgram } from "./utils/semeste
 
 const ProgramContext = createContext();
 const EMPTY_DONE_CODES = [];
+const EMPTY_PARKED_CODES = [];
 const DEFAULT_GRAPH_FILTERS = {
     obligationTypes: [],
     ectsRange: null,
@@ -72,6 +73,20 @@ function sanitizeSemesterNotesByProgram(value) {
             normalizedBySemester[sem] = typeof note === "string" ? note : "";
         }
         normalized[program] = normalizedBySemester;
+    }
+    return normalized;
+}
+
+function sanitizeParkedByProgram(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const normalized = {};
+    for (const [program, codes] of Object.entries(source)) {
+        const safeCodes = Array.isArray(codes) ? codes : [];
+        normalized[program] = [...new Set(
+            safeCodes
+                .map((code) => String(code || "").trim())
+                .filter(Boolean)
+        )];
     }
     return normalized;
 }
@@ -152,7 +167,9 @@ function normalizeBySemesterMap(value, minCount, maxCount) {
 
 function buildCoursesOnlyFromNodes(nodes, programCode) {
     const bounds = semesterBoundsForProgram(programCode);
-    if (!Array.isArray(nodes)) return emptyCoursesOnlyPlan(bounds.min);
+    if (!Array.isArray(nodes)) {
+        return { bySem: emptyCoursesOnlyPlan(bounds.min), parkedCodes: [] };
+    }
 
     const modules = new Map();
     for (const n of nodes) {
@@ -170,10 +187,16 @@ function buildCoursesOnlyFromNodes(nodes, programCode) {
     }
 
     const bySem = emptyCoursesOnlyPlan(bounds.min);
+    const parkedCodes = [];
     const yById = Object.fromEntries(nodes.map((n) => [n.id, n?.position?.y ?? 0]));
 
     for (const n of nodes) {
         if (n?.type !== "course") continue;
+        if (String(n?.data?.status || "").trim() === "parked") {
+            const parkedCode = String(n?.data?.code || "").trim();
+            if (parkedCode) parkedCodes.push(parkedCode);
+            continue;
+        }
         const laneIdx = Math.max(0, Math.min(laneIndexFromX(n.position?.x ?? 0, bounds.max - 1), bounds.max - 1));
         const semesterId = laneIdx + 1;
         const modMeta = n?.data?.groupId
@@ -200,7 +223,10 @@ function buildCoursesOnlyFromNodes(nodes, programCode) {
     for (const semesterId of Object.keys(bySem)) {
         bySem[semesterId].sort((a, b) => (yById[a.id] ?? 0) - (yById[b.id] ?? 0));
     }
-    return bySem;
+    return {
+        bySem,
+        parkedCodes: [...new Set(parkedCodes)],
+    };
 }
 
 function flattenBySemester(bySemester, minCount, maxCount) {
@@ -298,6 +324,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
     });
     const [coursesByProgram, setCoursesByProgram] = useState({});
     const [doneByProgram, setDoneByProgram] = useState({});
+    const [parkedByProgram, setParkedByProgram] = useState({});
     const [lastPlanChange, setLastPlanChange] = useState(null);
     const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
     const [graphViewByProgram, setGraphViewByProgram] = useState({});
@@ -309,6 +336,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
     const emptyPlanForProgram = useMemo(() => emptyCoursesOnlyPlan(semesterBounds.min), [semesterBounds.min]);
     const coursesBySemester = coursesByProgram?.[programCode] ?? emptyPlanForProgram;
     const doneCourseCodes = doneByProgram?.[programCode] ?? EMPTY_DONE_CODES;
+    const parkedCourseCodes = parkedByProgram?.[programCode] ?? EMPTY_PARKED_CODES;
     const selectedFocus = selectedFocusByProgram?.[programCode] ?? "";
     const graphViewState = graphViewByProgram?.[programCode] ?? EMPTY_GRAPH_VIEW_STATE;
     const semesterLoadLimits = sanitizeSemesterLoadLimits(
@@ -319,7 +347,9 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
 
     const setCoursesFromNodes = useCallback((nodes) => {
         const bounds = semesterBoundsForProgram(programCode);
-        const nextPlan = buildCoursesOnlyFromNodes(nodes, programCode);
+        const parsed = buildCoursesOnlyFromNodes(nodes, programCode);
+        const nextPlan = parsed?.bySem ?? emptyCoursesOnlyPlan(bounds.min);
+        const nextParked = Array.isArray(parsed?.parkedCodes) ? parsed.parkedCodes : [];
 
         setCoursesByProgram((prev) => {
             const prevPlan = prev?.[programCode] ?? emptyCoursesOnlyPlan(bounds.min);
@@ -358,6 +388,16 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
                 };
             });
         }
+        setParkedByProgram((prev) => {
+            const current = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
+            if (
+                current.length === nextParked.length &&
+                current.every((code, idx) => code === nextParked[idx])
+            ) {
+                return prev;
+            }
+            return { ...(prev || {}), [programCode]: nextParked };
+        });
     }, [doneByProgram, programCode]);
 
     const getCoursesForSemester = useCallback((semesterId) => {
@@ -379,11 +419,12 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
     const getCourseStatus = useCallback((courseCode) => {
         if (!courseCode) return "todo";
         if ((doneByProgram?.[programCode] ?? []).includes(courseCode)) return "done";
+        if ((parkedByProgram?.[programCode] ?? []).includes(courseCode)) return "parked";
         for (const semesterId of numericSemesterIds(coursesBySemester, semesterBounds.min, semesterBounds.max)) {
             if ((coursesBySemester?.[semesterId] ?? []).some((c) => c?.code === courseCode)) return "in_plan";
         }
         return "todo";
-    }, [coursesBySemester, doneByProgram, programCode, semesterBounds.max, semesterBounds.min]);
+    }, [coursesBySemester, doneByProgram, parkedByProgram, programCode, semesterBounds.max, semesterBounds.min]);
 
     const setCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
@@ -612,12 +653,13 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         programCode,
         coursesByProgram,
         doneByProgram,
+        parkedByProgram,
         courseMetaByProgram,
         semesterNotesByProgram,
         selectedFocusByProgram,
         graphViewByProgram,
         semesterLoadLimitsByProgram,
-    }), [programCode, coursesByProgram, doneByProgram, courseMetaByProgram, semesterNotesByProgram, selectedFocusByProgram, graphViewByProgram, semesterLoadLimitsByProgram]);
+    }), [programCode, coursesByProgram, doneByProgram, parkedByProgram, courseMetaByProgram, semesterNotesByProgram, selectedFocusByProgram, graphViewByProgram, semesterLoadLimitsByProgram]);
 
     const importPlannerStateSnapshot = useCallback((snapshot) => {
         if (!snapshot || typeof snapshot !== "object") return;
@@ -631,6 +673,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         }
         setCoursesByProgram(normalizedCoursesByProgram);
         setDoneByProgram(snapshot?.doneByProgram && typeof snapshot.doneByProgram === "object" ? snapshot.doneByProgram : {});
+        setParkedByProgram(sanitizeParkedByProgram(snapshot?.parkedByProgram));
         setCourseMetaByProgram(sanitizeCourseMetaByProgram(snapshot?.courseMetaByProgram));
         setSemesterNotesByProgram(sanitizeSemesterNotesByProgram(snapshot?.semesterNotesByProgram));
         setSelectedFocusByProgram(snapshot?.selectedFocusByProgram && typeof snapshot.selectedFocusByProgram === "object" ? snapshot.selectedFocusByProgram : {});
@@ -682,6 +725,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         setProgramCode("066 937");
         setCoursesByProgram({});
         setDoneByProgram({});
+        setParkedByProgram({});
         setLastPlanChange(null);
         setSelectedFocusByProgram({});
         setGraphViewByProgram({});
@@ -696,6 +740,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         coursesBySemester,
         setCoursesFromNodes,
         doneCourseCodes,
+        parkedCourseCodes,
         courseMetaByCode,
         semesterNotesBySemesterId,
         getCourseMeta,
@@ -722,6 +767,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         coursesBySemester,
         setCoursesFromNodes,
         doneCourseCodes,
+        parkedCourseCodes,
         courseMetaByCode,
         semesterNotesBySemesterId,
         getCourseMeta,

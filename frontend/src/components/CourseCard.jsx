@@ -13,11 +13,29 @@ import { BACHELOR_PROGRAM_CODE } from "../utils/semesters.js";
 
 /** CourseCard — React Flow node renderer */
 export default function CourseCard({ data }) {
+    if (data?.collapsedGhost) {
+        return (
+            <div
+                style={{
+                    width: CARD_WIDTH,
+                    minHeight: NODE_HEIGHT,
+                    border: "1px dashed rgba(107,114,128,0.7)",
+                    borderRadius: 10,
+                    background: "transparent",
+                    pointerEvents: "none",
+                    boxSizing: "border-box",
+                }}
+            />
+        );
+    }
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [menuView, setMenuView] = useState(null);
+    const [plusRevealCount, setPlusRevealCount] = useState(0);
     const menuRef = useRef(null);
     const rootRef = useRef(null);
     const courseCode = data?.code;
+    const isChildCourse = Boolean(data?.groupId);
     const notes = String(data?.notes ?? "");
     const estimatedHours = String(data?.estimatedHours ?? "");
     const grade = String(data?.grade ?? "");
@@ -34,14 +52,16 @@ export default function CourseCard({ data }) {
     useEffect(() => {
         const nodeEl = rootRef.current?.closest?.(".react-flow__node");
         if (!nodeEl) return;
+        const baseZIndex = data?.groupId ? "2" : "1";
         if (isMenuOpen) {
             nodeEl.style.zIndex = "1000";
             return () => {
-                nodeEl.style.zIndex = "";
+                nodeEl.style.zIndex = baseZIndex;
             };
         }
-        nodeEl.style.zIndex = "";
-    }, [isMenuOpen]);
+        nodeEl.style.zIndex = baseZIndex;
+        return undefined;
+    }, [data?.groupId, isMenuOpen]);
 
     const handleRemove = (e) => {
         e.stopPropagation();
@@ -87,6 +107,23 @@ export default function CourseCard({ data }) {
         : [4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
     const extensionOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     const headerCode = displayCourseHeader(data?.code, data?.label, data?.courseType ?? data?.type);
+    const rawSemesterOptions = Array.isArray(data?.semesters) ? data.semesters : [];
+    const parkingOptions = rawSemesterOptions.filter((semester) => Boolean(semester?.isParking) || Number(semester?.id) === 0);
+    const regularSemesterOptions = rawSemesterOptions.filter((semester) => !(Boolean(semester?.isParking) || Number(semester?.id) === 0));
+    const baseSemesterOptions = regularSemesterOptions.filter((semester) => !Boolean(semester?.isPlus));
+    const plusSemesterOptions = regularSemesterOptions.filter((semester) => Boolean(semester?.isPlus));
+    const visibleSemesterOptions = [
+        ...parkingOptions,
+        ...baseSemesterOptions,
+        ...plusSemesterOptions.slice(0, plusRevealCount),
+    ];
+    const canRevealMoreSemesters = plusRevealCount < plusSemesterOptions.length;
+
+    useEffect(() => {
+        if (!isMenuOpen || menuView !== "semesters") {
+            setPlusRevealCount(0);
+        }
+    }, [isMenuOpen, menuView]);
 
     return (
         <div
@@ -157,7 +194,7 @@ export default function CourseCard({ data }) {
                             >
                                 i
                             </button>
-                            {data?.status === "todo" && data?.onAddToPlan && (
+                            {((data?.status === "todo" || data?.status === "parked") || isChildCourse) && data?.onAddToPlan && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -168,9 +205,9 @@ export default function CourseCard({ data }) {
                                     aria-label="Add to plan"
                                     title="Add to plan"
                                     style={{
-                                        border: "1px solid #60a5fa",
-                                        background: "#eff6ff",
-                                        color: "#1d4ed8",
+                                        border: `1px solid ${cardBorderColor}`,
+                                        background: "#ffffff",
+                                        color: "#111827",
                                         borderRadius: 6,
                                         fontSize: 12,
                                         padding: "2px 6px",
@@ -181,7 +218,7 @@ export default function CourseCard({ data }) {
                                     +
                                 </button>
                             )}
-                            {(data.status === "in_plan" || data.status === "done") && data?.onToggleDone && (
+                            {(data.status === "in_plan" || data.status === "done") && data?.onToggleDone && !isChildCourse && (
                                 <button
                                     onClick={handleToggleDone}
                                     aria-label={isDone ? "Mark as in plan" : "Mark as done"}
@@ -200,7 +237,7 @@ export default function CourseCard({ data }) {
                                     ✓
                                 </button>
                             )}
-                            {(data.status === "in_plan" || data.status === "done") && data?.onRemove && (
+                            {(data.status === "in_plan" || data.status === "done" || data.status === "parked") && data?.onRemove && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
@@ -247,27 +284,68 @@ export default function CourseCard({ data }) {
                             >
                                 {menuView === "semesters" && (
                                     <>
-                                        {(Array.isArray(data?.semesters) ? data.semesters : []).map((semester) => (
+                                        {visibleSemesterOptions.map((semester) => {
+                                            const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                            const disableChoice = data?.status === "parked" && isParkingChoice;
+                                            return (
                                             <button
                                                 key={semester.id}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    data?.onAddToPlan?.({
-                                                        code: data?.code,
-                                                        name: data?.label,
-                                                        ects: data?.ects ?? null,
-                                                        category: data?.category ?? null,
-                                                        examSubject: data?.examSubject ?? null,
-                                                        subjectColor,
-                                                    }, (Number(semester.id) || 1) - 1);
+                                                    if (disableChoice) return;
+                                                    const laneIndex = Number.isFinite(Number(semester?.laneIndex))
+                                                        ? Number(semester.laneIndex)
+                                                        : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0);
+                                                    const moduleMeta = data?.moduleMeta && typeof data.moduleMeta === "object" ? data.moduleMeta : null;
+                                                    const moduleCodes = Array.isArray(moduleMeta?.courseCodes)
+                                                        ? moduleMeta.courseCodes.map((code) => String(code || "").trim()).filter(Boolean)
+                                                        : [];
+                                                    if (moduleMeta && moduleCodes.length >= 2 && data?.onAddModuleToPlan) {
+                                                        const confirmed = window.confirm(
+                                                            `${data?.code || "This course"} belongs to a module. Adding it will automatically add all module courses. Continue?`
+                                                        );
+                                                        if (!confirmed) return;
+                                                        data.onAddModuleToPlan({
+                                                            kind: "module",
+                                                            code: moduleMeta?.code ?? null,
+                                                            name: moduleMeta?.title || "Module",
+                                                            ects: moduleMeta?.ects ?? null,
+                                                            category: moduleMeta?.category ?? data?.category ?? "unknown",
+                                                            examSubject: moduleMeta?.examSubject ?? data?.examSubject ?? null,
+                                                            subjectColor,
+                                                            courses: moduleCodes.map((code) => ({ code })),
+                                                        }, laneIndex, { allowDirectLaneSelection: true });
+                                                    } else {
+                                                        data?.onAddToPlan?.({
+                                                            code: data?.code,
+                                                            name: data?.label,
+                                                            ects: data?.ects ?? null,
+                                                            category: data?.category ?? null,
+                                                            examSubject: data?.examSubject ?? null,
+                                                            subjectColor,
+                                                        }, laneIndex);
+                                                    }
                                                     setIsMenuOpen(false);
                                                     setMenuView(null);
                                                 }}
-                                                style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                                disabled={disableChoice}
+                                                style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#fff", cursor: disableChoice ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, color: disableChoice ? "#9ca3af" : "#111827" }}
                                             >
                                                 {semester.title}
                                             </button>
-                                        ))}
+                                            );
+                                        })}
+                                        {canRevealMoreSemesters && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPlusRevealCount((count) => Math.min(count + 1, plusSemesterOptions.length));
+                                                }}
+                                                style={{ border: "1px dashed #9ca3af", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", cursor: "pointer", fontSize: 12, fontWeight: 700 }}
+                                            >
+                                                + Add next semester
+                                            </button>
+                                        )}
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
@@ -413,7 +491,7 @@ export default function CourseCard({ data }) {
                 <div style={{ fontSize: 11, color: "#6b7280" }}>{data.ects ? `${data.ects} ECTS` : "-"}</div>
                 <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>{typeMeta.label}</div>
                 <div style={{ fontSize: 11, color: statusTextColor, textTransform: "lowercase", fontWeight: 700 }}>
-                    {data.status === "done" ? "done" : (data.status === "in_plan" ? "planned" : "not planned")}
+                    {data.status === "done" ? "done" : (data.status === "in_plan" ? "planned" : (data.status === "parked" ? "parked" : "not planned"))}
                 </div>
             </div>
         </div>

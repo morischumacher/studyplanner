@@ -16,6 +16,7 @@ export default function GraphModuleNode({ data }) {
     const visualStatus = status === "done" ? "done" : "todo";
     const isDone = status === "done";
     const isInPlan = status === "in_plan";
+    const isParked = status === "parked";
     const stateMeta = stateVisualByStatus(visualStatus);
     const typeMeta = mapTypeForProgram(data?.category, data?.programCode);
     const typeShadow = layeredTypeShadow(color, typeMeta.layers, stateMeta.background || "transparent");
@@ -50,9 +51,10 @@ export default function GraphModuleNode({ data }) {
     const statusStyle = (() => {
         if (status === "done") return { color: "#166534", label: "done" };
         if (status === "in_plan") return { color: "#1d4ed8", label: "planned" };
+        if (status === "parked") return { color: "#4b5563", label: "parked" };
         return { color: "#4b5563", label: "todo" };
     })();
-    const statusLabel = status === "done" ? "done" : (status === "in_plan" ? "planned" : "not planned");
+    const statusLabel = status === "done" ? "done" : (status === "in_plan" ? "planned" : (status === "parked" ? "parked" : "not planned"));
 
     return (
         <div
@@ -82,7 +84,7 @@ export default function GraphModuleNode({ data }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    {status === "todo" && (
+                    {(status === "todo" || isParked) && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -93,9 +95,9 @@ export default function GraphModuleNode({ data }) {
                             title="Add to plan"
                             aria-label="Add to plan"
                             style={{
-                                border: "1px solid #60a5fa",
-                                background: "#eff6ff",
-                                color: "#1d4ed8",
+                                border: `1px solid ${cardBorderColor}`,
+                                background: "#ffffff",
+                                color: "#111827",
                                 borderRadius: 6,
                                 fontSize: 12,
                                 padding: "1px 6px",
@@ -126,7 +128,7 @@ export default function GraphModuleNode({ data }) {
                             ✓
                         </button>
                     )}
-                    {(isInPlan || isDone) && (
+                    {(isInPlan || isDone || isParked) && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -173,20 +175,26 @@ export default function GraphModuleNode({ data }) {
                                         key={semester.id}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            data?.onAddModuleToPlan?.(data?.modulePayload, (Number(semester.id) || 1) - 1);
+                                            const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                            if (isParked && isParkingChoice) return;
+                                            const laneIndex = Number.isFinite(Number(semester?.laneIndex))
+                                                ? Number(semester.laneIndex)
+                                                : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0);
+                                            data?.onAddModuleToPlan?.(data?.modulePayload, laneIndex);
                                             setIsMenuOpen(false);
                                             setMenuView(null);
                                         }}
+                                        disabled={isParked && (Boolean(semester?.isParking) || Number(semester?.id) === 0)}
                                         style={{
                                             border: "1px solid #e5e7eb",
                                             borderRadius: 6,
                                             padding: "5px 8px",
                                             textAlign: "left",
-                                            background: "#ffffff",
-                                            cursor: "pointer",
+                                            background: isParked && (Boolean(semester?.isParking) || Number(semester?.id) === 0) ? "#f3f4f6" : "#ffffff",
+                                            cursor: isParked && (Boolean(semester?.isParking) || Number(semester?.id) === 0) ? "not-allowed" : "pointer",
                                             fontSize: 12,
                                             fontWeight: 600,
-                                            color: "#111827",
+                                            color: isParked && (Boolean(semester?.isParking) || Number(semester?.id) === 0) ? "#9ca3af" : "#111827",
                                         }}
                                     >
                                         {semester.title}

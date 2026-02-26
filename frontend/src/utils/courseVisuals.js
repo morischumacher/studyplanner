@@ -62,9 +62,18 @@ export function stateVisualByStatus(status) {
             extraShadow: "inset 0 0 0 1px #9ca3af",
         };
     }
+    if (status === "parked") {
+        return {
+            background: "#ffffff",
+            borderColor: null,
+            textColor: "#111827",
+            opacity: 1,
+            extraShadow: "0 2px 8px rgba(0,0,0,0.08)",
+        };
+    }
     if (status === "in_plan") {
         return {
-            background: "#f3f4f6",
+            background: "#ffffff",
             borderColor: null,
             textColor: "#111827",
             opacity: 1,
@@ -72,11 +81,11 @@ export function stateVisualByStatus(status) {
         };
     }
     return {
-        background: "transparent",
+        background: "#ffffff",
         borderColor: null,
         textColor: "#111827",
         opacity: 1,
-        extraShadow: "none",
+        extraShadow: "0 2px 8px rgba(0,0,0,0.08)",
     };
 }
 

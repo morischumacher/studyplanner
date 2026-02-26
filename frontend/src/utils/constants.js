@@ -32,7 +32,6 @@ export const TYPE_COLORS = {
 
 export const colorForType = (t) => TYPE_COLORS[t] || TYPE_COLORS.unknown;
 
-
 export const DEFAULT_EDGE_OPTIONS = {
     type: "smoothstep",
     animated: false,

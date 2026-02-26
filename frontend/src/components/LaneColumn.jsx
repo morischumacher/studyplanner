@@ -12,7 +12,10 @@ export default function LaneColumn({ data }) {
     const weightedGrade = Number.isFinite(Number(data?.weightedGrade)) ? Number(data.weightedGrade) : null;
     const courseNotes = Array.isArray(data?.courseNotes) ? data.courseNotes : [];
     const additionalNote = String(data?.additionalNote || "");
-    const laneHeight = Math.max(CANVAS_HEIGHT, Number(data?.height) || CANVAS_HEIGHT);
+    const isParkingLane = Boolean(data?.isParking) || Number(data?.semesterId) === 0;
+    const laneHeight = isParkingLane
+        ? Math.max(64, Number(data?.height) || 88)
+        : Math.max(CANVAS_HEIGHT, Number(data?.height) || CANVAS_HEIGHT);
 
     useEffect(() => {
         if (!isInfoOpen) return;
@@ -63,7 +66,7 @@ export default function LaneColumn({ data }) {
                     lineHeight: 1.2,
                 }}
             >
-                {data.title} · {plannedEcts.toFixed(1)} ECTS
+                {`${data.title} · ${plannedEcts.toFixed(1)} ECTS`}
             </div>
             <div
                 ref={infoRef}
@@ -75,27 +78,50 @@ export default function LaneColumn({ data }) {
                     zIndex: 1200,
                 }}
             >
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setIsInfoOpen((v) => !v);
-                    }}
-                    style={{
-                        border: "1px solid #d1d5db",
-                        background: "#ffffff",
-                        color: "#111827",
-                        borderRadius: 8,
-                        fontSize: 12,
-                        padding: "4px 8px",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                    }}
-                    title="Semester details"
-                    aria-label="Semester details"
-                >
-                    i
-                </button>
-                {isInfoOpen && (
+                {isParkingLane ? (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            data?.onToggleParkingCollapsed?.();
+                        }}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            color: "#111827",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            padding: "4px 8px",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                        }}
+                        title={data?.isParkingCollapsed ? "Show parking courses" : "Hide parking courses"}
+                        aria-label={data?.isParkingCollapsed ? "Show parking courses" : "Hide parking courses"}
+                    >
+                        {data?.isParkingCollapsed ? "Show" : "Hide"}
+                    </button>
+                ) : (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsInfoOpen((v) => !v);
+                        }}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            color: "#111827",
+                            borderRadius: 8,
+                            fontSize: 12,
+                            padding: "4px 8px",
+                            cursor: "pointer",
+                            fontWeight: 700,
+                        }}
+                        title="Semester details"
+                        aria-label="Semester details"
+                    >
+                        i
+                    </button>
+                )}
+                {!isParkingLane && isInfoOpen && (
                     <div
                         style={{
                             position: "absolute",

@@ -120,6 +120,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setCoursesFromNodes,
         coursesBySemester,
         doneCourseCodes,
+        parkedCourseCodes,
         courseMetaByCode,
         getCourseMeta,
         setCourseMeta,
@@ -174,6 +175,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     // React Flow refs
     const wrapperRef = useRef(null);
     const rfRef = useRef(null);
+    const addGraphModuleToPlanRef = useRef(null);
     const groupDragRef = useRef(new Map()); // Map<groupId, { lastX, lastY }>
     const nodeDragStartPosRef = useRef(new Map()); // Map<nodeId, { x, y }>
     const nodeDragInProgressRef = useRef(false);
@@ -209,6 +211,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [profileDraftMaxWeekHours, setProfileDraftMaxWeekHours] = useState(50);
     const [profileDraftRecommendedWeekHours, setProfileDraftRecommendedWeekHours] = useState(40);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isParkingCollapsed, setIsParkingCollapsed] = useState(false);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
     const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
     const [focusPrefillPrompt, setFocusPrefillPrompt] = useState(null);
@@ -632,20 +635,100 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     }, [maxSemesterCount, startTermSeason, termAvailabilityForCode]);
 
     const validSemestersForCourse = useCallback((courseCode) => {
-        return sidebarSemesters.filter((semester) => {
+        const allowed = sidebarSemesters.filter((semester) => {
             const laneIndex = (Number(semester?.id) || 1) - 1;
             return isCourseAllowedInLane(courseCode, laneIndex);
         });
+        return [{ id: 0, title: "Parking Stage", isParking: true }, ...allowed];
     }, [isCourseAllowedInLane, sidebarSemesters]);
 
     const validSemestersForModule = useCallback((courses) => {
         const codes = (Array.isArray(courses) ? courses : []).map((course) => course?.code).filter(Boolean);
-        if (!codes.length) return [];
-        return sidebarSemesters.filter((semester) => {
+        if (!codes.length) return [{ id: 0, title: "Parking Stage", isParking: true }];
+        const allowed = sidebarSemesters.filter((semester) => {
             const laneIndex = (Number(semester?.id) || 1) - 1;
             return codes.every((code) => isCourseAllowedInLane(code, laneIndex));
         });
+        if (allowed.length > 0) {
+            return [{ id: 0, title: "Parking Stage", isParking: true }, ...allowed];
+        }
+        const pairOptions = [];
+        for (let idx = 0; idx < sidebarSemesters.length - 1; idx += 1) {
+            const first = sidebarSemesters[idx];
+            const second = sidebarSemesters[idx + 1];
+            const firstLane = (Number(first?.id) || 1) - 1;
+            const secondLane = (Number(second?.id) || 1) - 1;
+            const canPlaceInWindow = codes.every((code) =>
+                isCourseAllowedInLane(code, firstLane) || isCourseAllowedInLane(code, secondLane)
+            );
+            if (!canPlaceInWindow) continue;
+            pairOptions.push({
+                id: `pair-${first?.id}-${second?.id}`,
+                laneIndex: firstLane,
+                windowEndLaneIndex: secondLane,
+                isPlus: Boolean(first?.isPlus || second?.isPlus),
+                title: `${first?.title ?? `Semester ${first?.id}`} & ${second?.title ?? `Semester ${second?.id}`}`,
+            });
+        }
+        if (pairOptions.length > 0) {
+            return [{ id: 0, title: "Parking Stage", isParking: true }, ...pairOptions];
+        }
+        const fallbackAllowed = sidebarSemesters.filter((semester) => {
+            const laneIndex = (Number(semester?.id) || 1) - 1;
+            return codes.some((code) => isCourseAllowedInLane(code, laneIndex));
+        });
+        return [{ id: 0, title: "Parking Stage", isParking: true }, ...fallbackAllowed];
     }, [isCourseAllowedInLane, sidebarSemesters]);
+    const catalogCourseByCode = useMemo(() => {
+        const byCode = new Map();
+        const subjects = Array.isArray(catalog) ? catalog : [];
+        subjects.forEach((subject, subjectIdx) => {
+            const modules = Array.isArray(subject?.modules) ? subject.modules : [];
+            modules.forEach((module, moduleIdx) => {
+                const standaloneCode = String(module?.code || `MOD-${subjectIdx + 1}-${moduleIdx + 1}`).trim();
+                const moduleCourses = Array.isArray(module?.courses) ? module.courses : [];
+                const moduleCourseCodes = moduleCourses
+                    .map((course) => String(course?.code || "").trim())
+                    .filter(Boolean);
+                const moduleId = `mod-cat-${subjectIdx + 1}-${moduleIdx + 1}-${standaloneCode || "module"}`;
+                const moduleMeta = moduleCourseCodes.length >= 2
+                    ? {
+                        id: moduleId,
+                        title: module?.name || "Module",
+                        code: module?.code ?? null,
+                        ects: module?.ects ?? null,
+                        examSubject: subject?.pruefungsfach ?? null,
+                        category: module?.category ?? "unknown",
+                        courseCodes: moduleCourseCodes,
+                    }
+                    : null;
+                if (moduleCourses.length === 0 && standaloneCode && !byCode.has(standaloneCode)) {
+                    byCode.set(standaloneCode, {
+                        code: standaloneCode,
+                        name: module?.name || standaloneCode,
+                        type: module?.category || null,
+                        ects: module?.ects ?? null,
+                        category: module?.category ?? "unknown",
+                        examSubject: subject?.pruefungsfach ?? null,
+                    });
+                }
+                for (const course of moduleCourses) {
+                    const code = String(course?.code || "").trim();
+                    if (!code || byCode.has(code)) continue;
+                    byCode.set(code, {
+                        code,
+                        name: course?.name || code,
+                        type: course?.type || null,
+                        ects: course?.ects ?? null,
+                        category: module?.category ?? "unknown",
+                        examSubject: subject?.pruefungsfach ?? null,
+                        moduleMeta,
+                    });
+                }
+            });
+        });
+        return byCode;
+    }, [catalog]);
 
     const plannedEctsBySemester = useMemo(() => {
         const out = {};
@@ -655,6 +738,18 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         }
         return out;
     }, [coursesBySemester, semesters]);
+    const parkingEctsFromParkedCodes = useMemo(() => {
+        const seenCodes = new Set();
+        let total = 0;
+        for (const codeRaw of Array.isArray(parkedCourseCodes) ? parkedCourseCodes : []) {
+            const code = String(codeRaw || "").trim();
+            if (!code || seenCodes.has(code)) continue;
+            seenCodes.add(code);
+            const catalogCourse = catalogCourseByCode.get(code);
+            total += Number(catalogCourse?.ects || 0);
+        }
+        return total;
+    }, [catalogCourseByCode, parkedCourseCodes]);
     const laneInsightsBySemester = useMemo(() => {
         const doneSet = new Set(doneCourseCodes || []);
         const parseNumeric = (value) => {
@@ -800,12 +895,38 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
     // Lane background columns
     const laneNodes = useMemo(
-        () =>
-            semesters.map((s, i) => ({
+        () => {
+            const parkingLaneHeight = isParkingCollapsed ? 88 : CANVAS_HEIGHT;
+            const parkingLane = {
+                id: "lane-0",
+                type: "lane",
+                data: {
+                    title: "Parking Stage",
+                    isParking: true,
+                    isParkingCollapsed,
+                    onToggleParkingCollapsed: () => setIsParkingCollapsed((v) => !v),
+                    even: false,
+                    height: parkingLaneHeight,
+                    ectsPlanned: Number(parkingEctsFromParkedCodes ?? 0),
+                    semesterId: 0,
+                    courseNotes: [],
+                    estimatedHoursTotal: 0,
+                    weightedGrade: null,
+                    additionalNote: "",
+                    onSetSemesterNote: null,
+                },
+                position: { x: laneX(-1), y: 0 },
+                draggable: false,
+                selectable: false,
+                zIndex: 0,
+                style: { height: parkingLaneHeight, width: LANE_WIDTH },
+            };
+            const regular = semesters.map((s, i) => ({
                 id: `lane-${s.id}`,
                 type: "lane",
                 data: {
                     title: s.title,
+                    isParking: false,
                     even: i % 2 === 0,
                     height: CANVAS_HEIGHT,
                     ectsPlanned: Number(plannedEctsBySemester?.[s.id] ?? 0),
@@ -821,13 +942,32 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 selectable: false,
                 zIndex: 0,
                 style: { height: CANVAS_HEIGHT },
-            })),
-        [laneInsightsBySemester, plannedEctsBySemester, semesters, setSemesterNote]
+            }));
+            return [parkingLane, ...regular];
+        },
+        [isParkingCollapsed, laneInsightsBySemester, parkingEctsFromParkedCodes, plannedEctsBySemester, semesters, setSemesterNote]
     );
 
     // React Flow state
     const initialNodes = useMemo(() => [...laneNodes], [laneNodes]);
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+    const renderNodes = useMemo(() => {
+        return nodes.map((node) => {
+            const isParkedCourse = node?.type === "course" && String(node?.data?.status || "") === "parked";
+            const isParkedGroup = node?.type === "moduleBg" && String(node?.data?.status || "") === "parked";
+            const shouldHide = Boolean(isParkingCollapsed && (isParkedCourse || isParkedGroup));
+            const hadGhost = Boolean(node?.data?.collapsedGhost);
+            if (Boolean(node?.hidden) === shouldHide && !hadGhost) return node;
+            return {
+                ...node,
+                hidden: shouldHide,
+                data: {
+                    ...(node?.data || {}),
+                    collapsedGhost: false,
+                },
+            };
+        });
+    }, [isParkingCollapsed, nodes]);
     const requiredLaneHeight = useMemo(() => {
         let maxBottom = 0;
         for (const node of nodes) {
@@ -870,20 +1010,29 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     useEffect(() => {
         setNodes((prev) => {
             const nonLane = prev.filter((n) => n.type !== "lane");
-            const prevLaneIds = prev.filter((n) => n.type === "lane").map((n) => n.id).join("|");
-            const nextLaneIds = laneNodes.map((n) => n.id).join("|");
-            if (prevLaneIds === nextLaneIds) return prev;
             return [...laneNodes, ...nonLane];
         });
     }, [laneNodes, setNodes]);
 
     useEffect(() => {
         setNodes((prev) => {
+            const seenParkedCodes = new Set();
+            let parkedEctsFromNodes = 0;
+            for (const node of prev) {
+                if (node?.type !== "course") continue;
+                if (String(node?.data?.status || "") !== "parked") continue;
+                const code = String(node?.data?.code || "").trim();
+                if (code && seenParkedCodes.has(code)) continue;
+                if (code) seenParkedCodes.add(code);
+                parkedEctsFromNodes += Number(node?.data?.ects || 0);
+            }
             let changed = false;
             const next = prev.map((node) => {
                 if (node.type !== "lane") return node;
                 const semesterId = Number(String(node.id).replace("lane-", ""));
-                const ectsPlanned = Number(plannedEctsBySemester?.[semesterId] ?? 0);
+                const ectsPlanned = semesterId === 0
+                    ? Number(parkedEctsFromNodes || 0)
+                    : Number(plannedEctsBySemester?.[semesterId] ?? 0);
                 const laneInsight = laneInsightsBySemester?.[semesterId] ?? {};
                 const currentEcts = Number(node?.data?.ectsPlanned ?? 0);
                 const currentHeight = Number(node?.data?.height ?? 0);
@@ -1006,7 +1155,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setNodes((prev) => prev.filter((n) => n.id !== groupId && n.data?.groupId !== groupId));
         setNeedsPersist(true);
     }, [setNodes]);
-
     const rollbackAddedCourses = useCallback((change) => {
         const addedIds = Array.isArray(change?.added) ? change.added.map((a) => a?.id).filter(Boolean) : [];
         if (!addedIds.length) return;
@@ -1145,9 +1293,292 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         });
     }, [nodes, setCourseDone, setNodes]);
 
+    const parkCourseCodes = useCallback((courseCodes) => {
+        const input = Array.isArray(courseCodes) ? courseCodes : [courseCodes];
+        const requestedByCode = new Map();
+        for (const item of input) {
+            const isObject = item && typeof item === "object";
+            const code = String(isObject ? item?.code : item || "").trim();
+            if (!code) continue;
+            if (!requestedByCode.has(code)) {
+                requestedByCode.set(code, isObject ? item : null);
+            }
+        }
+        const requestedCodes = [...requestedByCode.keys()];
+        if (!requestedCodes.length) return false;
+
+        const source = rfRef.current?.getNodes?.() || nodes;
+        const groupedCodes = new Set();
+        for (const code of requestedCodes) {
+            const node = source.find((n) => n?.type === "course" && String(n?.data?.code || "").trim() === code);
+            const groupId = String(node?.data?.groupId || "").trim();
+            if (!groupId) continue;
+            source
+                .filter((n) => n?.type === "course" && String(n?.data?.groupId || "").trim() === groupId)
+                .forEach((n) => {
+                    const groupedCode = String(n?.data?.code || "").trim();
+                    if (groupedCode) groupedCodes.add(groupedCode);
+                });
+        }
+        const allCodes = [...new Set([...requestedCodes, ...groupedCodes])];
+        if (!allCodes.length) return false;
+
+        allCodes.forEach((code) => setCourseDone(code, false));
+        const targetSet = new Set(allCodes);
+        const now = Date.now();
+        const x = centerX(-1);
+        let persistedNodes = null;
+        let changed = false;
+        setNodes((prev) => {
+            const parkedByCode = new Map();
+            const removeGroupIds = new Set();
+            const removedCourseByCode = new Map();
+            const next = [];
+            for (const node of prev) {
+                if (node?.type === "course") {
+                    const code = String(node?.data?.code || "").trim();
+                    if (node?.data?.status === "parked" && code && !parkedByCode.has(code)) {
+                        parkedByCode.set(code, node);
+                    }
+                    if (code && targetSet.has(code)) {
+                        const groupId = String(node?.data?.groupId || "").trim();
+                        if (groupId) removeGroupIds.add(groupId);
+                        if (!removedCourseByCode.has(code)) removedCourseByCode.set(code, node);
+                        continue;
+                    }
+                }
+                next.push(node);
+            }
+            const survivors = next.filter((node) => !(node?.type === "moduleBg" && removeGroupIds.has(String(node?.id || ""))));
+
+            let parkingIndex = survivors.filter((n) => n?.type === "course" && String(n?.data?.status || "") === "parked").length;
+            const appended = [];
+            for (const code of allCodes) {
+                if (parkedByCode.has(code)) {
+                    const parked = parkedByCode.get(code);
+                    appended.push({
+                        ...parked,
+                        data: {
+                            ...parked.data,
+                            status: "parked",
+                            groupId: null,
+                            moduleMeta: null,
+                        },
+                        position: {
+                            ...parked.position,
+                            x,
+                        },
+                    });
+                    continue;
+                }
+                const removed = removedCourseByCode.get(code);
+                const requestedMeta = requestedByCode.get(code) || {};
+                const fromCatalog = catalogCourseByCode.get(code) || {};
+                const resolvedModuleMeta =
+                    removed?.data?.moduleMeta ||
+                    requestedMeta?.moduleMeta ||
+                    fromCatalog?.moduleMeta ||
+                    null;
+                const examSubject =
+                    removed?.data?.examSubject ||
+                    requestedMeta?.examSubject ||
+                    fromCatalog?.examSubject ||
+                    getExamSubjectForCode(catalog, code) ||
+                    null;
+                const subjectColor =
+                    removed?.data?.subjectColor ||
+                    requestedMeta?.subjectColor ||
+                    fromCatalog?.subjectColor ||
+                    (examSubject ? subjectColors?.[examSubject] : null) ||
+                    "#2563eb";
+                appended.push({
+                    id: removed?.id || `${code}-parked-${now}-${parkingIndex}`,
+                    type: "course",
+                    data: {
+                        label: removed?.data?.label || requestedMeta?.name || requestedMeta?.label || fromCatalog?.name || code,
+                        code,
+                        type: removed?.data?.type ?? requestedMeta?.type ?? fromCatalog?.type ?? getCourseTypeForCode(catalog, code),
+                        ects: removed?.data?.ects ?? requestedMeta?.ects ?? fromCatalog?.ects ?? null,
+                        moduleMeta: resolvedModuleMeta,
+                        onRemove: removeCourseNode,
+                        onRemoveModuleGroup: removeModuleGroup,
+                        onToggleDone: toggleCourseDone,
+                        onUpdateEcts: updateCourseEcts,
+                        nodeId: removed?.id || `${code}-parked-${now}-${parkingIndex}`,
+                        examSubject,
+                        category: removed?.data?.category ?? requestedMeta?.category ?? fromCatalog?.category ?? "unknown",
+                        programCode,
+                        subjectColor,
+                        status: "parked",
+                    },
+                    position: {
+                        x,
+                        y: 96 + parkingIndex * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP),
+                    },
+                    sourcePosition: "right",
+                    targetPosition: "left",
+                    zIndex: 1,
+                });
+                parkingIndex += 1;
+                changed = true;
+            }
+            if (!appended.length && survivors.length === prev.length) return prev;
+            changed = true;
+            const withParkedCandidates = survivors.concat(appended);
+            const parkedCourses = withParkedCandidates.filter((n) => n?.type === "course" && String(n?.data?.status || "") === "parked");
+            const parkedCodeSet = new Set(
+                parkedCourses
+                    .map((n) => String(n?.data?.code || "").trim())
+                    .filter(Boolean)
+            );
+            const eligibleGroups = new Map();
+            for (const parkedCourse of parkedCourses) {
+                const code = String(parkedCourse?.data?.code || "").trim();
+                if (!code) continue;
+                const courseCatalog = catalogCourseByCode.get(code) || {};
+                const modMeta = parkedCourse?.data?.moduleMeta || courseCatalog?.moduleMeta || null;
+                if (!modMeta || !Array.isArray(modMeta?.courseCodes) || modMeta.courseCodes.length < 2) continue;
+                const allParked = modMeta.courseCodes.every((courseCode) => parkedCodeSet.has(String(courseCode || "").trim()));
+                if (!allParked) continue;
+                const groupKey = `parked-group-${String(modMeta.id || modMeta.code || modMeta.title || "module").replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+                if (!eligibleGroups.has(groupKey)) {
+                    eligibleGroups.set(groupKey, {
+                        groupId: groupKey,
+                        moduleMeta: modMeta,
+                    });
+                }
+            }
+
+            const withoutOldParkingGroups = withParkedCandidates.filter(
+                (n) => !(n?.type === "moduleBg" && String(n?.id || "").startsWith("parked-group-"))
+            );
+            const groupedCourses = withoutOldParkingGroups.map((node) => {
+                if (node?.type !== "course" || String(node?.data?.status || "") !== "parked") return node;
+                const code = String(node?.data?.code || "").trim();
+                const courseCatalog = catalogCourseByCode.get(code) || {};
+                const modMeta = node?.data?.moduleMeta || courseCatalog?.moduleMeta || null;
+                const groupId = modMeta
+                    ? `parked-group-${String(modMeta.id || modMeta.code || modMeta.title || "module").replace(/[^a-zA-Z0-9_-]/g, "_")}`
+                    : null;
+                if (!groupId || !eligibleGroups.has(groupId)) {
+                    if (!node?.data?.groupId) return node;
+                    return {
+                        ...node,
+                        data: { ...node.data, groupId: null },
+                    };
+                }
+                if (node?.data?.groupId === groupId) return node;
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        groupId,
+                        moduleMeta: modMeta || null,
+                    },
+                };
+            });
+
+            const parkingGroupNodes = [...eligibleGroups.values()].map(({ groupId, moduleMeta }) => {
+                const moduleCourses = (Array.isArray(moduleMeta?.courseCodes) ? moduleMeta.courseCodes : [])
+                    .map((courseCode) => {
+                        const normalizedCode = String(courseCode || "").trim();
+                        const fromCatalog = catalogCourseByCode.get(normalizedCode) || {};
+                        return {
+                            code: normalizedCode,
+                            name: fromCatalog?.name || normalizedCode,
+                            ects: fromCatalog?.ects ?? null,
+                            type: fromCatalog?.type ?? null,
+                        };
+                    })
+                    .filter((course) => Boolean(course?.code));
+                const modulePayload = {
+                    kind: "module",
+                    code: moduleMeta?.code ?? null,
+                    name: moduleMeta?.title || "Module",
+                    category: moduleMeta?.category ?? "unknown",
+                    subjectColor: (moduleMeta?.examSubject ? subjectColors?.[moduleMeta.examSubject] : null) || "#2563eb",
+                    courses: moduleCourses,
+                };
+                return {
+                    id: groupId,
+                    type: "moduleBg",
+                    data: {
+                        title: moduleMeta?.title || "Module",
+                        code: null,
+                        moduleCode: moduleMeta?.code ?? null,
+                        moduleEcts: moduleMeta?.ects ?? null,
+                        moduleCourseCount: Array.isArray(moduleMeta?.courseCodes) ? moduleMeta.courseCodes.length : 0,
+                        moduleCourseCodes: Array.isArray(moduleMeta?.courseCodes) ? moduleMeta.courseCodes : [],
+                        status: "parked",
+                        groupId,
+                        onRemoveGroup: removeModuleGroup,
+                        onRemove: () => removeModuleGroup(groupId),
+                        onToggleModuleDone: toggleModuleDoneCodes,
+                        onAddModuleToPlan: (...args) => addGraphModuleToPlanRef.current?.(...args),
+                        semestersForModule: validSemestersForModule(moduleCourses).map((semester) => ({
+                            ...semester,
+                            title: semester?.title ?? `Semester ${semester?.id}`,
+                        })),
+                        modulePayload,
+                        examSubject: moduleMeta?.examSubject ?? null,
+                        category: moduleMeta?.category ?? "unknown",
+                        programCode,
+                        subjectColor: (moduleMeta?.examSubject ? subjectColors?.[moduleMeta.examSubject] : null) || "#2563eb",
+                    },
+                    position: { x, y: MIN_GROUP_CHILD_Y },
+                    draggable: true,
+                    dragHandle: ".module-bg-drag-handle",
+                    selectable: false,
+                    zIndex: 0,
+                };
+            });
+
+            let groupedResolved = groupedCourses.concat(parkingGroupNodes);
+            for (const { groupId } of eligibleGroups.values()) {
+                groupedResolved = resolveGroupCourseOverlaps(groupedResolved, groupId);
+                groupedResolved = recomputeGroupFromChildren(groupedResolved, groupId);
+            }
+            const resolved = resolveLaneCollisions(groupedResolved);
+            persistedNodes = resolved.filter((n) => n.type !== "lane");
+            return resolved;
+        });
+
+        if (!changed) return false;
+        if (Array.isArray(persistedNodes)) {
+            setCoursesFromNodes(persistedNodes);
+            setNeedsPersist(false);
+        } else {
+        setNeedsPersist(true);
+        }
+        return true;
+    }, [
+        MIN_GROUP_CHILD_Y,
+        catalog,
+        catalogCourseByCode,
+        centerX,
+        nodes,
+        programCode,
+        removeCourseNode,
+        removeModuleGroup,
+        recomputeGroupFromChildren,
+        resolveLaneCollisions,
+        setCourseDone,
+        setCoursesFromNodes,
+        setNodes,
+        subjectColors,
+        toggleCourseDone,
+        updateCourseEcts,
+        toggleModuleDoneCodes,
+        validSemestersForModule,
+    ]);
+
     const addGraphCourseToPlan = useCallback((course, requestedLaneIndex, options = null) => {
         const courseCode = course?.code;
-        if (!courseCode || getCourseStatus(courseCode) !== "todo") return false;
+        const currentStatus = getCourseStatus(courseCode);
+        if (!courseCode || (currentStatus !== "todo" && currentStatus !== "parked")) return false;
+        if (Number(requestedLaneIndex) < 0) {
+            return parkCourseCodes([course]);
+        }
 
         const allowDirect = Boolean(options?.allowDirectLaneSelection);
         const rawLaneIndex = allowDirect
@@ -1171,7 +1602,28 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         let persistedNodes = null;
         let added = false;
         setNodes((prev) => {
-            if (prev.some((n) => n.type === "course" && n?.data?.code === courseCode)) return prev;
+            const existing = prev.find((n) => n.type === "course" && n?.data?.code === courseCode);
+            if (existing && existing?.data?.status !== "parked") return prev;
+            if (existing && existing?.data?.status === "parked") {
+                const laneNodes = prev
+                    .filter((n) => n.type === "course" && laneIdx(n) === laneIndex && n.id !== existing.id)
+                    .sort((a, b) => (a?.position?.y ?? 0) - (b?.position?.y ?? 0));
+                const last = laneNodes[laneNodes.length - 1];
+                const y = last ? (last.position.y + COURSE_LAYOUT_HEIGHT + COLLISION_GAP) : 96;
+                const next = prev.map((n) => (
+                    n.id === existing.id
+                        ? {
+                            ...n,
+                            data: { ...n.data, status: "in_plan", groupId: null, moduleMeta: null },
+                            position: { ...n.position, x, y },
+                        }
+                        : n
+                ));
+                added = true;
+                const resolvedExisting = resolveLaneCollisions(next);
+                persistedNodes = resolvedExisting.filter((n) => n.type !== "lane");
+                return resolvedExisting;
+            }
 
             const laneNodes = prev
                 .filter((n) => n.type === "course" && laneIdx(n) === laneIndex)
@@ -1217,14 +1669,34 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+    }, [catalog, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, parkCourseCodes, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
 
     const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex, options = null) => {
         const variantResolution = resolveModuleVariantCourses(modulePayload, options?.variantId ?? null);
-        const courses = Array.isArray(variantResolution?.selectedCourses)
+        const selectedCoursesRaw = Array.isArray(variantResolution?.selectedCourses)
             ? variantResolution.selectedCourses
             : (Array.isArray(modulePayload?.courses) ? modulePayload.courses : []);
-        const allVariantCourses = Array.isArray(variantResolution?.allVariantCourses) ? variantResolution.allVariantCourses : courses;
+        const allVariantCoursesRaw = Array.isArray(variantResolution?.allVariantCourses)
+            ? variantResolution.allVariantCourses
+            : selectedCoursesRaw;
+        const enrichCourse = (course) => {
+            const code = String(course?.code || "").trim();
+            if (!code) return null;
+            const fromCatalog = catalogCourseByCode.get(code) || {};
+            return {
+                ...fromCatalog,
+                ...(course || {}),
+                code,
+                name: course?.name || fromCatalog?.name || code,
+                ects: course?.ects ?? fromCatalog?.ects ?? null,
+                type: course?.type ?? fromCatalog?.type ?? null,
+                category: modulePayload?.category ?? course?.category ?? fromCatalog?.category ?? "unknown",
+                examSubject: course?.examSubject ?? fromCatalog?.examSubject ?? null,
+                subjectColor: course?.subjectColor ?? fromCatalog?.subjectColor ?? null,
+            };
+        };
+        const courses = selectedCoursesRaw.map(enrichCourse).filter(Boolean);
+        const allVariantCourses = allVariantCoursesRaw.map(enrichCourse).filter(Boolean);
         if (courses.length === 1) {
             return addGraphCourseToPlan({
                 ...courses[0],
@@ -1235,7 +1707,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         if (courses.length < 2) return false;
         const codes = courses.map((c) => c?.code).filter(Boolean);
         if (!codes.length) return false;
-        if (codes.some((code) => getCourseStatus(code) !== "todo")) return false;
+        if (Number(requestedLaneIndex) < 0) {
+            return parkCourseCodes(courses);
+        }
+        if (codes.some((code) => {
+            const status = getCourseStatus(code);
+            return status !== "todo" && status !== "parked";
+        })) return false;
         const conflictingVariantCodes = allVariantCourses
             .map((c) => c?.code)
             .filter((code) => code && !codes.includes(code));
@@ -1245,9 +1723,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             ? Math.max(0, Math.min(Number(requestedLaneIndex) || 0, maxSemesterCount - 1))
             : clampPlacementLane(requestedLaneIndex);
         const allAllowedAtLane = (laneIdx) => codes.every((code) => isCourseAllowedInLane(code, laneIdx));
-        let laneIndex = rawLaneIndex;
-        if (!allowDirect) {
-            laneIndex = null;
+        let laneIndex = null;
+        if (allowDirect) {
+            laneIndex = allAllowedAtLane(rawLaneIndex) ? rawLaneIndex : null;
+        } else {
             for (let idx = rawLaneIndex; idx <= maxSemesterCount - 1; idx += 1) {
                 if (allAllowedAtLane(idx)) {
                     laneIndex = idx;
@@ -1263,8 +1742,135 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 }
             }
         }
-        if (laneIndex == null) return false;
-        if (allowDirect && !allAllowedAtLane(laneIndex)) return false;
+        if (laneIndex == null) {
+            const targetLaneByCode = new Map();
+            for (const course of courses) {
+                const code = String(course?.code || "").trim();
+                if (!code) continue;
+                const targetLane = firstAllowedLaneForCourse(code, rawLaneIndex);
+                if (targetLane == null) return false;
+                targetLaneByCode.set(code, targetLane);
+            }
+            if (targetLaneByCode.size !== codes.length) return false;
+
+            const y = Math.max(144, MIN_GROUP_CHILD_Y);
+            const now = Date.now();
+            const groupId = `mod-${now}-graph`;
+            const groupExamSubject =
+                modulePayload?.examSubject ||
+                getExamSubjectForCode(catalog, modulePayload?.code) ||
+                getExamSubjectForCode(catalog, courses?.[0]?.code) ||
+                null;
+            const resolvedGroupSubjectColor =
+                modulePayload?.subjectColor ||
+                (groupExamSubject ? subjectColors?.[groupExamSubject] : null) ||
+                "#2563eb";
+
+            const groupNode = {
+                id: groupId,
+                type: "moduleBg",
+                data: {
+                    title: `${modulePayload?.name || "Module"}`,
+                    code: null,
+                    moduleCode: modulePayload?.code ?? null,
+                    moduleEcts: modulePayload?.ects ?? null,
+                    moduleCourseCount: courses.length,
+                    moduleCourseCodes: codes,
+                    status: "in_plan",
+                    groupId,
+                    onRemoveGroup: removeModuleGroup,
+                    onRemove: () => removeModuleGroup(groupId),
+                    onToggleModuleDone: toggleModuleDoneCodes,
+                    examSubject: groupExamSubject,
+                    category: modulePayload?.category ?? "unknown",
+                    programCode,
+                    subjectColor: resolvedGroupSubjectColor,
+                },
+                position: { x: centerX(rawLaneIndex), y },
+                draggable: true,
+                dragHandle: ".module-bg-drag-handle",
+                selectable: false,
+                zIndex: 0,
+            };
+
+            const childCourseNodes = courses.map((course, idx) => {
+                const code = String(course?.code || "").trim();
+                const childId = `${code}-${now}-${idx}-graph`;
+                const targetLane = targetLaneByCode.get(code);
+                const baseY = y + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
+                const examSubject =
+                    getExamSubjectForCode(catalog, code) || getExamSubjectForCode(catalog, modulePayload?.code);
+                const resolvedCourseSubjectColor =
+                    (examSubject ? subjectColors?.[examSubject] : null) ||
+                    resolvedGroupSubjectColor;
+                return {
+                    id: childId,
+                    type: "course",
+                    data: {
+                        label: course?.name || code || "Course",
+                        code,
+                        type: course?.type ?? getCourseTypeForCode(catalog, code),
+                        ects: course?.ects ?? null,
+                        groupId,
+                        baseY,
+                        onRemove: removeCourseNode,
+                        onRemoveModuleGroup: removeModuleGroup,
+                        onToggleDone: toggleCourseDone,
+                        onUpdateEcts: updateCourseEcts,
+                        nodeId: childId,
+                        examSubject,
+                        category: modulePayload?.category ?? "unknown",
+                        programCode,
+                        subjectColor: resolvedCourseSubjectColor,
+                        status: "in_plan",
+                    },
+                    position: { x: centerX(targetLane), y: baseY },
+                    sourcePosition: "right",
+                    targetPosition: "left",
+                    zIndex: 1,
+                };
+            });
+
+            let persistedNodes = null;
+            let added = false;
+            setNodes((prev) => {
+                const hasSelectedAlready = codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code && n?.data?.status !== "parked"));
+                if (hasSelectedAlready) return prev;
+
+                const removeSet = new Set(conflictingVariantCodes);
+                const affectedGroupIds = new Set(
+                    prev
+                        .filter((n) =>
+                            n.type === "course" &&
+                            n?.data?.groupId &&
+                            (
+                                removeSet.has(n?.data?.code) ||
+                                (codes.includes(n?.data?.code) && n?.data?.status === "parked")
+                            )
+                        )
+                        .map((n) => n.data.groupId)
+                );
+                let next = prev.filter((n) => !(n.type === "course" && (removeSet.has(n?.data?.code) || (codes.includes(n?.data?.code) && n?.data?.status === "parked"))));
+                for (const oldGroupId of affectedGroupIds) {
+                    next = recomputeGroupFromChildren(next, oldGroupId);
+                }
+
+                const withAll = next.concat(groupNode, ...childCourseNodes);
+                const sized = recomputeGroupFromChildren(withAll, groupId);
+                const resolved = resolveLaneCollisions(sized);
+                persistedNodes = resolved.filter((n) => n.type !== "lane");
+                added = true;
+                return resolved;
+            });
+            if (!added) return false;
+            if (Array.isArray(persistedNodes)) {
+                setCoursesFromNodes(persistedNodes);
+                setNeedsPersist(false);
+            } else {
+                setNeedsPersist(true);
+            }
+            return true;
+        }
         const x = centerX(laneIndex);
         const y = Math.max(144, MIN_GROUP_CHILD_Y);
         const now = Date.now();
@@ -1301,6 +1907,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             },
             position: { x, y },
             draggable: true,
+            dragHandle: ".module-bg-drag-handle",
             selectable: false,
             zIndex: 0,
         };
@@ -1344,16 +1951,23 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         let persistedNodes = null;
         let added = false;
         setNodes((prev) => {
-            const hasSelectedAlready = codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code));
+            const hasSelectedAlready = codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code && n?.data?.status !== "parked"));
             if (hasSelectedAlready) return prev;
 
             const removeSet = new Set(conflictingVariantCodes);
             const affectedGroupIds = new Set(
                 prev
-                    .filter((n) => n.type === "course" && removeSet.has(n?.data?.code) && n?.data?.groupId)
+                    .filter((n) =>
+                        n.type === "course" &&
+                        n?.data?.groupId &&
+                        (
+                            removeSet.has(n?.data?.code) ||
+                            (codes.includes(n?.data?.code) && n?.data?.status === "parked")
+                        )
+                    )
                     .map((n) => n.data.groupId)
             );
-            let next = prev.filter((n) => !(n.type === "course" && removeSet.has(n?.data?.code)));
+            let next = prev.filter((n) => !(n.type === "course" && (removeSet.has(n?.data?.code) || (codes.includes(n?.data?.code) && n?.data?.status === "parked"))));
             for (const oldGroupId of affectedGroupIds) {
                 next = recomputeGroupFromChildren(next, oldGroupId);
             }
@@ -1373,7 +1987,11 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             setNeedsPersist(true);
         }
         return true;
-    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, clampPlacementLane, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
+    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, catalogCourseByCode, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
+
+    useEffect(() => {
+        addGraphModuleToPlanRef.current = addGraphModuleToPlan;
+    }, [addGraphModuleToPlan]);
 
     const toggleGraphCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
@@ -1425,11 +2043,26 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 const nextNotes = String(meta?.notes ?? "");
                 const nextEstimatedHours = String(meta?.estimatedHours ?? "");
                 const nextGrade = String(meta?.grade ?? "");
+                const nextSemesters = validSemestersForCourse(code).map((semester) => ({
+                    ...semester,
+                    title: semester?.title ?? `Semester ${semester?.id}`,
+                }));
+                const needsAddToPlanHandler = typeof node?.data?.onAddToPlan !== "function";
+                const needsAddModuleToPlanHandler = typeof node?.data?.onAddModuleToPlan !== "function";
+                const currentSemesterSig = (Array.isArray(node?.data?.semesters) ? node.data.semesters : [])
+                    .map((semester) => `${Number(semester?.id) || 0}:${semester?.title || ""}:${semester?.isParking ? 1 : 0}:${semester?.isPlus ? 1 : 0}`)
+                    .join("|");
+                const nextSemesterSig = nextSemesters
+                    .map((semester) => `${Number(semester?.id) || 0}:${semester?.title || ""}:${semester?.isParking ? 1 : 0}:${semester?.isPlus ? 1 : 0}`)
+                    .join("|");
                 if (
                     node?.data?.notes === nextNotes &&
                     String(node?.data?.estimatedHours ?? "") === nextEstimatedHours &&
                     String(node?.data?.grade ?? "") === nextGrade &&
-                    node?.data?.onUpdateCourseMeta === updateCourseMeta
+                    node?.data?.onUpdateCourseMeta === updateCourseMeta &&
+                    !needsAddToPlanHandler &&
+                    !needsAddModuleToPlanHandler &&
+                    currentSemesterSig === nextSemesterSig
                 ) {
                     return node;
                 }
@@ -1442,12 +2075,15 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         estimatedHours: nextEstimatedHours,
                         grade: nextGrade,
                         onUpdateCourseMeta: updateCourseMeta,
+                        onAddToPlan: needsAddToPlanHandler ? addGraphCourseToPlan : node?.data?.onAddToPlan,
+                        onAddModuleToPlan: needsAddModuleToPlanHandler ? addGraphModuleToPlan : node?.data?.onAddModuleToPlan,
+                        semesters: nextSemesters,
                     },
                 };
             });
             return changed ? next : prev;
         });
-    }, [courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta]);
+    }, [addGraphCourseToPlan, addGraphModuleToPlan, courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta, validSemestersForCourse]);
 
     const removeGraphCoursesFromPlan = useCallback((courseCodes) => {
         const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
@@ -1656,6 +2292,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 },
                 position: { x: children[0].position.x, y: children[0].position.y },
                 draggable: true,
+                dragHandle: ".module-bg-drag-handle",
                 selectable: false,
                 zIndex: 0,
             });
@@ -1875,35 +2512,41 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     // Keep node status visuals in sync with persisted done-state.
     useEffect(() => {
         const doneSet = new Set(doneCourseCodes || []);
+        const parkedSet = new Set(parkedCourseCodes || []);
         setNodes((prev) => {
             const groupStatuses = new Map();
             for (const n of prev) {
                 if (n.type !== "course" || !n?.data?.groupId) continue;
                 const groupId = n.data.groupId;
-                const nextCourseStatus = doneSet.has(n?.data?.code) ? "done" : "in_plan";
-                const current = groupStatuses.get(groupId) || { total: 0, done: 0 };
+                const nextCourseStatus = parkedSet.has(n?.data?.code) ? "parked" : (doneSet.has(n?.data?.code) ? "done" : "in_plan");
+                const current = groupStatuses.get(groupId) || { total: 0, done: 0, parked: 0 };
                 current.total += 1;
                 if (nextCourseStatus === "done") current.done += 1;
+                if (nextCourseStatus === "parked") current.parked += 1;
                 groupStatuses.set(groupId, current);
             }
 
             return prev.map((n) => {
                 if (n.type === "course") {
-                    const status = doneSet.has(n?.data?.code) ? "done" : "in_plan";
+                    const status = parkedSet.has(n?.data?.code)
+                        ? "parked"
+                        : (doneSet.has(n?.data?.code) ? "done" : "in_plan");
                     if (n?.data?.status === status) return n;
                     return { ...n, data: { ...n.data, status } };
                 }
                 if (n.type === "moduleBg") {
                     const group = groupStatuses.get(n.id);
                     if (!group || group.total <= 0) return n;
-                    const status = group.done === group.total ? "done" : "in_plan";
+                    const status = group.done === group.total
+                        ? "done"
+                        : (group.parked === group.total ? "parked" : "in_plan");
                     if (n?.data?.status === status) return n;
                     return { ...n, data: { ...n.data, status } };
                 }
                 return n;
             });
         });
-    }, [doneCourseCodes, setNodes]);
+    }, [doneCourseCodes, parkedCourseCodes, setNodes]);
 
     // Notify backend rule-check endpoint on each plan/status change.
     useEffect(() => {
@@ -2061,6 +2704,19 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         // If a whole module group was dragged: shift children by the snap delta, snap the group,
         // then recompute the group bbox, and resolve collisions.
         if (node?.type === "moduleBg") {
+            const span = LANE_WIDTH + LANE_GAP;
+            const rawLane = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
+            if (rawLane < 0) {
+                const source = rfRef.current?.getNodes?.() || [];
+                const codes = source
+                    .filter((n) => n.type === "course" && n?.data?.groupId === node.id)
+                    .map((n) => n?.data?.code)
+                    .filter(Boolean);
+                parkCourseCodes(codes);
+                groupDragRef.current.delete(node.id);
+                nodeDragStartPosRef.current.delete(node?.id);
+                return;
+            }
             setNodes((prev) => {
                 const children = prev.filter((n) => n.type === "course" && n.data?.groupId === node.id);
                 const clampedGroupY = Math.max(MIN_MODULE_GROUP_TOP_Y, snappedY);
@@ -2074,9 +2730,25 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         }
                         return {
                             ...n,
+                            data: {
+                                ...n.data,
+                                status: "in_plan",
+                            },
                             position: {
                                 x: centerX(targetLane),
                                 y: n.position.y + dySnap,
+                            },
+                        };
+                    }
+                    if (n.type === "moduleBg" && n.id === node.id) {
+                        return {
+                            ...n,
+                            data: {
+                                ...n.data,
+                                status: "in_plan",
+                                onToggleModuleDone: toggleModuleDoneCodes,
+                                onRemoveGroup: removeModuleGroup,
+                                onRemove: () => removeModuleGroup(node.id),
                             },
                         };
                     }
@@ -2092,6 +2764,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
         // Course inside a group → snap only the course, then recompute the group bbox
         if (node?.type === "course" && node?.data?.groupId) {
+            const span = LANE_WIDTH + LANE_GAP;
+            const rawLane = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
+            if (rawLane < 0) {
+                parkCourseCodes([node?.data?.code]);
+                nodeDragStartPosRef.current.delete(node?.id);
+                return;
+            }
             const groupId = node.data.groupId;
             const startPos = nodeDragStartPosRef.current.get(node?.id);
             const preferredLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
@@ -2130,6 +2809,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         }
 
         // All other nodes: normal snapping + collision resolution
+        const span = LANE_WIDTH + LANE_GAP;
+        const rawLane = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
+        if (node?.type === "course" && rawLane < 0) {
+            parkCourseCodes([node?.data?.code]);
+            nodeDragStartPosRef.current.delete(node?.id);
+            return;
+        }
         const preferredLane = clampPlacementLane(laneIndexFromX(node.position.x, maxSemesterCount - 1));
         const startPos = nodeDragStartPosRef.current.get(node?.id);
         if (node?.type === "course" && !isCourseAllowedInLane(node?.data?.code, preferredLane) && startPos) {
@@ -2155,7 +2841,23 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         }
         const snappedX = centerX(li);
         setNodes((prev) => {
-            const next = prev.map((n) => (n.id === node.id ? { ...n, position: { x: snappedX, y: snappedY } } : n));
+            const next = prev.map((n) => {
+                if (n.id !== node.id) return n;
+                if (n?.type === "course" && String(n?.data?.status || "") === "parked") {
+                    setCourseDone(String(n?.data?.code || ""), false);
+                    return {
+                        ...n,
+                        data: {
+                            ...n.data,
+                            status: "in_plan",
+                            groupId: null,
+                            moduleMeta: null,
+                        },
+                        position: { x: snappedX, y: snappedY },
+                    };
+                }
+                return { ...n, position: { x: snappedX, y: snappedY } };
+            });
             return resolveLaneCollisions(next);
         });
         if (invalidPlacementAttempted) {
@@ -2166,7 +2868,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             });
         }
         nodeDragStartPosRef.current.delete(node?.id);
-    }, [MIN_GROUP_CHILD_Y, MIN_MODULE_GROUP_TOP_Y, clampPlacementLane, firstAllowedLaneForCourse, isCourseAllowedInLane, laneIndexFromX, maxSemesterCount, setNodes, setStickyViolation]);
+    }, [MIN_GROUP_CHILD_Y, MIN_MODULE_GROUP_TOP_Y, clampPlacementLane, firstAllowedLaneForCourse, isCourseAllowedInLane, laneIndexFromX, maxSemesterCount, parkCourseCodes, removeModuleGroup, setCourseDone, setNodes, setStickyViolation, toggleModuleDoneCodes]);
 
     // Merge: run drag-stop logic, then schedule a persist
     const onNodeDragStopMerged = useCallback((evt, node) => {
@@ -2209,6 +2911,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             if (!children.length) continue;
             let movedAnyChildInGroup = false;
             for (const child of children) {
+                if (String(child?.data?.status || "") === "parked") continue;
                 const code = child?.data?.code;
                 if (!code) continue;
                 const currentLane = Math.max(0, Math.min(laneIndexFromX(child?.position?.x ?? 0, maxLane), maxLane));
@@ -2226,6 +2929,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
         for (const node of next) {
             if (node?.type !== "course") continue;
+            if (String(node?.data?.status || "") === "parked") continue;
             if (node?.data?.groupId) continue;
             const code = node?.data?.code;
             if (!code) continue;
@@ -2327,211 +3031,68 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             pendingDragPayloadRef.current = null;
             setDragPreviewSemesterCount(null);
 
-            const { x, y } = projectToLaneAndSnap({
+            const { x } = projectToLaneAndSnap({
                 evt,
                 wrapperEl: wrapperRef.current,
                 rfInstance: rfRef.current,
                 maxLaneIndex: Math.min(maxSemesterCount - 1, activeSemesterCount),
             });
-            const now = Date.now();
+            const bounds = wrapperRef.current?.getBoundingClientRect?.();
+            const viewport = rfRef.current?.getViewport?.() || { x: 0, y: 0, zoom: 1 };
+            const flowX = (Number(evt?.clientX || 0) - Number(bounds?.left || 0) - Number(viewport?.x || 0)) / (Number(viewport?.zoom || 1) || 1);
+            const dropInParking = flowX < laneX(0);
             const dropLaneIndex = Math.max(0, Math.min(laneIndexFromX(x, maxSemesterCount - 1), maxSemesterCount - 1));
 
-            // A) Module with >= 2 courses → create group + children
+            // A) Module with >= 2 courses
             if (payload?.kind === "module" && Array.isArray(payload.courses) && payload.courses.length >= 2) {
-                const groupChildBaseY = Math.max(y, MIN_GROUP_CHILD_Y);
                 const variantResolution = resolveModuleVariantCourses(payload, payload?.variantId ?? null);
                 const moduleCourses = Array.isArray(variantResolution?.selectedCourses) ? variantResolution.selectedCourses : payload.courses;
                 if (!moduleCourses.length) return;
-                if (moduleCourses.length === 1) {
-                    const single = moduleCourses[0];
-                    if (!isCourseAllowedInLane(single?.code, dropLaneIndex)) {
-                        setStickyViolation({
-                            message: "This course is not offered in that semester.",
-                            until: Date.now() + 3500,
-                            tone: "error",
-                        });
-                        return;
-                    }
-                    const singlePayload = {
-                        code: single?.code ?? payload?.code,
-                        name: single?.name ?? payload?.name,
-                        type: single?.type ?? payload?.type ?? getCourseTypeForCode(catalog, single?.code ?? payload?.code),
-                        ects: single?.ects ?? payload?.ects ?? null,
-                        category: payload?.category ?? null,
-                        subjectColor: payload?.subjectColor ?? null,
-                    };
-                    const id = `${singlePayload.code}-${now}`;
-                    const examSubject = getExamSubjectForCode(catalog, singlePayload.code);
-                    const resolvedSubjectColor =
-                        singlePayload.subjectColor ||
-                        (examSubject ? subjectColors?.[examSubject] : null) ||
-                        "#2563eb";
-                    setNodes((prev) => {
-                        const next = prev.concat({
-                            id,
-                            type: "course",
-                            data: {
-                                label: singlePayload.name,
-                                code: singlePayload.code,
-                                type: singlePayload.type ?? null,
-                                ects: singlePayload.ects ?? null,
-                                moduleMeta: null,
-                                onRemove: removeCourseNode,
-                                onToggleDone: toggleCourseDone,
-                                onUpdateEcts: updateCourseEcts,
-                                nodeId: id,
-                                examSubject,
-                                category: singlePayload.category ?? "unknown",
-                                programCode,
-                                subjectColor: resolvedSubjectColor,
-                                status: "in_plan",
-                            },
-                            position: { x, y: groupChildBaseY },
-                            sourcePosition: "right",
-                            targetPosition: "left",
-                            zIndex: 1,
-                        });
-                        return resolveLaneCollisions(next);
-                    });
+                if (dropInParking) {
+                    parkCourseCodes(moduleCourses.map((course) => course?.code).filter(Boolean));
                     schedulePersist();
                     return;
                 }
-                const groupId = `mod-${now}`;
-                const moduleCodes = moduleCourses.map((course) => course?.code).filter(Boolean);
-                if (!moduleCodes.every((courseCode) => isCourseAllowedInLane(courseCode, dropLaneIndex))) {
+                const added = addGraphModuleToPlan(payload, dropLaneIndex, {
+                    allowDirectLaneSelection: true,
+                    variantId: payload?.variantId ?? null,
+                });
+                if (!added) {
                     setStickyViolation({
-                        message: "At least one module course is not offered in that semester.",
+                        message: "At least one module course could not be placed in a valid semester.",
                         until: Date.now() + 3500,
                         tone: "error",
                     });
-                    return;
                 }
-                const groupExamSubject =
-                    getExamSubjectForCode(catalog, payload.code) ||
-                    getExamSubjectForCode(catalog, moduleCourses?.[0]?.code) ||
-                    null;
-                const resolvedGroupSubjectColor =
-                    payload.subjectColor ||
-                    (groupExamSubject ? subjectColors?.[groupExamSubject] : null) ||
-                    "#2563eb";
-
-                const groupNode = {
-                    id: groupId,
-                    type: "moduleBg",
-                    data: {
-                        title: `${payload.name}`,
-                        code: null,
-                        moduleCode: payload?.code ?? null,
-                        moduleEcts: payload?.ects ?? null,
-                        moduleCourseCount: moduleCourses?.length ?? 0,
-                        moduleCourseCodes: moduleCourses?.map((c) => c?.code).filter(Boolean) ?? [],
-                        status: "in_plan",
-                        groupId,
-                        onRemoveGroup: removeModuleGroup,
-                        onRemove: () => removeModuleGroup(groupId),
-                        onToggleModuleDone: toggleModuleDoneCodes,
-                        examSubject: groupExamSubject,
-                        category: payload.category ?? "unknown",
-                        programCode,
-                        subjectColor: resolvedGroupSubjectColor,
-                    },
-                    position: { x, y: groupChildBaseY }, // preliminary; will be resized by recomputeGroupFromChildren
-                    draggable: true,
-                    selectable: false,
-                    zIndex: 0,
-                };
-
-                const childCourseNodes = moduleCourses.map((course, idx) => {
-                    const childId = `${course.code}-${now}-${idx}`;
-                    const baseY = groupChildBaseY + idx * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
-                    const examSubject =
-                        getExamSubjectForCode(catalog, course.code) || getExamSubjectForCode(catalog, payload.code);
-                    const resolvedCourseSubjectColor =
-                        (examSubject ? subjectColors?.[examSubject] : null) ||
-                        resolvedGroupSubjectColor;
-
-                    return {
-                        id: childId,
-                        type: "course",
-                        data: {
-                            label: course.name,
-                            code: course.code,
-                            type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
-                            ects: course.ects ?? null,
-                            groupId,
-                            baseY,
-                            onRemove: removeCourseNode,
-                            onRemoveModuleGroup: removeModuleGroup,
-                            onToggleDone: toggleCourseDone,
-                            onUpdateEcts: updateCourseEcts,
-                            nodeId: childId,
-                            examSubject,
-                            category: payload.category ?? "unknown",
-                            programCode,
-                            subjectColor: resolvedCourseSubjectColor,
-                            status: "in_plan",
-                        },
-                        position: { x, y: baseY },
-                        sourcePosition: "right",
-                        targetPosition: "left",
-                        zIndex: 1,
-                    };
-                });
-
-                setNodes((prev) => {
-                    const withAll = prev.concat(groupNode, ...childCourseNodes);
-                    const sized = recomputeGroupFromChildren(withAll, groupId);
-                    return resolveLaneCollisions(sized);
-                });
                 schedulePersist();
                 return;
             }
 
             // B) Single course card (or module with a single course treated as course)
-            const id = `${payload.code}-${now}`;
-            if (!isCourseAllowedInLane(payload?.code, dropLaneIndex)) {
+            if (dropInParking) {
+                parkCourseCodes([payload.code]);
+                schedulePersist();
+                return;
+            }
+            const added = addGraphCourseToPlan({
+                code: payload.code,
+                name: payload.name,
+                type: payload?.type ?? getCourseTypeForCode(catalog, payload?.code),
+                ects: payload.ects ?? null,
+                moduleMeta: payload?.moduleMeta ?? null,
+                category: payload.category ?? "unknown",
+                subjectColor: payload.subjectColor ?? null,
+            }, dropLaneIndex, { allowDirectLaneSelection: true });
+            if (!added) {
                 setStickyViolation({
                     message: "This course is not offered in that semester.",
                     until: Date.now() + 3500,
                     tone: "error",
                 });
-                return;
             }
-            const examSubject = getExamSubjectForCode(catalog, payload.code);
-            const resolvedSubjectColor =
-                payload.subjectColor ||
-                (examSubject ? subjectColors?.[examSubject] : null) ||
-                "#2563eb";
-            setNodes((prev) => {
-                const next = prev.concat({
-                    id,
-                    type: "course",
-                    data: {
-                        label: payload.name,
-                        code: payload.code,
-                        type: payload?.type ?? getCourseTypeForCode(catalog, payload?.code),
-                        ects: payload.ects ?? null,
-                        moduleMeta: payload?.moduleMeta ?? null,
-                        onRemove: removeCourseNode,
-                        onToggleDone: toggleCourseDone,
-                        onUpdateEcts: updateCourseEcts,
-                        nodeId: id,
-                        examSubject,
-                        category: payload.category ?? "unknown",
-                        programCode,
-                        subjectColor: resolvedSubjectColor,
-                        status: "in_plan",
-                    },
-                    position: { x, y },
-                    sourcePosition: "right",
-                    targetPosition: "left",
-                    zIndex: 1,
-                });
-                return resolveLaneCollisions(next);
-            });
             schedulePersist();
         },
-        [MIN_GROUP_CHILD_Y, activeSemesterCount, catalog, getCourseStatus, isCourseAllowedInLane, laneIndexFromX, maxSemesterCount, removeCourseNode, removeModuleGroup, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]
+        [activeSemesterCount, addGraphCourseToPlan, addGraphModuleToPlan, catalog, laneIndexFromX, maxSemesterCount, parkCourseCodes, schedulePersist, setStickyViolation]
     );
 
     useEffect(() => {
@@ -2597,6 +3158,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 },
                 position: { x: 0, y: 0 },
                 draggable: true,
+                dragHandle: ".module-bg-drag-handle",
                 selectable: false,
                 zIndex: 0,
             });
@@ -2669,8 +3231,132 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             });
         });
 
+        const parkingX = centerX(-1);
+        const parkedEntries = [];
+        (Array.isArray(parkedCourseCodes) ? parkedCourseCodes : []).forEach((code, idx) => {
+            const normalizedCode = String(code || "").trim();
+            if (!normalizedCode) return;
+            const fromCatalog = catalogCourseByCode.get(normalizedCode) || {};
+            const examSubject = fromCatalog?.examSubject || getExamSubjectForCode(catalog, normalizedCode) || null;
+            const subjectColor =
+                (examSubject ? subjectColors?.[examSubject] : null) ||
+                "#2563eb";
+            const id = `${normalizedCode}-parked-${idx}`;
+            parkedEntries.push({
+                id,
+                type: "course",
+                data: {
+                    label: fromCatalog?.name || normalizedCode,
+                    code: normalizedCode,
+                    type: fromCatalog?.type ?? getCourseTypeForCode(catalog, normalizedCode),
+                    ects: fromCatalog?.ects ?? null,
+                    moduleMeta: fromCatalog?.moduleMeta ?? null,
+                    onRemove: removeCourseNode,
+                    onRemoveModuleGroup: removeModuleGroup,
+                    onToggleDone: toggleCourseDone,
+                    onUpdateEcts: updateCourseEcts,
+                    nodeId: id,
+                    examSubject,
+                    category: fromCatalog?.category ?? "unknown",
+                    programCode,
+                    subjectColor,
+                    status: "parked",
+                },
+                position: { x: parkingX, y: 96 + idx * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP) },
+                sourcePosition: "right",
+                targetPosition: "left",
+                zIndex: 1,
+            });
+        });
+
+        const parkedCodeSet = new Set(
+            parkedEntries
+                .map((node) => String(node?.data?.code || "").trim())
+                .filter(Boolean)
+        );
+        const eligibleParkedGroups = new Map();
+        for (const node of parkedEntries) {
+            const modMeta = node?.data?.moduleMeta;
+            if (!modMeta || !Array.isArray(modMeta?.courseCodes) || modMeta.courseCodes.length < 2) continue;
+            const allParked = modMeta.courseCodes.every((courseCode) => parkedCodeSet.has(String(courseCode || "").trim()));
+            if (!allParked) continue;
+            const groupId = `parked-group-${String(modMeta.id || modMeta.code || modMeta.title || "module").replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+            if (!eligibleParkedGroups.has(groupId)) {
+                eligibleParkedGroups.set(groupId, {
+                    groupId,
+                    moduleMeta: modMeta,
+                });
+            }
+        }
+
+        parkedEntries.forEach((node) => {
+            const modMeta = node?.data?.moduleMeta;
+            if (!modMeta) return;
+            const groupId = `parked-group-${String(modMeta.id || modMeta.code || modMeta.title || "module").replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+            if (!eligibleParkedGroups.has(groupId)) return;
+            node.data.groupId = groupId;
+        });
+        rebuilt.push(...parkedEntries);
+
+        for (const { groupId, moduleMeta } of eligibleParkedGroups.values()) {
+            const moduleCourses = (Array.isArray(moduleMeta?.courseCodes) ? moduleMeta.courseCodes : [])
+                .map((courseCode) => {
+                    const normalizedCode = String(courseCode || "").trim();
+                    const courseCatalog = catalogCourseByCode.get(normalizedCode) || {};
+                    return {
+                        code: normalizedCode,
+                        name: courseCatalog?.name || normalizedCode,
+                        ects: courseCatalog?.ects ?? null,
+                        type: courseCatalog?.type ?? null,
+                    };
+                })
+                .filter((course) => Boolean(course?.code));
+            const modulePayload = {
+                kind: "module",
+                code: moduleMeta?.code ?? null,
+                name: moduleMeta?.title || "Module",
+                category: moduleMeta?.category ?? "unknown",
+                subjectColor: (moduleMeta?.examSubject ? subjectColors?.[moduleMeta.examSubject] : null) || "#2563eb",
+                courses: moduleCourses,
+            };
+            rebuilt.push({
+                id: groupId,
+                type: "moduleBg",
+                data: {
+                    title: moduleMeta?.title || "Module",
+                    code: null,
+                    moduleCode: moduleMeta?.code ?? null,
+                    moduleEcts: moduleMeta?.ects ?? null,
+                    moduleCourseCount: moduleCourses.length,
+                    moduleCourseCodes: moduleCourses.map((c) => c?.code).filter(Boolean),
+                    status: "parked",
+                    groupId,
+                    onRemoveGroup: removeModuleGroup,
+                    onRemove: () => removeModuleGroup(groupId),
+                    onToggleModuleDone: toggleModuleDoneCodes,
+                    onAddModuleToPlan: addGraphModuleToPlan,
+                    semestersForModule: validSemestersForModule(moduleCourses).map((semester) => ({
+                        ...semester,
+                        title: semester?.title ?? `Semester ${semester?.id}`,
+                    })),
+                    modulePayload,
+                    examSubject: moduleMeta?.examSubject ?? null,
+                    category: moduleMeta?.category ?? "unknown",
+                    programCode,
+                    subjectColor: (moduleMeta?.examSubject ? subjectColors?.[moduleMeta.examSubject] : null) || "#2563eb",
+                },
+                position: { x: parkingX, y: MIN_GROUP_CHILD_Y },
+                draggable: true,
+                dragHandle: ".module-bg-drag-handle",
+                selectable: false,
+                zIndex: 0,
+            });
+            groupIds.push(groupId);
+        }
+
         let withGroups = rebuilt;
         for (const groupId of groupIds) {
+            withGroups = resolveGroupCourseOverlaps(withGroups, groupId);
             withGroups = recomputeGroupFromChildren(withGroups, groupId);
         }
         const resolved = resolveLaneCollisions(withGroups);
@@ -2684,8 +3370,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         catalog,
         coursesBySemester,
         doneCourseCodes,
+        parkedCourseCodes,
         laneNodes,
         maxSemesterCount,
+        catalogCourseByCode,
         removeCourseNode,
         removeModuleGroup,
         semesterIdsFromPlan,
@@ -2693,6 +3381,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         toggleCourseDone,
         toggleModuleDoneCodes,
         updateCourseEcts,
+        addGraphModuleToPlan,
+        validSemestersForModule,
         setNodes,
     ]);
 
@@ -5214,7 +5904,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     <div className="rf-wrapper" ref={wrapperRef} onDrop={onDrop} onDragOver={onDragOver} onDragLeave={onDragLeave} style={{ position: "absolute", inset: 0 }}>
                         <ReactFlow
                             onInit={(inst) => (rfRef.current = inst)}
-                            nodes={nodes}
+                            nodes={renderNodes}
                             onNodesChange={onNodesChange}
                             onNodeDragStart={onNodeDragStart}
                             onNodeDrag={onNodeDrag}

@@ -183,6 +183,7 @@ function computeTreeNodeStatus(node, getCourseStatus) {
         if (statuses.length === 0) return "todo";
         if (statuses.every((s) => s === "done")) return "done";
         if (statuses.some((s) => s === "in_plan" || s === "done")) return "in_plan";
+        if (statuses.some((s) => s === "parked")) return "parked";
         return "todo";
     }
     return null;
@@ -372,6 +373,7 @@ function layoutTree(root, collapsedIds, options = {}) {
             if (statuses.length === 0) status = "todo";
             else if (statuses.every((s) => s === "done")) status = "done";
             else if (statuses.some((s) => s === "in_plan" || s === "done")) status = "in_plan";
+            else if (statuses.some((s) => s === "parked")) status = "parked";
             else status = "todo";
         }
         const semestersForCourse =

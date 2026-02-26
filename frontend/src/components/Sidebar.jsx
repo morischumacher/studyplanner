@@ -136,14 +136,27 @@ export default function Sidebar({
         const allowed = getValidSemestersForCourse(courseCode);
         if (!Array.isArray(allowed)) return [];
         const allowedIds = new Set(allowed.map((semester) => Number(semester?.id)).filter(Number.isFinite));
-        return visibleSemesters.filter((semester) => allowedIds.has(Number(semester?.id)));
+        const visibleIds = new Set(visibleSemesters.map((semester) => Number(semester?.id)).filter(Number.isFinite));
+        return allowed.filter((semester) => {
+            const id = Number(semester?.id);
+            if (!Number.isFinite(id)) return false;
+            if (id === 0) return true;
+            return visibleIds.has(id) && allowedIds.has(id);
+        });
     };
     const semestersForModule = (courses) => {
         if (typeof getValidSemestersForModule !== "function") return visibleSemesters;
         const allowed = getValidSemestersForModule(courses);
         if (!Array.isArray(allowed)) return [];
-        const allowedIds = new Set(allowed.map((semester) => Number(semester?.id)).filter(Number.isFinite));
-        return visibleSemesters.filter((semester) => allowedIds.has(Number(semester?.id)));
+        const visibleIds = new Set(visibleSemesters.map((semester) => Number(semester?.id)).filter(Number.isFinite));
+        return allowed.filter((semester) => {
+            if (Boolean(semester?.isParking) || Number(semester?.id) === 0) return true;
+            const laneIndex = Number.isFinite(Number(semester?.laneIndex))
+                ? Number(semester.laneIndex)
+                : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0);
+            const semesterId = laneIndex + 1;
+            return visibleIds.has(semesterId);
+        });
     };
     useEffect(() => {
         if (!menuState?.key) return;
@@ -169,12 +182,14 @@ export default function Sidebar({
     const statusLabel = (status) => {
         if (status === "done") return "done";
         if (status === "in_plan") return "planned";
+        if (status === "parked") return "parked";
         return "not planned";
     };
 
     const statusStyle = (status) => {
         if (status === "done") return { bg: "#dcfce7", color: "#166534", border: "#86efac" };
         if (status === "in_plan") return { bg: "#dbeafe", color: "#1d4ed8", border: "#93c5fd" };
+        if (status === "parked") return { bg: "#fef9c3", color: "#854d0e", border: "#fde68a" };
         return { bg: "#f3f4f6", color: "#4b5563", border: "#d1d5db" };
     };
 
@@ -183,10 +198,12 @@ export default function Sidebar({
         const statuses = codes.map((code) => getCourseStatus?.(code) ?? "todo");
         if (statuses.every((s) => s === "done")) return "done";
         if (statuses.some((s) => s === "in_plan" || s === "done")) return "in_plan";
+        if (statuses.some((s) => s === "parked")) return "parked";
         return "todo";
     };
 
     const isBlockedStatus = (status) => status === "done" || status === "in_plan";
+    const isAddableStatus = (status) => status === "todo" || status === "parked";
     const modulePriority = (mod) => {
         const raw = String(mod?.category ?? "").trim().toLowerCase();
         const isMandatory =
@@ -376,9 +393,9 @@ export default function Sidebar({
                                                 <div
                                                     key={menuKey}
                                                     data-sidebar-menu-key={menuKey}
-                                                    draggable={standaloneStatus === "todo"}
+                                                    draggable={isAddableStatus(standaloneStatus)}
                                                     onDragStart={(e) => {
-                                                        if (standaloneStatus !== "todo") return;
+                                                        if (!isAddableStatus(standaloneStatus)) return;
                                                         onDragStart(e, standalonePayload);
                                                     }}
                                                     title="Drag into the graph"
@@ -389,7 +406,7 @@ export default function Sidebar({
                                                         background: stateMeta.background,
                                                         boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
                                                         padding: "12px 12px",
-                                                        cursor: standaloneStatus === "todo" ? "grab" : "default",
+                                                        cursor: isAddableStatus(standaloneStatus) ? "grab" : "default",
                                                         opacity: menuState.key === menuKey ? 1 : stateMeta.opacity,
                                                         display: "grid",
                                                         gap: 8,
@@ -412,13 +429,13 @@ export default function Sidebar({
                                                             >
                                                                 i
                                                             </button>
-                                                            {standaloneStatus === "todo" && (
+                                                            {isAddableStatus(standaloneStatus) && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         gotoSemesters(menuKey);
                                                                     }}
-                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: "1px solid #fca5a5", background: "#fef2f2", color: "#b91c1c", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     +
                                                                 </button>
@@ -434,13 +451,13 @@ export default function Sidebar({
                                                                     ✓
                                                                 </button>
                                                             )}
-                                                            {(standaloneStatus === "in_plan" || standaloneStatus === "done") && (
+                                                            {(standaloneStatus === "in_plan" || standaloneStatus === "done" || standaloneStatus === "parked") && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         onRemoveCourseFromPlan?.(moduleCodeFallback);
                                                                     }}
-                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: "1px solid #fca5a5", background: "#fef2f2", color: "#b91c1c", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     ×
                                                                 </button>
@@ -449,10 +466,10 @@ export default function Sidebar({
                                                     </div>
                                                     {menuState.key === menuKey && (
                                                         <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
-                                                            {menuState.view === "root" && standaloneStatus === "todo" && (
+                                                            {menuState.view === "root" && isAddableStatus(standaloneStatus) && (
                                                                 <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
-                                                            {menuState.view === "root" && (standaloneStatus === "in_plan" || standaloneStatus === "done") && (
+                                                            {menuState.view === "root" && (standaloneStatus === "in_plan" || standaloneStatus === "done" || standaloneStatus === "parked") && (
                                                                 <button onClick={(e) => { e.stopPropagation(); onRemoveCourseFromPlan?.(moduleCodeFallback); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
                                                             )}
                                                             {menuState.view === "root" && (
@@ -460,9 +477,13 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {semestersForCourse(moduleCodeFallback).map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.(standalonePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
-                                                                    ))}
+                                                                    {semestersForCourse(moduleCodeFallback).map((semester) => {
+                                                                        const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                                                        const disableChoice = standaloneStatus === "parked" && isParkingChoice;
+                                                                        return (
+                                                                            <button key={semester.id} onClick={(e) => { e.stopPropagation(); if (disableChoice) return; onAddCourseToPlan?.(standalonePayload, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} disabled={disableChoice} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#fff", fontSize: 12, fontWeight: 600, cursor: disableChoice ? "not-allowed" : "pointer", color: disableChoice ? "#9ca3af" : "#111827" }}>{semesterButtonLabel(semester)}</button>
+                                                                        );
+                                                                    })}
                                                                     {canRevealMoreSemesters && (
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
@@ -501,9 +522,9 @@ export default function Sidebar({
                                                 <div
                                                     key={menuKey}
                                                     data-sidebar-menu-key={menuKey}
-                                                    draggable={courseStatus === "todo"}
+                                                    draggable={isAddableStatus(courseStatus)}
                                                     onDragStart={(e) => {
-                                                        if (courseStatus !== "todo") return;
+                                                        if (!isAddableStatus(courseStatus)) return;
                                                         onDragStart(e, {
                                                             kind: "course",
                                                             code: course.code ?? mod.code,
@@ -522,7 +543,7 @@ export default function Sidebar({
                                                         background: stateMeta.background,
                                                         boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
                                                         padding: "12px 12px",
-                                                        cursor: courseStatus === "todo" ? "grab" : "default",
+                                                        cursor: isAddableStatus(courseStatus) ? "grab" : "default",
                                                         opacity: menuState.key === menuKey ? 1 : stateMeta.opacity,
                                                         display: "grid",
                                                         gap: 8,
@@ -548,7 +569,7 @@ export default function Sidebar({
                                                             >
                                                                 i
                                                             </button>
-                                                            {courseStatus === "todo" && (
+                                                            {isAddableStatus(courseStatus) && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -570,13 +591,13 @@ export default function Sidebar({
                                                                     ✓
                                                                 </button>
                                                             )}
-                                                            {(courseStatus === "in_plan" || courseStatus === "done") && (
+                                                            {(courseStatus === "in_plan" || courseStatus === "done" || courseStatus === "parked") && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         onRemoveCourseFromPlan?.(course.code ?? mod.code);
                                                                     }}
-                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: "1px solid #fca5a5", background: "#fef2f2", color: "#b91c1c", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     ×
                                                                 </button>
@@ -585,10 +606,10 @@ export default function Sidebar({
                                                     </div>
                                                     {menuState.key === menuKey && (
                                                         <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
-                                                            {menuState.view === "root" && courseStatus === "todo" && (
+                                                            {menuState.view === "root" && isAddableStatus(courseStatus) && (
                                                                 <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
-                                                            {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
+                                                            {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done" || courseStatus === "parked") && (
                                                                 <button onClick={(e) => { e.stopPropagation(); onRemoveCourseFromPlan?.(course.code ?? mod.code); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
                                                             )}
                                                             {menuState.view === "root" && (
@@ -596,9 +617,13 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {semestersForCourse(course.code ?? mod.code).map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, type: course.type ?? null, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
-                                                                    ))}
+                                                                    {semestersForCourse(course.code ?? mod.code).map((semester) => {
+                                                                        const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                                                        const disableChoice = courseStatus === "parked" && isParkingChoice;
+                                                                        return (
+                                                                            <button key={semester.id} onClick={(e) => { e.stopPropagation(); if (disableChoice) return; onAddCourseToPlan?.({ code: course.code ?? mod.code, name: course.name ?? mod.name, type: course.type ?? null, ects: course.ects ?? mod.ects ?? null, category: mod?.category ?? null, subjectColor }, semester.id - 1, { allowDirectLaneSelection: true }); closeMenu(); }} disabled={disableChoice} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#fff", fontSize: 12, fontWeight: 600, cursor: disableChoice ? "not-allowed" : "pointer", color: disableChoice ? "#9ca3af" : "#111827" }}>{semesterButtonLabel(semester)}</button>
+                                                                        );
+                                                                    })}
                                                                     {canRevealMoreSemesters && (
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
@@ -713,9 +738,9 @@ export default function Sidebar({
                                                 }}
                                             >
                                                 <div
-                                                    draggable={groupStatus === "todo" && !moduleBlocked && !hasSplitVariants}
+                                                    draggable={isAddableStatus(groupStatus) && !moduleBlocked && !hasSplitVariants}
                                                     onDragStart={(e) => {
-                                                        if (groupStatus !== "todo" || moduleBlocked || hasSplitVariants) return;
+                                                        if (!isAddableStatus(groupStatus) || moduleBlocked || hasSplitVariants) return;
                                                         onDragStart(e, defaultModuleDragPayload);
                                                     }}
                                                     title="Drag the whole module"
@@ -729,7 +754,7 @@ export default function Sidebar({
                                                         padding: 12,
                                                         display: "grid",
                                                         gap: 8,
-                                                        cursor: groupStatus === "todo" && !moduleBlocked ? "grab" : "default",
+                                                        cursor: isAddableStatus(groupStatus) && !moduleBlocked ? "grab" : "default",
                                                         opacity: menuState.key === moduleMenuKey ? 1 : (moduleBlocked ? 0.85 : groupStateMeta.opacity),
                                                         position: "relative",
                                                         boxSizing: "border-box",
@@ -741,7 +766,7 @@ export default function Sidebar({
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                                                            {groupStatus === "todo" && (
+                                                            {isAddableStatus(groupStatus) && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
@@ -769,7 +794,7 @@ export default function Sidebar({
                                                                         e.stopPropagation();
                                                                         onRemoveModuleFromPlan?.(modulePayload);
                                                                     }}
-                                                                    style={{ border: `1px solid ${isGroupDone ? "#9ca3af" : subjectColor}`, background: "#fff", color: isGroupDone ? "#6b7280" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: "1px solid #fca5a5", background: "#fef2f2", color: "#b91c1c", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     ×
                                                                 </button>
@@ -778,7 +803,7 @@ export default function Sidebar({
                                                     </div>
                                                     {menuState.key === moduleMenuKey && (
                                                         <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
-                                                            {menuState.view === "root" && groupStatus === "todo" && (
+                                                            {menuState.view === "root" && isAddableStatus(groupStatus) && (
                                                                 hasSplitVariants
                                                                     ? (
                                                                         <>
@@ -800,9 +825,13 @@ export default function Sidebar({
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
-                                                                    {semestersForModule(activeVariantCourses).map((semester) => (
-                                                                        <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
-                                                                    ))}
+                                                                    {semestersForModule(activeVariantCourses).map((semester) => {
+                                                                        const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                                                        const disableChoice = groupStatus === "parked" && isParkingChoice;
+                                                                        return (
+                                                                            <button key={semester.id} onClick={(e) => { e.stopPropagation(); if (disableChoice) return; const laneIndex = Number.isFinite(Number(semester?.laneIndex)) ? Number(semester.laneIndex) : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0); onAddModuleToPlan?.(modulePayload, laneIndex, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} disabled={disableChoice} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#fff", fontSize: 12, fontWeight: 600, cursor: disableChoice ? "not-allowed" : "pointer", color: disableChoice ? "#9ca3af" : "#111827" }}>{semesterButtonLabel(semester)}</button>
+                                                                        );
+                                                                    })}
                                                                     {canRevealMoreSemesters && (
                                                                         <button
                                                                             onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}
@@ -819,7 +848,7 @@ export default function Sidebar({
                                                     <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: isGroupDone ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                                                         {displayCourseTitle(mod?.name)}
                                                     </div>
-                                                    {hasSplitVariants && groupStatus === "todo" && (
+                                                    {hasSplitVariants && isAddableStatus(groupStatus) && (
                                                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                                             {variantOptions.map((opt) => (
                                                                 <div
@@ -905,13 +934,13 @@ export default function Sidebar({
                                                                         >
                                                                             i
                                                                         </button>
-                                                                        {courseStatus === "todo" && (
+                                                                        {isAddableStatus(courseStatus) && (
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                     hasSplitVariants ? gotoSemesters(menuKey, variantOptions?.[0]?.id ?? null) : gotoSemesters(menuKey);
                                                                                 }}
-                                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                                style={{ border: "1px solid #111827", background: "#fff", color: "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                             >
                                                                                 +
                                                                             </button>
@@ -927,13 +956,13 @@ export default function Sidebar({
                                                                                 ✓
                                                                             </button>
                                                                         )}
-                                                                        {(courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                        {(courseStatus === "in_plan" || courseStatus === "done" || courseStatus === "parked") && (
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                     onRemoveModuleFromPlan?.(modulePayload);
                                                                                 }}
-                                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                                style={{ border: "1px solid #fca5a5", background: "#fef2f2", color: "#b91c1c", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                             >
                                                                                 ×
                                                                             </button>
@@ -942,7 +971,7 @@ export default function Sidebar({
                                                                 </div>
                                                                 {menuState.key === menuKey && (
                                                         <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
-                                                                        {menuState.view === "root" && courseStatus === "todo" && (
+                                                                        {menuState.view === "root" && isAddableStatus(courseStatus) && (
                                                                             hasSplitVariants
                                                                                 ? (
                                                                                     <>
@@ -959,7 +988,7 @@ export default function Sidebar({
                                                                                 )
                                                                                 : <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                                         )}
-                                                                        {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                        {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done" || courseStatus === "parked") && (
                                                                             <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
                                                                         )}
                                                                         {menuState.view === "root" && (
@@ -967,9 +996,23 @@ export default function Sidebar({
                                                                         )}
                                                                         {menuState.view === "semesters" && (
                                                                             <>
-                                                                                {semestersForModule(activeVariantCourses).map((semester) => (
-                                                                                    <button key={semester.id} onClick={(e) => { e.stopPropagation(); onAddModuleToPlan?.(modulePayload, semester.id - 1, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null }); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{semesterButtonLabel(semester)}</button>
-                                                                                ))}
+                                                                                {semestersForModule(activeVariantCourses).map((semester) => {
+                                                                                    const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                                                                    const disableChoice = courseStatus === "parked" && isParkingChoice;
+                                                                                    return (
+                                                                                        <button key={semester.id} onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            if (disableChoice) return;
+                                                                                            const confirmed = window.confirm(
+                                                                                                `${course?.code || "This course"} belongs to a module. Adding it will automatically add all module courses. Continue?`
+                                                                                            );
+                                                                                            if (!confirmed) return;
+                                                                                            const laneIndex = Number.isFinite(Number(semester?.laneIndex)) ? Number(semester.laneIndex) : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0);
+                                                                                            onAddModuleToPlan?.(modulePayload, laneIndex, { allowDirectLaneSelection: true, variantId: menuState?.variantId || null });
+                                                                                            closeMenu();
+                                                                                        }} disabled={disableChoice} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#fff", fontSize: 12, fontWeight: 600, cursor: disableChoice ? "not-allowed" : "pointer", color: disableChoice ? "#9ca3af" : "#111827" }}>{semesterButtonLabel(semester)}</button>
+                                                                                    );
+                                                                                })}
                                                                                 {canRevealMoreSemesters && (
                                                                                     <button
                                                                                         onClick={(e) => { e.stopPropagation(); setPlusRevealCount((c) => Math.min(c + 1, plusSemesters.length)); }}

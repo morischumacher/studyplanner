@@ -11,8 +11,26 @@ import { displayCourseTitle } from "../utils/courseCodeDisplay.js";
 
 /** ModuleGroupBackground — soft panel wrapping a set of course nodes. */
 export default function ModuleGroupBackground({ data }) {
+    if (data?.collapsedGhost) {
+        return (
+            <div
+                style={{
+                    pointerEvents: "none",
+                    width: Number(data?.width) || 0,
+                    height: Number(data?.height) || 0,
+                    border: "2px dashed rgba(107,114,128,0.7)",
+                    borderRadius: 12,
+                    background: "transparent",
+                    boxSizing: "border-box",
+                }}
+            />
+        );
+    }
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [plusRevealCount, setPlusRevealCount] = useState(0);
     const menuRef = useRef(null);
+    const rootRef = useRef(null);
     const {
         title,
         width,
@@ -38,10 +56,38 @@ export default function ModuleGroupBackground({ data }) {
     const stateMeta = stateVisualByStatus(visualStatus);
     const typeMeta = mapTypeForProgram(category, programCode);
     const borderColor = stateMeta.borderColor || baseColor;
-    const statusLabel = status === "done" ? "done" : (status === "in_plan" ? "planned" : "not planned");
+    const statusLabel = status === "done" ? "done" : (status === "in_plan" ? "planned" : (status === "parked" ? "parked" : "not planned"));
     const statusTextColor = status === "done" ? "#166534" : (status === "in_plan" ? "#1d4ed8" : "#4b5563");
     const panelFill = visualStatus === "todo" ? moduleColor : stateMeta.background;
     const isDone = status === "done";
+    const isParked = status === "parked";
+    const isAddable = status === "todo" || isParked;
+    const fallbackModulePayload = {
+        kind: "module",
+        code: data?.moduleCode ?? null,
+        name: title ?? "Module",
+        ects: moduleEcts ?? null,
+        category: category ?? "unknown",
+        subjectColor: subjectColor ?? null,
+        courses: (Array.isArray(moduleCourseCodes) ? moduleCourseCodes : [])
+            .map((code) => String(code || "").trim())
+            .filter(Boolean)
+            .map((code) => ({ code })),
+    };
+    const resolvedModulePayload = modulePayload && Array.isArray(modulePayload?.courses) && modulePayload.courses.length > 0
+        ? modulePayload
+        : fallbackModulePayload;
+    const rawSemesterOptions = Array.isArray(semestersForModule) ? semestersForModule : [];
+    const parkingOptions = rawSemesterOptions.filter((semester) => Boolean(semester?.isParking) || Number(semester?.id) === 0);
+    const regularSemesterOptions = rawSemesterOptions.filter((semester) => !(Boolean(semester?.isParking) || Number(semester?.id) === 0));
+    const baseSemesterOptions = regularSemesterOptions.filter((semester) => !Boolean(semester?.isPlus));
+    const plusSemesterOptions = regularSemesterOptions.filter((semester) => Boolean(semester?.isPlus));
+    const visibleSemesterOptions = [
+        ...parkingOptions,
+        ...baseSemesterOptions,
+        ...plusSemesterOptions.slice(0, plusRevealCount),
+    ];
+    const canRevealMoreSemesters = plusRevealCount < plusSemesterOptions.length;
 
     useEffect(() => {
         if (!isMenuOpen) return;
@@ -52,8 +98,26 @@ export default function ModuleGroupBackground({ data }) {
         return () => document.removeEventListener("mousedown", handlePointerDown);
     }, [isMenuOpen]);
 
+    useEffect(() => {
+        if (!isMenuOpen) setPlusRevealCount(0);
+    }, [isMenuOpen]);
+
+    useEffect(() => {
+        const nodeEl = rootRef.current?.closest?.(".react-flow__node");
+        if (!nodeEl) return;
+        if (isMenuOpen) {
+            nodeEl.style.zIndex = "100000";
+            return () => {
+                nodeEl.style.zIndex = "";
+            };
+        }
+        nodeEl.style.zIndex = "";
+        return undefined;
+    }, [isMenuOpen]);
+
     return (
         <div
+            ref={rootRef}
             style={{
                 pointerEvents: "all",
                 width,
@@ -86,6 +150,7 @@ export default function ModuleGroupBackground({ data }) {
 
             {/* Header bar */}
             <div
+                className="module-bg-drag-handle"
                 style={{
                     position: "absolute",
                     top: 6,
@@ -101,11 +166,12 @@ export default function ModuleGroupBackground({ data }) {
                     background: "transparent",
                     borderRadius: 6,
                     padding: "6px 8px",
+                    cursor: "grab",
                 }}
             >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        {status === "todo" && onAddModuleToPlan && (
+                        {isAddable && onAddModuleToPlan && (
                             <button
                                 onPointerDown={(e) => {
                                     e.preventDefault();
@@ -122,9 +188,9 @@ export default function ModuleGroupBackground({ data }) {
                                 title="Add to plan"
                                 aria-label="Add to plan"
                                 style={{
-                                    border: "1px solid #60a5fa",
-                                    background: "#eff6ff",
-                                    color: "#1d4ed8",
+                                    border: `1px solid ${borderColor}`,
+                                    background: "#ffffff",
+                                    color: "#111827",
                                     borderRadius: 6,
                                     fontSize: 12,
                                     width: 24,
@@ -167,7 +233,7 @@ export default function ModuleGroupBackground({ data }) {
                                 ✓
                             </button>
                         )}
-                        {onRemove && (status === "in_plan" || status === "done") && (
+                        {onRemove && (status === "in_plan" || status === "done" || isParked) && (
                             <button
                                 onPointerDown={(e) => {
                                     e.preventDefault();
@@ -198,14 +264,14 @@ export default function ModuleGroupBackground({ data }) {
                                 ×
                             </button>
                         )}
-                        {isMenuOpen && status === "todo" && onAddModuleToPlan && (
+                        {isMenuOpen && isAddable && onAddModuleToPlan && (
                             <div
                                 ref={menuRef}
                                 style={{
                                     position: "absolute",
                                     top: 24,
                                     right: 0,
-                                    width: 170,
+                                    width: 220,
                                     border: "1px solid #d1d5db",
                                     borderRadius: 8,
                                     background: "#ffffff",
@@ -216,7 +282,10 @@ export default function ModuleGroupBackground({ data }) {
                                     zIndex: 30,
                                 }}
                             >
-                                {(Array.isArray(semestersForModule) ? semestersForModule : []).map((semester) => (
+                                {visibleSemesterOptions.map((semester) => {
+                                    const isParkingChoice = Boolean(semester?.isParking) || Number(semester?.id) === 0;
+                                    const disableChoice = isParked && isParkingChoice;
+                                    return (
                                     <button
                                         key={semester.id}
                                         onPointerDown={(e) => {
@@ -229,14 +298,56 @@ export default function ModuleGroupBackground({ data }) {
                                         }}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onAddModuleToPlan(modulePayload, (Number(semester.id) || 1) - 1);
+                                            if (disableChoice) return;
+                                            const laneIndex = Number.isFinite(Number(semester?.laneIndex))
+                                                ? Number(semester.laneIndex)
+                                                : (Number.isFinite(Number(semester?.id)) ? (Number(semester.id) - 1) : 0);
+                                            onAddModuleToPlan(resolvedModulePayload, laneIndex);
                                             setIsMenuOpen(false);
                                         }}
-                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                        disabled={disableChoice}
+                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: disableChoice ? "#f3f4f6" : "#fff", cursor: disableChoice ? "not-allowed" : "pointer", fontSize: 12, fontWeight: 600, color: disableChoice ? "#9ca3af" : "#111827" }}
                                     >
                                         {semester.title}
                                     </button>
-                                ))}
+                                    );
+                                })}
+                                {canRevealMoreSemesters && (
+                                    <button
+                                        onPointerDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                        }}
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPlusRevealCount((count) => Math.min(count + 1, plusSemesterOptions.length));
+                                        }}
+                                        style={{ border: "1px dashed #9ca3af", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                                    >
+                                        + Add next semester
+                                    </button>
+                                )}
+                                <button
+                                    onPointerDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsMenuOpen(false);
+                                    }}
+                                    style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                                >
+                                    Back
+                                </button>
                             </div>
                         )}
                     </div>
