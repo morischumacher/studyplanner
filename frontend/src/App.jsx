@@ -120,6 +120,11 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setCoursesFromNodes,
         coursesBySemester,
         doneCourseCodes,
+        courseMetaByCode,
+        getCourseMeta,
+        setCourseMeta,
+        getSemesterNote,
+        setSemesterNote,
         selectedFocus,
         setSelectedFocus,
         setSelectedFocusForProgram,
@@ -149,7 +154,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [isFocusChecklistOpen, setIsFocusChecklistOpen] = useState(false);
     const [isExamSubjectProgressOpen, setIsExamSubjectProgressOpen] = useState(false);
     const [isPerSemesterEctsOpen, setIsPerSemesterEctsOpen] = useState(false);
+    const [isPlannedEstimatedHoursOpen, setIsPlannedEstimatedHoursOpen] = useState(false);
     const [isDonePerSemesterEctsOpen, setIsDonePerSemesterEctsOpen] = useState(false);
+    const [isDoneGradePerSemesterOpen, setIsDoneGradePerSemesterOpen] = useState(false);
     const [isPlannedExamSubjectOpen, setIsPlannedExamSubjectOpen] = useState(false);
     const [isByCategoryOpen, setIsByCategoryOpen] = useState(false);
     const [isDoneByCategoryOpen, setIsDoneByCategoryOpen] = useState(false);
@@ -193,6 +200,14 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [isSavingSignupSetup, setIsSavingSignupSetup] = useState(false);
     const [pendingCourseTermUpdateByCode, setPendingCourseTermUpdateByCode] = useState({});
     const [isSavingProfileSettings, setIsSavingProfileSettings] = useState(false);
+    const [isCurriculumSettingsOpen, setIsCurriculumSettingsOpen] = useState(false);
+    const [profileDraftFocus, setProfileDraftFocus] = useState("");
+    const [profileDraftStartSeason, setProfileDraftStartSeason] = useState(TERM_WINTER);
+    const [profileDraftStartYear, setProfileDraftStartYear] = useState(new Date().getFullYear());
+    const [profileDraftMaxEcts, setProfileDraftMaxEcts] = useState(42);
+    const [profileDraftRecommendedEcts, setProfileDraftRecommendedEcts] = useState(30);
+    const [profileDraftMaxWeekHours, setProfileDraftMaxWeekHours] = useState(50);
+    const [profileDraftRecommendedWeekHours, setProfileDraftRecommendedWeekHours] = useState(40);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
     const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
@@ -251,7 +266,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 isFocusChecklistOpen,
                 isExamSubjectProgressOpen,
                 isPerSemesterEctsOpen,
+                isPlannedEstimatedHoursOpen,
                 isDonePerSemesterEctsOpen,
+                isDoneGradePerSemesterOpen,
                 isPlannedExamSubjectOpen,
                 isByCategoryOpen,
                 isDoneByCategoryOpen,
@@ -277,7 +294,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         isFocusChecklistOpen,
         isExamSubjectProgressOpen,
         isPerSemesterEctsOpen,
+        isPlannedEstimatedHoursOpen,
         isDonePerSemesterEctsOpen,
+        isDoneGradePerSemesterOpen,
         isPlannedExamSubjectOpen,
         isByCategoryOpen,
         isDoneByCategoryOpen,
@@ -305,7 +324,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setPendingCourseTermUpdateByCode({});
         setProfileSearch("");
     }, [programCode, isProfileOpen]);
-
     // Fetch & normalize catalog whenever programCode changes
     useEffect(() => {
         let cancelled = false;
@@ -398,7 +416,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 if (typeof dashboardUi?.isFocusChecklistOpen === "boolean") setIsFocusChecklistOpen(dashboardUi.isFocusChecklistOpen);
                 if (typeof dashboardUi?.isExamSubjectProgressOpen === "boolean") setIsExamSubjectProgressOpen(dashboardUi.isExamSubjectProgressOpen);
                 if (typeof dashboardUi?.isPerSemesterEctsOpen === "boolean") setIsPerSemesterEctsOpen(dashboardUi.isPerSemesterEctsOpen);
+                if (typeof dashboardUi?.isPlannedEstimatedHoursOpen === "boolean") setIsPlannedEstimatedHoursOpen(dashboardUi.isPlannedEstimatedHoursOpen);
                 if (typeof dashboardUi?.isDonePerSemesterEctsOpen === "boolean") setIsDonePerSemesterEctsOpen(dashboardUi.isDonePerSemesterEctsOpen);
+                if (typeof dashboardUi?.isDoneGradePerSemesterOpen === "boolean") setIsDoneGradePerSemesterOpen(dashboardUi.isDoneGradePerSemesterOpen);
                 if (typeof dashboardUi?.isPlannedExamSubjectOpen === "boolean") setIsPlannedExamSubjectOpen(dashboardUi.isPlannedExamSubjectOpen);
                 if (typeof dashboardUi?.isByCategoryOpen === "boolean") setIsByCategoryOpen(dashboardUi.isByCategoryOpen);
                 if (typeof dashboardUi?.isDoneByCategoryOpen === "boolean") setIsDoneByCategoryOpen(dashboardUi.isDoneByCategoryOpen);
@@ -436,7 +456,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         if (typeof dashboardUi?.isFocusChecklistOpen === "boolean") setIsFocusChecklistOpen(dashboardUi.isFocusChecklistOpen);
         if (typeof dashboardUi?.isExamSubjectProgressOpen === "boolean") setIsExamSubjectProgressOpen(dashboardUi.isExamSubjectProgressOpen);
         if (typeof dashboardUi?.isPerSemesterEctsOpen === "boolean") setIsPerSemesterEctsOpen(dashboardUi.isPerSemesterEctsOpen);
+        if (typeof dashboardUi?.isPlannedEstimatedHoursOpen === "boolean") setIsPlannedEstimatedHoursOpen(dashboardUi.isPlannedEstimatedHoursOpen);
         if (typeof dashboardUi?.isDonePerSemesterEctsOpen === "boolean") setIsDonePerSemesterEctsOpen(dashboardUi.isDonePerSemesterEctsOpen);
+        if (typeof dashboardUi?.isDoneGradePerSemesterOpen === "boolean") setIsDoneGradePerSemesterOpen(dashboardUi.isDoneGradePerSemesterOpen);
         if (typeof dashboardUi?.isPlannedExamSubjectOpen === "boolean") setIsPlannedExamSubjectOpen(dashboardUi.isPlannedExamSubjectOpen);
         if (typeof dashboardUi?.isByCategoryOpen === "boolean") setIsByCategoryOpen(dashboardUi.isByCategoryOpen);
         if (typeof dashboardUi?.isDoneByCategoryOpen === "boolean") setIsDoneByCategoryOpen(dashboardUi.isDoneByCategoryOpen);
@@ -543,6 +565,25 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const isStartTermLocked = Boolean(profileSettingsForProgram?.startTermLocked);
     const isProgramLocked = Boolean(String(lockedProgramCode || "").trim());
     const courseTermOverrides = profileSettingsForProgram?.courseTermOverrides ?? {};
+    useEffect(() => {
+        if (!isProfileOpen) return;
+        setProfileDraftFocus(selectedFocus || "");
+        setProfileDraftStartSeason(startTermSeason);
+        setProfileDraftStartYear(startTermYear);
+        setProfileDraftMaxEcts(Number(semesterLoadLimits?.maxEctsPerSemester ?? 42));
+        setProfileDraftRecommendedEcts(Number(semesterLoadLimits?.recommendedEctsPerSemester ?? 30));
+        setProfileDraftMaxWeekHours(Number(semesterLoadLimits?.maxWeekHoursPerSemester ?? 50));
+        setProfileDraftRecommendedWeekHours(Number(semesterLoadLimits?.recommendedWeekHoursPerSemester ?? 40));
+    }, [
+        isProfileOpen,
+        selectedFocus,
+        startTermSeason,
+        startTermYear,
+        semesterLoadLimits?.maxEctsPerSemester,
+        semesterLoadLimits?.recommendedEctsPerSemester,
+        semesterLoadLimits?.maxWeekHoursPerSemester,
+        semesterLoadLimits?.recommendedWeekHoursPerSemester,
+    ]);
 
     const effectiveCourseTermByCode = useMemo(() => {
         const map = {};
@@ -614,6 +655,148 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         }
         return out;
     }, [coursesBySemester, semesters]);
+    const laneInsightsBySemester = useMemo(() => {
+        const doneSet = new Set(doneCourseCodes || []);
+        const parseNumeric = (value) => {
+            if (value == null) return null;
+            const normalized = String(value).trim().replace(",", ".");
+            if (!normalized) return null;
+            const parsed = Number(normalized);
+            return Number.isFinite(parsed) ? parsed : null;
+        };
+        const out = {};
+        for (const semester of semesters) {
+            const semesterId = Number(semester?.id);
+            const list = Array.isArray(coursesBySemester?.[semesterId]) ? coursesBySemester[semesterId] : [];
+            let estimatedHoursTotal = 0;
+            let weightedGradeNumerator = 0;
+            let weightedGradeDenominator = 0;
+            const courseNotes = [];
+            for (const course of list) {
+                const code = String(course?.code || "").trim();
+                if (!code) continue;
+                const meta = getCourseMeta(code);
+                const note = String(meta?.notes || "").trim();
+                if (note) {
+                    courseNotes.push({
+                        code,
+                        name: String(course?.name || code),
+                        note,
+                    });
+                }
+                const estimated = parseNumeric(meta?.estimatedHours);
+                if (estimated != null && estimated > 0) {
+                    estimatedHoursTotal += estimated;
+                }
+                if (!doneSet.has(code)) continue;
+                const ects = Number(course?.ects);
+                const grade = parseNumeric(meta?.grade);
+                if (!Number.isFinite(ects) || ects <= 0 || grade == null || grade <= 0) continue;
+                weightedGradeNumerator += grade * ects;
+                weightedGradeDenominator += ects;
+            }
+            out[semesterId] = {
+                courseNotes,
+                estimatedHoursTotal,
+                weightedGrade: weightedGradeDenominator > 0 ? (weightedGradeNumerator / weightedGradeDenominator) : null,
+                additionalNote: getSemesterNote(semesterId),
+            };
+        }
+        return out;
+    }, [coursesBySemester, doneCourseCodes, getCourseMeta, getSemesterNote, semesters]);
+    const plannedEstimatedHoursPerSemesterRows = useMemo(() => (
+        semesters
+            .map((semester) => ({
+                sem: Number(semester?.id),
+                hours: Number(laneInsightsBySemester?.[semester?.id]?.estimatedHoursTotal ?? 0),
+            }))
+            .filter((row) => Number.isFinite(row?.sem) && row.sem >= 1 && Number(row?.hours || 0) > 0)
+    ), [laneInsightsBySemester, semesters]);
+    const plannedEstimatedHoursTotal = useMemo(
+        () => plannedEstimatedHoursPerSemesterRows.reduce((sum, row) => sum + Number(row?.hours || 0), 0),
+        [plannedEstimatedHoursPerSemesterRows]
+    );
+    const plannedEstimatedHoursAverage = useMemo(() => {
+        const count = plannedEstimatedHoursPerSemesterRows.length;
+        if (count <= 0) return 0;
+        return plannedEstimatedHoursTotal / count;
+    }, [plannedEstimatedHoursPerSemesterRows.length, plannedEstimatedHoursTotal]);
+    const maxWeekHoursPerSemester = (() => {
+        const parsed = Number(semesterLoadLimits?.maxWeekHoursPerSemester);
+        if (Number.isFinite(parsed) && parsed > 0) return parsed;
+        return 50;
+    })();
+    const recommendedWeekHoursPerSemester = (() => {
+        const parsed = Number(semesterLoadLimits?.recommendedWeekHoursPerSemester);
+        if (Number.isFinite(parsed) && parsed > 0) return Math.min(parsed, maxWeekHoursPerSemester);
+        return 40;
+    })();
+    const plannedWeekHoursWithinDesiredWorkload = plannedEstimatedHoursPerSemesterRows.every(
+        (row) => Number(row?.hours || 0) <= recommendedWeekHoursPerSemester + 1e-6
+    );
+    const maxWeekHoursForScale = Math.max(maxWeekHoursPerSemester, 1);
+    const doneGradePerSemesterRows = useMemo(() => (
+        semesters
+            .map((semester) => ({
+                sem: Number(semester?.id),
+                grade: laneInsightsBySemester?.[semester?.id]?.weightedGrade ?? null,
+            }))
+            .filter((row) => Number.isFinite(row?.sem) && row.sem >= 1 && row?.grade != null && Number.isFinite(Number(row?.grade)))
+            .map((row) => ({ ...row, grade: Number(row.grade) }))
+    ), [laneInsightsBySemester, semesters]);
+    const doneGradeOverall = useMemo(() => {
+        const doneSet = new Set(doneCourseCodes || []);
+        let numerator = 0;
+        let denominator = 0;
+        for (const semester of semesters) {
+            const semesterId = Number(semester?.id);
+            const list = Array.isArray(coursesBySemester?.[semesterId]) ? coursesBySemester[semesterId] : [];
+            for (const course of list) {
+                const code = String(course?.code || "").trim();
+                if (!code || !doneSet.has(code)) continue;
+                const ects = Number(course?.ects);
+                const meta = getCourseMeta(code);
+                const gradeRaw = String(meta?.grade ?? "").trim().replace(",", ".");
+                if (!gradeRaw) continue;
+                const grade = Number(gradeRaw);
+                if (!Number.isFinite(ects) || ects <= 0 || !Number.isFinite(grade) || grade <= 0) continue;
+                numerator += grade * ects;
+                denominator += ects;
+            }
+        }
+        return denominator > 0 ? (numerator / denominator) : null;
+    }, [coursesBySemester, doneCourseCodes, getCourseMeta, semesters]);
+    const missingDoneGradesBySemester = useMemo(() => {
+        const doneSet = new Set(doneCourseCodes || []);
+        const out = [];
+        for (const semester of semesters) {
+            const semesterId = Number(semester?.id);
+            const list = Array.isArray(coursesBySemester?.[semesterId]) ? coursesBySemester[semesterId] : [];
+            const missingCourses = [];
+            for (const course of list) {
+                const code = String(course?.code || "").trim();
+                if (!code || !doneSet.has(code)) continue;
+                const meta = getCourseMeta(code);
+                const gradeRaw = String(meta?.grade ?? "").trim().replace(",", ".");
+                const grade = Number(gradeRaw);
+                const hasValidGrade = gradeRaw && Number.isFinite(grade) && grade > 0;
+                if (!hasValidGrade) {
+                    missingCourses.push({
+                        code,
+                        name: String(course?.name || code),
+                    });
+                }
+            }
+            if (missingCourses.length > 0) {
+                out.push({ sem: semesterId, missingCourses });
+            }
+        }
+        return out;
+    }, [coursesBySemester, doneCourseCodes, getCourseMeta, semesters]);
+    const missingDoneGradesCount = useMemo(
+        () => missingDoneGradesBySemester.reduce((sum, row) => sum + Number(row?.missingCourses?.length || 0), 0),
+        [missingDoneGradesBySemester]
+    );
 
     // Lane background columns
     const laneNodes = useMemo(
@@ -626,6 +809,12 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     even: i % 2 === 0,
                     height: CANVAS_HEIGHT,
                     ectsPlanned: Number(plannedEctsBySemester?.[s.id] ?? 0),
+                    semesterId: Number(s.id),
+                    courseNotes: laneInsightsBySemester?.[s.id]?.courseNotes ?? [],
+                    estimatedHoursTotal: Number(laneInsightsBySemester?.[s.id]?.estimatedHoursTotal ?? 0),
+                    weightedGrade: laneInsightsBySemester?.[s.id]?.weightedGrade ?? null,
+                    additionalNote: String(laneInsightsBySemester?.[s.id]?.additionalNote || ""),
+                    onSetSemesterNote: setSemesterNote,
                 },
                 position: { x: laneX(i), y: 0 },
                 draggable: false,
@@ -633,7 +822,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 zIndex: 0,
                 style: { height: CANVAS_HEIGHT },
             })),
-        [plannedEctsBySemester, semesters]
+        [laneInsightsBySemester, plannedEctsBySemester, semesters, setSemesterNote]
     );
 
     // React Flow state
@@ -695,9 +884,24 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 if (node.type !== "lane") return node;
                 const semesterId = Number(String(node.id).replace("lane-", ""));
                 const ectsPlanned = Number(plannedEctsBySemester?.[semesterId] ?? 0);
+                const laneInsight = laneInsightsBySemester?.[semesterId] ?? {};
                 const currentEcts = Number(node?.data?.ectsPlanned ?? 0);
                 const currentHeight = Number(node?.data?.height ?? 0);
-                if (currentEcts === ectsPlanned && currentHeight === requiredLaneHeight) return node;
+                const nextCourseNotes = Array.isArray(laneInsight?.courseNotes) ? laneInsight.courseNotes : [];
+                const nextEstimatedHoursTotal = Number(laneInsight?.estimatedHoursTotal ?? 0);
+                const nextWeightedGrade = laneInsight?.weightedGrade ?? null;
+                const nextAdditionalNote = String(laneInsight?.additionalNote || "");
+                const notesUnchanged = JSON.stringify(node?.data?.courseNotes ?? []) === JSON.stringify(nextCourseNotes);
+                if (
+                    currentEcts === ectsPlanned &&
+                    currentHeight === requiredLaneHeight &&
+                    notesUnchanged &&
+                    Number(node?.data?.estimatedHoursTotal ?? 0) === nextEstimatedHoursTotal &&
+                    (node?.data?.weightedGrade ?? null) === nextWeightedGrade &&
+                    String(node?.data?.additionalNote || "") === nextAdditionalNote
+                ) {
+                    return node;
+                }
                 changed = true;
                 return {
                     ...node,
@@ -705,12 +909,17 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         ...node.data,
                         ectsPlanned,
                         height: requiredLaneHeight,
+                        courseNotes: nextCourseNotes,
+                        estimatedHoursTotal: nextEstimatedHoursTotal,
+                        weightedGrade: nextWeightedGrade,
+                        additionalNote: nextAdditionalNote,
+                        onSetSemesterNote: setSemesterNote,
                     },
                 };
             });
             return changed ? next : prev;
         });
-    }, [plannedEctsBySemester, requiredLaneHeight, setNodes]);
+    }, [laneInsightsBySemester, plannedEctsBySemester, requiredLaneHeight, setNodes, setSemesterNote]);
 
     /***********************
      * Sidebar drag & drop *
@@ -899,27 +1108,23 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     }, [setNodes]);
 
     const toggleModuleDoneCodes = useCallback((courseCodes, nextDone, groupId) => {
-        let codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
-        if (!codes.length && groupId) {
-            const source = (rfRef.current?.getNodes?.() || nodes);
-            codes = source
+        const source = (rfRef.current?.getNodes?.() || nodes);
+        const codesFromGroup = groupId
+            ? source
                 .filter((n) => n.type === "course" && n.data?.groupId === groupId)
                 .map((n) => n?.data?.code)
-                .filter(Boolean);
-        }
+                .filter(Boolean)
+            : [];
+        const codesFromPayload = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+        const codes = codesFromGroup.length ? codesFromGroup : codesFromPayload;
         const uniqueCodes = [...new Set(codes)];
         if (!uniqueCodes.length) return;
-        const allowedCodes = uniqueCodes.filter((code) => {
-            const status = getCourseStatus(code);
-            return status === "in_plan" || status === "done";
-        });
-        if (!allowedCodes.length) return;
-        for (const code of allowedCodes) {
+        for (const code of uniqueCodes) {
             setCourseDone(code, Boolean(nextDone));
         }
         setNodes((prev) => {
             const patched = prev.map((n) => {
-                if (n.type !== "course" || !allowedCodes.includes(n?.data?.code)) return n;
+                if (n.type !== "course" || !uniqueCodes.includes(n?.data?.code)) return n;
                 return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
             });
             if (groupId) {
@@ -930,7 +1135,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             data: {
                                 ...n.data,
                                 status: nextDone ? "done" : "in_plan",
-                                moduleCourseCodes: allowedCodes,
+                                moduleCourseCodes: uniqueCodes,
                             },
                         }
                         : n
@@ -938,7 +1143,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             }
             return patched;
         });
-    }, [getCourseStatus, nodes, setCourseDone, setNodes]);
+    }, [nodes, setCourseDone, setNodes]);
 
     const addGraphCourseToPlan = useCallback((course, requestedLaneIndex, options = null) => {
         const courseCode = course?.code;
@@ -1182,22 +1387,67 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         }));
     }, [getCourseStatus, setCourseDone, setNodes]);
 
-    const toggleGraphModuleDone = useCallback((courseCodes, nextDone) => {
-        const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+    const toggleGraphModuleDone = useCallback((courseCodes, nextDone, groupId) => {
+        const source = (rfRef.current?.getNodes?.() || nodes);
+        const codesFromGroup = groupId
+            ? source
+                .filter((n) => n.type === "course" && n.data?.groupId === groupId)
+                .map((n) => n?.data?.code)
+                .filter(Boolean)
+            : [];
+        const codesFromPayload = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+        const codes = codesFromGroup.length ? codesFromGroup : codesFromPayload;
         if (!codes.length) return;
-        const allowed = codes.filter((code) => {
-            const status = getCourseStatus(code);
-            return status === "in_plan" || status === "done";
-        });
-        if (!allowed.length) return;
-        for (const code of allowed) {
+        const uniqueCodes = [...new Set(codes)];
+        for (const code of uniqueCodes) {
             setCourseDone(code, Boolean(nextDone));
         }
         setNodes((prev) => prev.map((n) => {
-            if (n.type !== "course" || !allowed.includes(n?.data?.code)) return n;
+            if (n.type !== "course" || !uniqueCodes.includes(n?.data?.code)) return n;
             return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
         }));
-    }, [getCourseStatus, setCourseDone, setNodes]);
+    }, [nodes, setCourseDone, setNodes]);
+
+    const updateCourseMeta = useCallback((courseCode, patch) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return;
+        setCourseMeta(code, patch);
+    }, [setCourseMeta]);
+
+    useEffect(() => {
+        setNodes((prev) => {
+            let changed = false;
+            const next = prev.map((node) => {
+                if (node?.type !== "course") return node;
+                const code = String(node?.data?.code || "").trim();
+                if (!code) return node;
+                const meta = getCourseMeta(code);
+                const nextNotes = String(meta?.notes ?? "");
+                const nextEstimatedHours = String(meta?.estimatedHours ?? "");
+                const nextGrade = String(meta?.grade ?? "");
+                if (
+                    node?.data?.notes === nextNotes &&
+                    String(node?.data?.estimatedHours ?? "") === nextEstimatedHours &&
+                    String(node?.data?.grade ?? "") === nextGrade &&
+                    node?.data?.onUpdateCourseMeta === updateCourseMeta
+                ) {
+                    return node;
+                }
+                changed = true;
+                return {
+                    ...node,
+                    data: {
+                        ...node.data,
+                        notes: nextNotes,
+                        estimatedHours: nextEstimatedHours,
+                        grade: nextGrade,
+                        onUpdateCourseMeta: updateCourseMeta,
+                    },
+                };
+            });
+            return changed ? next : prev;
+        });
+    }, [courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta]);
 
     const removeGraphCoursesFromPlan = useCallback((courseCodes) => {
         const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
@@ -1681,6 +1931,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
             maxEctsPerSemester: Number(semesterLoadLimits?.maxEctsPerSemester),
             recommendedEctsPerSemester: Number(semesterLoadLimits?.recommendedEctsPerSemester),
+            maxWeekHoursPerSemester: Number(semesterLoadLimits?.maxWeekHoursPerSemester),
+            recommendedWeekHoursPerSemester: Number(semesterLoadLimits?.recommendedWeekHoursPerSemester),
         })
             .then((response) => {
                 if ((latestRuleCheckChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
@@ -1740,7 +1992,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     lastUpdatedAt: Date.now(),
                 }));
             });
-    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackMovedCourses, rollbackCourseStatusToggle, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, setProgramRuleCheckState]);
+    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackMovedCourses, rollbackCourseStatusToggle, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, semesterLoadLimits?.maxWeekHoursPerSemester, semesterLoadLimits?.recommendedWeekHoursPerSemester, setProgramRuleCheckState]);
 
     // Initial sync for current program so dashboard has data before first edit.
     useEffect(() => {
@@ -1764,6 +2016,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
             maxEctsPerSemester: Number(semesterLoadLimits?.maxEctsPerSemester),
             recommendedEctsPerSemester: Number(semesterLoadLimits?.recommendedEctsPerSemester),
+            maxWeekHoursPerSemester: Number(semesterLoadLimits?.maxWeekHoursPerSemester),
+            recommendedWeekHoursPerSemester: Number(semesterLoadLimits?.recommendedWeekHoursPerSemester),
         })
             .then((response) => {
                 setProgramRuleCheckState(requestProgramCode, {
@@ -1783,7 +2037,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 }));
                 pendingInitialSyncProgramRef.current = null;
             });
-    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, setProgramRuleCheckState]);
+    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, semesterLoadLimits?.maxWeekHoursPerSemester, semesterLoadLimits?.recommendedWeekHoursPerSemester, setProgramRuleCheckState]);
 
     useEffect(() => {
         if (!stickyViolation?.message) return;
@@ -2634,6 +2888,100 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             setIsSavingProfileSettings(false);
         }
     }, [pendingCourseTermUpdateByCode, programCode]);
+    const saveProfileChanges = useCallback(async () => {
+        if (isSavingProfileSettings) return;
+        setIsSavingProfileSettings(true);
+        try {
+            const normalizedSeason = normalizeStartSeason(profileDraftStartSeason);
+            const normalizedYear = Number(profileDraftStartYear) || new Date().getFullYear();
+            const shouldSaveStartTerm =
+                !isStartTermLocked &&
+                (normalizedSeason !== startTermSeason || normalizedYear !== startTermYear);
+            if (shouldSaveStartTerm) {
+                await saveStartTerm({
+                    programCode,
+                    season: normalizedSeason,
+                    year: normalizedYear,
+                });
+                setProfileSettingsByProgram((prev) => ({
+                    ...(prev || {}),
+                    [programCode]: {
+                        ...(prev?.[programCode] || {}),
+                        startTerm: { season: normalizedSeason, year: normalizedYear },
+                        startTermLocked: true,
+                        courseTermOverrides: prev?.[programCode]?.courseTermOverrides || {},
+                    },
+                }));
+            }
+
+            const updates = Object.entries(pendingCourseTermUpdateByCode || {})
+                .map(([courseCode, termAvailability]) => ({
+                    courseCode,
+                    termAvailability: normalizeTermAvailability(termAvailability),
+                }))
+                .filter((item) => Boolean(item.courseCode));
+            if (updates.length > 0) {
+                await saveCourseTerms({
+                    programCode,
+                    updates,
+                });
+                setProfileSettingsByProgram((prev) => {
+                    const current = prev?.[programCode] || {};
+                    const nextOverrides = { ...(current?.courseTermOverrides || {}) };
+                    for (const update of updates) {
+                        nextOverrides[update.courseCode] = update.termAvailability;
+                    }
+                    return {
+                        ...(prev || {}),
+                        [programCode]: {
+                            ...current,
+                            courseTermOverrides: nextOverrides,
+                        },
+                    };
+                });
+                setPendingCourseTermUpdateByCode({});
+            }
+
+            if ((selectedFocus || "") !== (profileDraftFocus || "")) {
+                setSelectedFocus?.(profileDraftFocus || "");
+            }
+            setSemesterLoadLimits?.({
+                maxEctsPerSemester: Number(profileDraftMaxEcts) || 42,
+                recommendedEctsPerSemester: Number(profileDraftRecommendedEcts) || 30,
+                maxWeekHoursPerSemester: Number(profileDraftMaxWeekHours) || 50,
+                recommendedWeekHoursPerSemester: Number(profileDraftRecommendedWeekHours) || 40,
+            });
+            setIsProfileOpen(false);
+        } catch (error) {
+            console.error("Failed to save profile settings", error);
+            setStickyViolation({
+                message: String(error?.message || "").includes("409")
+                    ? "Start semester is locked and cannot be changed anymore."
+                    : "Could not save profile settings.",
+                until: Date.now() + 4000,
+                tone: "error",
+            });
+        } finally {
+            setIsSavingProfileSettings(false);
+        }
+    }, [
+        isSavingProfileSettings,
+        isStartTermLocked,
+        startTermSeason,
+        startTermYear,
+        programCode,
+        pendingCourseTermUpdateByCode,
+        selectedFocus,
+        profileDraftFocus,
+        profileDraftStartSeason,
+        profileDraftStartYear,
+        profileDraftMaxEcts,
+        profileDraftRecommendedEcts,
+        profileDraftMaxWeekHours,
+        profileDraftRecommendedWeekHours,
+        setSelectedFocus,
+        setSemesterLoadLimits,
+    ]);
     const togglePf = useCallback((name) => {
         setExpandedPf((prev) => {
             const next = new Set(prev);
@@ -3125,25 +3473,49 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ fontSize: 14, color: "#111827", fontWeight: 700 }}>Profile</div>
-                    <button
-                        onClick={() => setIsProfileOpen(false)}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "6px 10px",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                        }}
-                    >
-                        Close
-                    </button>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <button
+                            onClick={() => setIsCurriculumSettingsOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 8,
+                                padding: "6px 10px",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            Course availability
+                        </button>
+                        <button
+                            onClick={() => setIsProfileOpen(false)}
+                            title="Close"
+                            aria-label="Close"
+                            style={{
+                                border: "1px solid #fca5a5",
+                                background: "#fef2f2",
+                                color: "#b91c1c",
+                                borderRadius: 8,
+                                fontSize: 12,
+                                width: 24,
+                                height: 22,
+                                lineHeight: 1,
+                                cursor: "pointer",
+                                fontWeight: 700,
+                            }}
+                        >
+                            ×
+                        </button>
+                    </div>
                 </div>
-                <div style={{ fontSize: 13, color: "#111827" }}>
-                    Name: <strong>{currentUser?.username || "user"}</strong>
-                </div>
-                <div style={{ display: "grid", gap: 4 }}>
+                {!isCurriculumSettingsOpen && (
+                    <div style={{ fontSize: 13, color: "#111827" }}>
+                        Name: <strong>{currentUser?.username || "user"}</strong>
+                    </div>
+                )}
+                {!isCurriculumSettingsOpen && (
+                    <div style={{ display: "grid", gap: 4 }}>
                     <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
                     <select
                         value={programCode}
@@ -3172,13 +3544,14 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             Study program is locked after signup setup.
                         </div>
                     )}
-                </div>
-                {programCode === BACHELOR_PROGRAM_CODE && (
+                    </div>
+                )}
+                {!isCurriculumSettingsOpen && programCode === BACHELOR_PROGRAM_CODE && (
                     <div style={{ display: "grid", gap: 4 }}>
                         <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
                         <select
-                            value={selectedFocus || ""}
-                            onChange={(e) => setSelectedFocus?.(e.target.value)}
+                            value={profileDraftFocus || ""}
+                            onChange={(e) => setProfileDraftFocus(e.target.value)}
                             style={{
                                 border: "1px solid #d1d5db",
                                 background: "#ffffff",
@@ -3198,12 +3571,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         </select>
                     </div>
                 )}
-                <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                {!isCurriculumSettingsOpen && (
+                    <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
                     <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Start Semester</div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
                         <select
-                            value={startTermSeason}
-                            onChange={(e) => saveStartTermSetting(e.target.value, startTermYear)}
+                            value={profileDraftStartSeason}
+                            onChange={(e) => setProfileDraftStartSeason(normalizeStartSeason(e.target.value))}
                             disabled={isSavingProfileSettings || isStartTermLocked}
                             style={{
                                 border: "1px solid #d1d5db",
@@ -3224,8 +3598,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             type="number"
                             min={1900}
                             max={2600}
-                            value={startTermYear}
-                            onChange={(e) => saveStartTermSetting(startTermSeason, Number(e.target.value))}
+                            value={profileDraftStartYear}
+                            onChange={(e) => setProfileDraftStartYear(Number(e.target.value))}
                             disabled={isSavingProfileSettings || isStartTermLocked}
                             style={{
                                 border: "1px solid #d1d5db",
@@ -3240,7 +3614,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             }}
                         />
                         <div style={{ alignSelf: "center", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
-                            S1: {laneSeason(startTermSeason, 0)}
+                            S1: {laneSeason(profileDraftStartSeason, 0)}
                         </div>
                     </div>
                     {isStartTermLocked && (
@@ -3248,87 +3622,74 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             Start semester is locked after initial setup.
                         </div>
                     )}
-                </div>
+                    </div>
+                )}
                 <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Course Semester Availability</div>
-                        <button
-                            onClick={savePendingCourseTerms}
-                            disabled={isSavingProfileSettings || Object.keys(pendingCourseTermUpdateByCode || {}).length === 0}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "5px 8px",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                cursor: "pointer",
-                                opacity: (isSavingProfileSettings || Object.keys(pendingCourseTermUpdateByCode || {}).length === 0) ? 0.5 : 1,
-                            }}
-                        >
-                            Save Flags
-                        </button>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Search by code/title..."
-                        value={profileSearch}
-                        onChange={(e) => setProfileSearch(e.target.value)}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontSize: 12,
-                        }}
-                    />
-                    <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 8 }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                            <thead>
-                                <tr style={{ background: "#f9fafb" }}>
-                                    <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Title</th>
-                                    <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Type</th>
-                                    <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Term</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredCatalogCourseRows.map((row) => (
-                                    <tr key={`profile-course-${row.code}`}>
-                                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
-                                            <div style={{ color: "#6b7280" }}>{row.title}</div>
-                                        </td>
-                                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6", color: "#6b7280", whiteSpace: "nowrap" }}>
-                                            {row.type || "-"}
-                                        </td>
-                                        <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
-                                            <select
-                                                value={pendingTermForCode(row.code)}
-                                                onChange={(e) => setPendingTermForCode(row.code, e.target.value)}
-                                                style={{
-                                                    border: "1px solid #d1d5db",
-                                                    borderRadius: 6,
-                                                    padding: "4px 6px",
-                                                    background: "#ffffff",
-                                                }}
-                                            >
-                                                <option value={TERM_BOTH}>Both</option>
-                                                <option value={TERM_WINTER}>Winter</option>
-                                                <option value={TERM_SUMMER}>Summer</option>
-                                            </select>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {filteredCatalogCourseRows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={3} style={{ padding: "8px", color: "#6b7280" }}>No courses found.</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    {isCurriculumSettingsOpen && (
+                        <>
+                            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Course Semester Availability</div>
+                            <input
+                                type="text"
+                                placeholder="Search by code/title..."
+                                value={profileSearch}
+                                onChange={(e) => setProfileSearch(e.target.value)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontSize: 12,
+                                }}
+                            />
+                            <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 8 }}>
+                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                                    <thead>
+                                        <tr style={{ background: "#f9fafb" }}>
+                                            <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Title</th>
+                                            <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Type</th>
+                                            <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Term</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredCatalogCourseRows.map((row) => (
+                                            <tr key={`profile-course-${row.code}`}>
+                                                <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
+                                                    <div style={{ color: "#6b7280" }}>{row.title}</div>
+                                                </td>
+                                                <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6", color: "#6b7280", whiteSpace: "nowrap" }}>
+                                                    {row.type || "-"}
+                                                </td>
+                                                <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
+                                                    <select
+                                                        value={pendingTermForCode(row.code)}
+                                                        onChange={(e) => setPendingTermForCode(row.code, e.target.value)}
+                                                        style={{
+                                                            border: "1px solid #d1d5db",
+                                                            borderRadius: 6,
+                                                            padding: "4px 6px",
+                                                            background: "#ffffff",
+                                                        }}
+                                                    >
+                                                        <option value={TERM_BOTH}>Both</option>
+                                                        <option value={TERM_WINTER}>Winter</option>
+                                                        <option value={TERM_SUMMER}>Summer</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {filteredCatalogCourseRows.length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} style={{ padding: "8px", color: "#6b7280" }}>No courses found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    )}
                 </div>
-                <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Rulecheck Semester Load</div>
+                {!isCurriculumSettingsOpen && (
+                    <div style={{ display: "grid", gap: 8 }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                         <div style={{ display: "grid", gap: 4 }}>
                             <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Max ECTS / semester</label>
@@ -3336,14 +3697,34 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                                 type="number"
                                 min={1}
                                 step={0.5}
-                                value={Number(semesterLoadLimits?.maxEctsPerSemester ?? 42)}
+                                value={Number(profileDraftMaxEcts ?? 42)}
                                 onChange={(e) => {
                                     const nextMax = Number(e.target.value);
                                     if (!Number.isFinite(nextMax) || nextMax <= 0) return;
-                                    setSemesterLoadLimits?.((prev) => ({
-                                        ...(prev || {}),
-                                        maxEctsPerSemester: nextMax,
-                                    }));
+                                    setProfileDraftMaxEcts(nextMax);
+                                }}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontWeight: 600,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Max Week-Hours / semester</label>
+                            <input
+                                type="number"
+                                min={1}
+                                step={0.5}
+                                value={Number(profileDraftMaxWeekHours ?? 50)}
+                                onChange={(e) => {
+                                    const nextMax = Number(e.target.value);
+                                    if (!Number.isFinite(nextMax) || nextMax <= 0) return;
+                                    setProfileDraftMaxWeekHours(nextMax);
                                 }}
                                 style={{
                                     border: "1px solid #d1d5db",
@@ -3362,14 +3743,34 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                                 type="number"
                                 min={1}
                                 step={0.5}
-                                value={Number(semesterLoadLimits?.recommendedEctsPerSemester ?? 30)}
+                                value={Number(profileDraftRecommendedEcts ?? 30)}
                                 onChange={(e) => {
                                     const nextRecommended = Number(e.target.value);
                                     if (!Number.isFinite(nextRecommended) || nextRecommended <= 0) return;
-                                    setSemesterLoadLimits?.((prev) => ({
-                                        ...(prev || {}),
-                                        recommendedEctsPerSemester: nextRecommended,
-                                    }));
+                                    setProfileDraftRecommendedEcts(nextRecommended);
+                                }}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontWeight: 600,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Recommended Week-Hours</label>
+                            <input
+                                type="number"
+                                min={1}
+                                step={0.5}
+                                value={Number(profileDraftRecommendedWeekHours ?? 40)}
+                                onChange={(e) => {
+                                    const nextRecommended = Number(e.target.value);
+                                    if (!Number.isFinite(nextRecommended) || nextRecommended <= 0) return;
+                                    setProfileDraftRecommendedWeekHours(nextRecommended);
                                 }}
                                 style={{
                                     border: "1px solid #d1d5db",
@@ -3383,1090 +3784,1255 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             />
                         </div>
                     </div>
+                    </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                    <button
+                        onClick={saveProfileChanges}
+                        disabled={isSavingProfileSettings}
+                        style={{
+                            border: "1px solid #15803d",
+                            background: isSavingProfileSettings ? "#86efac" : "#16a34a",
+                            color: "#ffffff",
+                            borderRadius: 8,
+                            padding: "8px 12px",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            cursor: "pointer",
+                        }}
+                    >
+                        {isSavingProfileSettings ? "Saving..." : "Save"}
+                    </button>
                 </div>
             </div>
         </div>
     ) : null;
 
     const ruleDashboardAside = isRuleDashboardOpen && (
-                    <aside
-                        style={{
-                            width: 420,
-                            borderLeft: "1px solid #e5e7eb",
-                            background: "#ffffff",
-                            marginTop: PANEL_TOP_MARGIN,
-                            marginBottom: PANEL_BOTTOM_MARGIN,
-                            height: `calc(100vh - ${PANEL_TOP_MARGIN + PANEL_BOTTOM_MARGIN}px)`,
-                            padding: 12,
-                            overflow: "auto",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignSelf: "flex-start",
-                        }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                            <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
+        <aside
+            style={{
+                width: 420,
+                borderLeft: "1px solid #e5e7eb",
+                background: "#ffffff",
+                marginTop: PANEL_TOP_MARGIN,
+                marginBottom: PANEL_BOTTOM_MARGIN,
+                height: `calc(100vh - ${PANEL_TOP_MARGIN + PANEL_BOTTOM_MARGIN}px)`,
+                padding: 12,
+                overflow: "auto",
+                display: "flex",
+                flexDirection: "column",
+                alignSelf: "flex-start",
+            }}
+        >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
+                <button
+                    onClick={() => setIsRuleDashboardOpen(false)}
+                    style={{
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    Close
+                </button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+                <div>Program: {programCode}</div>
+                {programCode === BACHELOR_PROGRAM_CODE && <div>Focus: {selectedFocus || "-"}</div>}
+            </div>
+            <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", minWidth: 118 }}>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Target ECTS</div>
+                        <div style={{ fontSize: 18, fontWeight: 700 }}>{targetEctsKpi.toFixed(1)}</div>
+                    </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Planned ECTS</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: plannedChecklistComplete ? "#166534" : "#111827" }}>{totalEctsKpi.toFixed(1)}</div>
+                        {renderKpiProgress(totalPctKpi, plannedChecklistComplete ? "#16a34a" : "#2563eb")}
+                    </div>
+                    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>Done ECTS</div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: donePctKpi >= 100 - 1e-6 ? "#166534" : "#111827" }}>{doneEctsKpi.toFixed(1)}</div>
+                        {renderKpiProgress(donePctKpi, donePctKpi >= 100 - 1e-6 ? "#16a34a" : "#2563eb")}
+                    </div>
+                </div>
+            </div>
+
+            <div style={{ display: "inline-flex", gap: 6, marginBottom: 12 }}>
+                <button
+                    onClick={() => setDashboardViewMode("planning")}
+                    style={getDashboardModeButtonStyle("planning")}
+                >
+                    Planned
+                </button>
+                <button
+                    onClick={() => setDashboardViewMode("progress")}
+                    style={getDashboardModeButtonStyle("progress")}
+                >
+                    Done
+                </button>
+            </div>
+
+            {isBachelorDashboard && dashboardViewMode === "planning" && (
+                <div
+                    draggable
+                    onDragStart={() => handlePlannedSectionDragStart("steop")}
+                    onDragOver={(event) => handlePlannedSectionDragOver(event, "steop")}
+                    onDrop={() => handlePlannedSectionDrop("steop")}
+                    onDragEnd={handlePlannedSectionDragEnd}
+                    style={plannedSectionStyle("steop", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
+                        <button
+                            onClick={() => setIsSteopInfoOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                            title="Show StEOP rules"
+                        >
+                            i
+                        </button>
+                    </div>
+                    {isSteopInfoOpen && (
+                        <div
+                            style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                background: "#f9fafb",
+                                padding: 8,
+                                marginBottom: 8,
+                                fontSize: 11,
+                                color: "#374151",
+                                whiteSpace: "pre-line",
+                            }}
+                        >
+                            {STEOP_RULES_TEXT}
+                        </div>
+                    )}
+                    <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 12 }}>
+                            Status: <strong style={{ color: bachelorSteopPlannedComplete ? "#166534" : "#991b1b" }}>
+                                {bachelorSteopPlannedComplete ? "completed" : "not completed"}
+                            </strong>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                            Complete in semester: <strong>{bachelorSteopPlannedLane == null ? "-" : bachelorSteopPlannedLane + 1}</strong>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                            Planned progress: <strong>{steopPlannedEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
+                            {" "}(
+                            mandatory {steopMandatoryPlannedEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
+                            {" "}pool {steopPoolPlannedEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
+                            )
+                        </div>
+                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ width: `${steopPlannedPct}%`, height: "100%", background: bachelorSteopPlannedComplete ? "#16a34a" : "#2563eb" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required courses</div>
                             <button
-                                onClick={() => setIsRuleDashboardOpen(false)}
+                                onClick={() => setIsSteopChecklistOpen((v) => !v)}
                                 style={{
                                     border: "1px solid #d1d5db",
                                     background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "6px 10px",
-                                    fontWeight: 600,
+                                    borderRadius: 999,
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
                                     cursor: "pointer",
                                 }}
                             >
-                                Close
+                                {isSteopChecklistOpen ? "Collapse" : "Expand"}
                             </button>
                         </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-                            <div>Program: {programCode}</div>
-                            {programCode === BACHELOR_PROGRAM_CODE && <div>Focus: {selectedFocus || "-"}</div>}
-                        </div>
-                        <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
-                            <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "6px 8px", minWidth: 118 }}>
-                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Target ECTS</div>
-                                    <div style={{ fontSize: 18, fontWeight: 700 }}>{targetEctsKpi.toFixed(1)}</div>
-                                </div>
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Planned ECTS</div>
-                                    <div style={{ fontSize: 18, fontWeight: 700, color: plannedChecklistComplete ? "#166534" : "#111827" }}>{totalEctsKpi.toFixed(1)}</div>
-                                    {renderKpiProgress(totalPctKpi, plannedChecklistComplete ? "#16a34a" : "#2563eb")}
-                                </div>
-                                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                    <div style={{ fontSize: 11, color: "#6b7280" }}>Done ECTS</div>
-                                    <div style={{ fontSize: 18, fontWeight: 700, color: donePctKpi >= 100 - 1e-6 ? "#166534" : "#111827" }}>{doneEctsKpi.toFixed(1)}</div>
-                                    {renderKpiProgress(donePctKpi, donePctKpi >= 100 - 1e-6 ? "#16a34a" : "#2563eb")}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style={{ display: "inline-flex", gap: 6, marginBottom: 12 }}>
-                            <button
-                                onClick={() => setDashboardViewMode("planning")}
-                                style={getDashboardModeButtonStyle("planning")}
-                            >
-                                Planned
-                            </button>
-                            <button
-                                onClick={() => setDashboardViewMode("progress")}
-                                style={getDashboardModeButtonStyle("progress")}
-                            >
-                                Done
-                            </button>
-                        </div>
-
-                        {isBachelorDashboard && dashboardViewMode === "planning" && (
-                            <div
-                                draggable
-                                onDragStart={() => handlePlannedSectionDragStart("steop")}
-                                onDragOver={(event) => handlePlannedSectionDragOver(event, "steop")}
-                                onDrop={() => handlePlannedSectionDrop("steop")}
-                                onDragEnd={handlePlannedSectionDragEnd}
-                                style={plannedSectionStyle("steop", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
-                                    <button
-                                        onClick={() => setIsSteopInfoOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                        title="Show StEOP rules"
-                                    >
-                                        i
-                                    </button>
-                                </div>
-                                {isSteopInfoOpen && (
-                                    <div
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 8,
-                                            background: "#f9fafb",
-                                            padding: 8,
-                                            marginBottom: 8,
-                                            fontSize: 11,
-                                            color: "#374151",
-                                            whiteSpace: "pre-line",
-                                        }}
-                                    >
-                                        {STEOP_RULES_TEXT}
-                                    </div>
-                                )}
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>
-                                        Status: <strong style={{ color: bachelorSteopPlannedComplete ? "#166534" : "#991b1b" }}>
-                                            {bachelorSteopPlannedComplete ? "completed" : "not completed"}
-                                        </strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Complete in semester: <strong>{bachelorSteopPlannedLane == null ? "-" : bachelorSteopPlannedLane + 1}</strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Planned progress: <strong>{steopPlannedEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
-                                        {" "}(
-                                        mandatory {steopMandatoryPlannedEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
-                                        {" "}pool {steopPoolPlannedEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
-                                        )
-                                    </div>
-                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                        <div style={{ width: `${steopPlannedPct}%`, height: "100%", background: bachelorSteopPlannedComplete ? "#16a34a" : "#2563eb" }} />
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required courses</div>
-                                        <button
-                                            onClick={() => setIsSteopChecklistOpen((v) => !v)}
-                                            style={{
-                                                border: "1px solid #d1d5db",
-                                                background: "#ffffff",
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            {isSteopChecklistOpen ? "Collapse" : "Expand"}
-                                        </button>
-                                    </div>
-                                    {isSteopChecklistOpen && (
-                                        <>
-                                            {steopMandatoryChecklistPlanned
-                                                .filter((row) => !bachelorSteopPlannedComplete || row.done)
-                                                .map((row, idx) => (
-                                                <div key={`steop-man-planned-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
-                                                    {row.done ? "✓" : "○"} {row.label}
-                                                </div>
-                                            ))}
-                                            <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
-                                                Pool requirement (need at least {steopPoolRequiredEcts.toFixed(1)} ECTS):
-                                            </div>
-                                            {steopPoolChecklistPlanned
-                                                .filter((row) => !bachelorSteopPlannedComplete || row.done)
-                                                .map((row, idx) => (
-                                                <div key={`steop-pool-planned-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
-                                                    {row.done ? "✓" : "○"} {row.label}
-                                                </div>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {isBachelorDashboard && hasSelectedFocusArea && dashboardViewMode === "planning" && (
-                            <div
-                                draggable
-                                onDragStart={() => handlePlannedSectionDragStart("focus")}
-                                onDragOver={(event) => handlePlannedSectionDragOver(event, "focus")}
-                                onDrop={() => handlePlannedSectionDrop("focus")}
-                                onDragEnd={handlePlannedSectionDragEnd}
-                                style={plannedSectionStyle("focus", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
-                                    <button
-                                        onClick={() => setIsFocusInfoOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                        title="Show Focus Area info"
-                                    >
-                                        i
-                                    </button>
-                                </div>
-                                {isFocusInfoOpen && (
-                                    <div
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 8,
-                                            background: "#f9fafb",
-                                            padding: 8,
-                                            marginBottom: 8,
-                                            fontSize: 11,
-                                            color: "#374151",
-                                            whiteSpace: "pre-line",
-                                        }}
-                                    >
-                                        {FOCUS_INFO_TEXT}
-                                    </div>
-                                )}
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus || "-"}</strong></div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Status: <strong style={{ color: bachelorFocusCompletePlanned ? "#166534" : "#991b1b" }}>
-                                            {bachelorFocusCompletePlanned ? "completed" : "not completed"}
-                                        </strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Checklist progress: <strong>{focusRequirementDoneCountPlanned}</strong> / {focusRequirementTotalCountPlanned}
-                                    </div>
-                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                        <div style={{ width: `${focusChecklistPctPlanned}%`, height: "100%", background: bachelorFocusCompletePlanned ? "#16a34a" : "#2563eb" }} />
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required modules</div>
-                                        <button
-                                            onClick={() => setIsFocusChecklistOpen((v) => !v)}
-                                            style={{
-                                                border: "1px solid #d1d5db",
-                                                background: "#ffffff",
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            {isFocusChecklistOpen ? "Collapse" : "Expand"}
-                                        </button>
-                                    </div>
-                                    {isFocusChecklistOpen && (
-                                        <>
-                                            {focusChecklistPlanned.length === 0 && (
-                                                <div style={{ fontSize: 12, color: "#6b7280" }}>No detailed focus checklist available.</div>
-                                            )}
-                                            {focusRequiredItemsPlanned.length > 0 && (
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 2 }}>Mandatory modules</div>
-                                            )}
-                                            {focusRequiredItemsPlanned
-                                                .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
-                                                .map((item, idx) => (
-                                                <div key={`focus-req-planned-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
-                                                    {item?.done ? "✓" : "○"} {item?.label}
-                                                </div>
-                                            ))}
-                                            {focusChooseItemsPlanned.length > 0 && (
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
-                                                    Choose {Number(focusChooseSummaryPlanned?.min || 0)} from {focusChooseItemsPlanned.length} modules
-                                                    {focusChooseSummaryPlanned ? ` (${Number(focusChooseSummaryPlanned?.done || 0)} done)` : ""}
-                                                </div>
-                                            )}
-                                            {focusChooseItemsPlanned
-                                                .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
-                                                .map((item, idx) => (
-                                                <div key={`focus-choose-planned-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
-                                                    {item?.done ? "✓" : "○"} {item?.label}
-                                                </div>
-                                            ))}
-                                            {focusChooseGroupRowsPlanned.map((group, gIdx) => (
-                                                <div key={`focus-group-planned-${gIdx}`} style={{ display: "grid", gap: 4 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
-                                                        Choose {Number(group?.summary?.min || 0)} from {group.items.length} modules
-                                                        {group?.summary ? ` (${Number(group.summary?.done || 0)} done)` : ""}
-                                                    </div>
-                                                    {group.items
-                                                        .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
-                                                        .map((item, idx) => (
-                                                        <div key={`focus-group-item-planned-${gIdx}-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
-                                                            {item?.done ? "✓" : "○"} {item?.label}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "planning" && (
-                            <div
-                                draggable
-                                onDragStart={() => handlePlannedSectionDragStart("planned_exam_subject")}
-                                onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_exam_subject")}
-                                onDrop={() => handlePlannedSectionDrop("planned_exam_subject")}
-                                onDragEnd={handlePlannedSectionDragEnd}
-                                style={plannedSectionStyle("planned_exam_subject", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Planned per Exam Subject (ECTS)</div>
-                                    <button
-                                        onClick={() => setIsPlannedExamSubjectOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        {isPlannedExamSubjectOpen ? "Collapse" : "Expand"}
-                                    </button>
-                                </div>
-                                <div style={{ display: "grid", gap: 4, marginBottom: isPlannedExamSubjectOpen ? 6 : 0 }}>
-                                    <div style={{ fontSize: 12, color: "#374151" }}>
-                                        Planned <strong>{plannedEctsByExamSubjectTotal.toFixed(1)} ECTS</strong> across <strong>{plannedEctsByExamSubjectRows.length}</strong> exam subject{plannedEctsByExamSubjectRows.length === 1 ? "" : "s"}
-                                    </div>
-                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", display: "flex" }}>
-                                        {plannedEctsByExamSubjectRows.length === 0 && <div style={{ width: "100%", height: "100%", background: "#d1d5db" }} />}
-                                        {plannedEctsByExamSubjectRows.map((row, idx) => {
-                                            const pct = plannedEctsByExamSubjectTotal > 0
-                                                ? Math.max(0, Math.min(100, (Number(row?.ects || 0) / plannedEctsByExamSubjectTotal) * 100))
-                                                : 0;
-                                            const color = subjectColors?.[row?.subject] || "#9ca3af";
-                                            return (
-                                                <div
-                                                    key={`planned-exam-segment-${idx}`}
-                                                    title={`${row?.subject}: ${Number(row?.ects || 0).toFixed(1)} ECTS`}
-                                                    style={{ width: `${pct}%`, height: "100%", background: color }}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                                {isPlannedExamSubjectOpen && (
-                                    <div style={{ display: "grid", gap: 6 }}>
-                                        {plannedEctsByExamSubjectRows.length === 0 && (
-                                            <div style={{ fontSize: 12, color: "#6b7280" }}>No planned exam-subject ECTS yet.</div>
-                                        )}
-                                        {plannedEctsByExamSubjectRows.map((row, idx) => {
-                                            const pct = plannedEctsByExamSubjectTotal > 0
-                                                ? Math.max(0, Math.min(100, (Number(row?.ects || 0) / plannedEctsByExamSubjectTotal) * 100))
-                                                : 0;
-                                            const color = subjectColors?.[row?.subject] || "#9ca3af";
-                                            return (
-                                                <div key={`${row?.subject}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{row?.subject}</div>
-                                                    <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
-                                                        {Number(row?.ects || 0).toFixed(1)} ECTS planned ({pct.toFixed(1)}%)
-                                                    </div>
-                                                    <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                                        <div style={{ width: `${pct}%`, height: "100%", background: color }} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "planning" && !isBachelorDashboard && (
-                            <div
-                                draggable
-                                onDragStart={() => handlePlannedSectionDragStart("key_buckets")}
-                                onDragOver={(event) => handlePlannedSectionDragOver(event, "key_buckets")}
-                                onDrop={() => handlePlannedSectionDrop("key_buckets")}
-                                onDragEnd={handlePlannedSectionDragEnd}
-                                style={plannedSectionStyle("key_buckets", { marginBottom: 12 })}
-                            >
-                                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 6 }}>Key Buckets</div>
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>Subject modules (excl. free): <strong>{buckets.subject_modules_excl_free ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Free choice + TS: <strong>{buckets.free_choice_and_ts ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Transferable skills: <strong>{buckets.transferable_skills ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Diploma total: <strong>{buckets.diploma_total ?? 0}</strong></div>
-                                    <div style={{ fontSize: 12 }}>Needed free to hit 120: <strong>{buckets.needed_free_to_hit_120 ?? 0}</strong></div>
-                                </div>
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "planning" && (
-                        <div
-                            draggable
-                            onDragStart={() => handlePlannedSectionDragStart("planned_semester")}
-                            onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_semester")}
-                            onDrop={() => handlePlannedSectionDrop("planned_semester")}
-                            onDragEnd={handlePlannedSectionDragEnd}
-                            style={plannedSectionStyle("planned_semester", { marginBottom: 12 })}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700 }}>Planned per Semester (ECTS)</div>
-                                <button
-                                    onClick={() => setIsPerSemesterEctsOpen((v) => !v)}
-                                    style={{
-                                        border: "1px solid #d1d5db",
-                                        background: "#ffffff",
-                                        borderRadius: 999,
-                                        padding: "2px 8px",
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    {isPerSemesterEctsOpen ? "Collapse" : "Expand"}
-                                </button>
-                            </div>
-                            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isPerSemesterEctsOpen ? 6 : 0 }}>
-                                Target ~ {workloadTargetPerSemester.toFixed(1)} ECTS / semester
-                            </div>
-                            <div style={{ fontSize: 12, color: perSemesterWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isPerSemesterEctsOpen ? 6 : 0 }}>
-                                {perSemesterRows.length === 0
-                                    ? "No semester data yet."
-                                    : (perSemesterWithinDesiredWorkload
-                                        ? "You are under your desired workload in every semester."
-                                        : "At least one semester is above your desired workload.")}
-                            </div>
-                            {isPerSemesterEctsOpen && (
-                                <div style={{ display: "grid", gap: 8 }}>
-                                    {perSemesterRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No semester data yet.</div>}
-                                    {perSemesterRows.map((row) => {
-                                        const rowPct = Math.max(0, Math.min(100, (row.ects / maxSemesterWorkloadForScale) * 100));
-                                        const targetPct = Math.max(0, Math.min(100, (workloadTargetPerSemester / maxSemesterWorkloadForScale) * 100));
-                                        const greenPct = Math.max(0, Math.min(rowPct, targetPct));
-                                        const redPct = Math.max(0, rowPct - targetPct);
-                                        return (
-                                            <div key={row.sem} style={{ display: "grid", gap: 4 }}>
-                                                <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
-                                                    <span>Semester {row.sem}</span>
-                                                    <strong>{row.ects.toFixed(1)} ECTS</strong>
-                                                </div>
-                                                <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
-                                                    <div style={{ display: "flex", height: "100%" }}>
-                                                        <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
-                                                        {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
-                                                    </div>
-                                                    <div
-                                                        style={{
-                                                            position: "absolute",
-                                                            left: `${targetPct}%`,
-                                                            top: 0,
-                                                            width: 2,
-                                                            height: "100%",
-                                                            background: "#1f2937",
-                                                            opacity: 0.45,
-                                                            transform: "translateX(-1px)",
-                                                        }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                        )}
-
-                        {dashboardViewMode === "planning" && (
-                        <div
-                            draggable
-                            onDragStart={() => handlePlannedSectionDragStart("planned_category")}
-                            onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_category")}
-                            onDrop={() => handlePlannedSectionDrop("planned_category")}
-                            onDragEnd={handlePlannedSectionDragEnd}
-                            style={plannedSectionStyle("planned_category", { marginBottom: 12 })}
-                        >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700 }}>Planned per Category (ECTS)</div>
-                                <button
-                                    onClick={() => setIsByCategoryOpen((v) => !v)}
-                                    style={{
-                                        border: "1px solid #d1d5db",
-                                        background: "#ffffff",
-                                        borderRadius: 999,
-                                        padding: "2px 8px",
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        cursor: "pointer",
-                                    }}
-                                >
-                                    {isByCategoryOpen ? "Collapse" : "Expand"}
-                                </button>
-                            </div>
-                            <div style={{ display: "grid", gap: 4, marginBottom: isByCategoryOpen ? 6 : 0 }}>
-                                <div style={{ fontSize: 12, color: "#374151" }}>
-                                    Total categorized: <strong>{byCategoryTotalEcts.toFixed(1)} ECTS</strong> across <strong>{byCategoryRows.length}</strong> categories
-                                </div>
-                                {topByCategoryRow && (
-                                    <div style={{ fontSize: 12, color: "#374151" }}>
-                                        Largest category: <strong>{topByCategoryRow.category}</strong> ({topByCategoryRow.ects.toFixed(1)} ECTS)
-                                    </div>
-                                )}
-                            </div>
-                            {isByCategoryOpen && (
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    {byCategoryRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No category data yet.</div>}
-                                    {byCategoryRows.map((row, idx) => {
-                                        const pct = byCategoryTotalEcts > 0
-                                            ? Math.max(0, Math.min(100, (row.ects / byCategoryTotalEcts) * 100))
-                                            : 0;
-                                        return (
-                                            <div key={`${row.category}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
-                                                    #{idx + 1} {row.category}
-                                                </div>
-                                                <div style={{ fontSize: 11, color: "#374151", display: "flex", justifyContent: "space-between" }}>
-                                                    <span>{row.ects.toFixed(1)} ECTS</span>
-                                                    <span>{pct.toFixed(1)}%</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                        )}
-
-                        {isBachelorDashboard && dashboardViewMode === "progress" && (
-                            <div
-                                draggable
-                                onDragStart={() => handleDoneSectionDragStart("steop")}
-                                onDragOver={(event) => handleDoneSectionDragOver(event, "steop")}
-                                onDrop={() => handleDoneSectionDrop("steop")}
-                                onDragEnd={handleDoneSectionDragEnd}
-                                style={doneSectionStyle("steop", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
-                                    <button
-                                        onClick={() => setIsSteopInfoOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                        title="Show StEOP rules"
-                                    >
-                                        i
-                                    </button>
-                                </div>
-                                {isSteopInfoOpen && (
-                                    <div
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 8,
-                                            background: "#f9fafb",
-                                            padding: 8,
-                                            marginBottom: 8,
-                                            fontSize: 11,
-                                            color: "#374151",
-                                            whiteSpace: "pre-line",
-                                        }}
-                                    >
-                                        {STEOP_RULES_TEXT}
-                                    </div>
-                                )}
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>
-                                        Status: <strong style={{ color: bachelorSteopComplete ? "#166534" : "#991b1b" }}>
-                                            {bachelorSteopComplete ? "completed" : "not completed"}
-                                        </strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Complete in semester: <strong>{bachelorSteopLane == null ? "-" : bachelorSteopLane + 1}</strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Done progress: <strong>{steopDoneEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
-                                        {" "}(
-                                        mandatory {steopMandatoryDoneEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
-                                        {" "}pool {steopPoolDoneEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
-                                        )
-                                    </div>
-                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                        <div style={{ width: `${steopDonePct}%`, height: "100%", background: bachelorSteopComplete ? "#16a34a" : "#2563eb" }} />
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required courses</div>
-                                        <button
-                                            onClick={() => setIsSteopChecklistOpen((v) => !v)}
-                                            style={{
-                                                border: "1px solid #d1d5db",
-                                                background: "#ffffff",
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            {isSteopChecklistOpen ? "Collapse" : "Expand"}
-                                        </button>
-                                    </div>
-                                    {isSteopChecklistOpen && (
-                                        <>
-                                            {steopMandatoryChecklist
-                                                .filter((row) => !bachelorSteopComplete || row.done)
-                                                .map((row, idx) => (
-                                                <div key={`steop-man-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
-                                                    {row.done ? "✓" : "○"} {row.label}
-                                                </div>
-                                            ))}
-                                            <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
-                                                Pool requirement (need at least {steopPoolRequiredEcts.toFixed(1)} ECTS):
-                                            </div>
-                                            {steopPoolChecklist
-                                                .filter((row) => !bachelorSteopComplete || row.done)
-                                                .map((row, idx) => (
-                                                <div key={`steop-pool-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
-                                                    {row.done ? "✓" : "○"} {row.label}
-                                                </div>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {isBachelorDashboard && hasSelectedFocusArea && dashboardViewMode === "progress" && (
-                            <div
-                                draggable
-                                onDragStart={() => handleDoneSectionDragStart("focus")}
-                                onDragOver={(event) => handleDoneSectionDragOver(event, "focus")}
-                                onDrop={() => handleDoneSectionDrop("focus")}
-                                onDragEnd={handleDoneSectionDragEnd}
-                                style={doneSectionStyle("focus", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
-                                    <button
-                                        onClick={() => setIsFocusInfoOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                        title="Show Focus Area info"
-                                    >
-                                        i
-                                    </button>
-                                </div>
-                                {isFocusInfoOpen && (
-                                    <div
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 8,
-                                            background: "#f9fafb",
-                                            padding: 8,
-                                            marginBottom: 8,
-                                            fontSize: 11,
-                                            color: "#374151",
-                                            whiteSpace: "pre-line",
-                                        }}
-                                    >
-                                        {FOCUS_INFO_TEXT}
-                                    </div>
-                                )}
-                                <div style={{ display: "grid", gap: 6 }}>
-                                    <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus || "-"}</strong></div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Status: <strong style={{ color: bachelorFocusComplete ? "#166534" : "#991b1b" }}>
-                                            {bachelorFocusComplete ? "completed" : "not completed"}
-                                        </strong>
-                                    </div>
-                                    <div style={{ fontSize: 12 }}>
-                                        Checklist progress: <strong>{focusRequirementDoneCount}</strong> / {focusRequirementTotalCount}
-                                    </div>
-                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                        <div style={{ width: `${focusChecklistPct}%`, height: "100%", background: bachelorFocusComplete ? "#16a34a" : "#2563eb" }} />
-                                    </div>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
-                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required modules</div>
-                                        <button
-                                            onClick={() => setIsFocusChecklistOpen((v) => !v)}
-                                            style={{
-                                                border: "1px solid #d1d5db",
-                                                background: "#ffffff",
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                cursor: "pointer",
-                                            }}
-                                        >
-                                            {isFocusChecklistOpen ? "Collapse" : "Expand"}
-                                        </button>
-                                    </div>
-                                    {isFocusChecklistOpen && (
-                                        <>
-                                            {focusChecklist.length === 0 && (
-                                                <div style={{ fontSize: 12, color: "#6b7280" }}>No detailed focus checklist available.</div>
-                                            )}
-                                            {focusRequiredItems.length > 0 && (
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 2 }}>Mandatory modules</div>
-                                            )}
-                                            {focusRequiredItems
-                                                .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
-                                                .map((item, idx) => (
-                                                <div key={`focus-req-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
-                                                    {item?.done ? "✓" : "○"} {item?.label}
-                                                </div>
-                                            ))}
-                                            {focusChooseItems.length > 0 && (
-                                                <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
-                                                    Choose {Number(focusChooseSummary?.min || 0)} from {focusChooseItems.length} modules
-                                                    {focusChooseSummary ? ` (${Number(focusChooseSummary?.done || 0)} done)` : ""}
-                                                </div>
-                                            )}
-                                            {focusChooseItems
-                                                .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
-                                                .map((item, idx) => (
-                                                <div key={`focus-choose-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
-                                                    {item?.done ? "✓" : "○"} {item?.label}
-                                                </div>
-                                            ))}
-                                            {focusChooseGroupRows.map((group, gIdx) => (
-                                                <div key={`focus-group-${gIdx}`} style={{ display: "grid", gap: 4 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
-                                                        Choose {Number(group?.summary?.min || 0)} from {group.items.length} modules
-                                                        {group?.summary ? ` (${Number(group.summary?.done || 0)} done)` : ""}
-                                                    </div>
-                                                    {group.items
-                                                        .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
-                                                        .map((item, idx) => (
-                                                        <div key={`focus-group-item-${gIdx}-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
-                                                            {item?.done ? "✓" : "○"} {item?.label}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ))}
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "progress" && (
-                            <div
-                                draggable
-                                onDragStart={() => handleDoneSectionDragStart("exam_subject")}
-                                onDragOver={(event) => handleDoneSectionDragOver(event, "exam_subject")}
-                                onDrop={() => handleDoneSectionDrop("exam_subject")}
-                                onDragEnd={handleDoneSectionDragEnd}
-                                style={doneSectionStyle("exam_subject", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Done per Exam Subject (ECTS)</div>
-                                    <button
-                                        onClick={() => setIsExamSubjectProgressOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        {isExamSubjectProgressOpen ? "Collapse" : "Expand"}
-                                    </button>
-                                </div>
-                                <div style={{ display: "grid", gap: 4, marginBottom: isExamSubjectProgressOpen ? 6 : 0 }}>
-                                    <div style={{ fontSize: 12, color: "#374151" }}>
-                                        Done <strong>{examSubjectTotalDoneCount}/{examSubjectTotalCourseCount}</strong> courses •{" "}
-                                        <strong>{examSubjectDoneEctsTotal.toFixed(1)}/{examSubjectTotalEctsTotal.toFixed(1)} ECTS</strong>
-                                    </div>
-                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                        <div style={{ width: `${examSubjectAggregatePct}%`, height: "100%", background: examSubjectAggregatePct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
-                                    </div>
-                                </div>
-                                {isExamSubjectProgressOpen && (
-                                    <div style={{ display: "grid", gap: 6 }}>
-                                        {examSubjectProgress.length === 0 && (
-                                            <div style={{ fontSize: 12, color: "#6b7280" }}>No exam-subject progress available yet.</div>
-                                        )}
-                                        {examSubjectProgress.map((row, idx) => {
-                                            const totalEcts = Number(row?.totalEcts || 0);
-                                            const doneEcts = Number(row?.doneEcts || 0);
-                                            const donePct = totalEcts > 0 ? Math.max(0, Math.min(100, (doneEcts / totalEcts) * 100)) : 0;
-                                            return (
-                                                <div key={`${row?.subject}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{row?.subject}</div>
-                                                    <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
-                                                        Done {row.doneCount}/{row.totalCount} courses • {doneEcts.toFixed(1)}/{totalEcts.toFixed(1)} ECTS
-                                                    </div>
-                                                    <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                                        <div style={{ width: `${donePct}%`, height: "100%", background: donePct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "progress" && (
-                            <div
-                                draggable
-                                onDragStart={() => handleDoneSectionDragStart("done_semester")}
-                                onDragOver={(event) => handleDoneSectionDragOver(event, "done_semester")}
-                                onDrop={() => handleDoneSectionDrop("done_semester")}
-                                onDragEnd={handleDoneSectionDragEnd}
-                                style={doneSectionStyle("done_semester", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Done per Semester (ECTS)</div>
-                                    <button
-                                        onClick={() => setIsDonePerSemesterEctsOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        {isDonePerSemesterEctsOpen ? "Collapse" : "Expand"}
-                                    </button>
-                                </div>
-                                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isDonePerSemesterEctsOpen ? 6 : 0 }}>
-                                    Target ~ {workloadTargetPerSemester.toFixed(1)} ECTS / semester
-                                </div>
-                                <div style={{ fontSize: 12, color: donePerSemesterWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isDonePerSemesterEctsOpen ? 6 : 0 }}>
-                                    {donePerSemesterRows.length === 0
-                                        ? "No done semester data yet."
-                                        : (donePerSemesterWithinDesiredWorkload
-                                            ? `Done total ${donePerSemesterTotal.toFixed(1)} ECTS and under desired workload in every semester.`
-                                            : `Done total ${donePerSemesterTotal.toFixed(1)} ECTS; at least one semester is above desired workload.`)}
-                                </div>
-                                {isDonePerSemesterEctsOpen && (
-                                    <div style={{ display: "grid", gap: 8 }}>
-                                        {donePerSemesterRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No done semester data yet.</div>}
-                                        {donePerSemesterRows.map((row) => {
-                                            const rowPct = Math.max(0, Math.min(100, (row.ects / maxDoneSemesterWorkloadForScale) * 100));
-                                            const targetPct = Math.max(0, Math.min(100, (workloadTargetPerSemester / maxDoneSemesterWorkloadForScale) * 100));
-                                            const greenPct = Math.max(0, Math.min(rowPct, targetPct));
-                                            const redPct = Math.max(0, rowPct - targetPct);
-                                            return (
-                                                <div key={`done-semester-row-${row.sem}`} style={{ display: "grid", gap: 4 }}>
-                                                    <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
-                                                        <span>Semester {row.sem}</span>
-                                                        <strong>{row.ects.toFixed(1)} ECTS</strong>
-                                                    </div>
-                                                    <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
-                                                        <div style={{ display: "flex", height: "100%" }}>
-                                                            <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
-                                                            {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
-                                                        </div>
-                                                        <div
-                                                            style={{
-                                                                position: "absolute",
-                                                                left: `${targetPct}%`,
-                                                                top: 0,
-                                                                width: 2,
-                                                                height: "100%",
-                                                                background: "#1f2937",
-                                                                opacity: 0.45,
-                                                                transform: "translateX(-1px)",
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "progress" && (
-                            <div
-                                draggable
-                                onDragStart={() => handleDoneSectionDragStart("category")}
-                                onDragOver={(event) => handleDoneSectionDragOver(event, "category")}
-                                onDrop={() => handleDoneSectionDrop("category")}
-                                onDragEnd={handleDoneSectionDragEnd}
-                                style={doneSectionStyle("category", { marginBottom: 12 })}
-                            >
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700 }}>Done per Category (ECTS)</div>
-                                    <button
-                                        onClick={() => setIsDoneByCategoryOpen((v) => !v)}
-                                        style={{
-                                            border: "1px solid #d1d5db",
-                                            background: "#ffffff",
-                                            borderRadius: 999,
-                                            padding: "2px 8px",
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        {isDoneByCategoryOpen ? "Collapse" : "Expand"}
-                                    </button>
-                                </div>
-                                <div style={{ display: "grid", gap: 4, marginBottom: isDoneByCategoryOpen ? 6 : 0 }}>
-                                    <div style={{ fontSize: 12, color: "#374151" }}>
-                                        Done <strong>{donePerCategoryDoneTotalEcts.toFixed(1)} / {donePerCategoryPlannedTotalEcts.toFixed(1)} ECTS</strong> across <strong>{donePerCategoryProgressRows.length}</strong> categories
-                                    </div>
-                                    {donePerCategoryProgressRows.length > 0 && (
-                                        <div style={{ fontSize: 12, color: "#374151" }}>
-                                            Fully done categories: <strong>{donePerCategoryCompleteCount}</strong> / {donePerCategoryProgressRows.length}
-                                        </div>
-                                    )}
-                                </div>
-                                {isDoneByCategoryOpen && (
-                                    <div style={{ display: "grid", gap: 6 }}>
-                                        {donePerCategoryProgressRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No done category data yet.</div>}
-                                        {donePerCategoryProgressRows.map((row, idx) => {
-                                            return (
-                                                <div key={`done-by-category-row-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
-                                                        #{idx + 1} {row.category}
-                                                    </div>
-                                                    <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
-                                                        {row.doneEcts.toFixed(1)} / {row.plannedEcts.toFixed(1)} ECTS done ({row.pct.toFixed(1)}%)
-                                                    </div>
-                                                    <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-                                                        <div style={{ width: `${row.pct}%`, height: "100%", background: row.pct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {dashboardViewMode === "planning" && (
+                        {isSteopChecklistOpen && (
                             <>
-                                <div
-                                    draggable
-                                    onDragStart={() => handlePlannedSectionDragStart("missing")}
-                                    onDragOver={(event) => handlePlannedSectionDragOver(event, "missing")}
-                                    onDrop={() => handlePlannedSectionDrop("missing")}
-                                    onDragEnd={handlePlannedSectionDragEnd}
-                                    style={plannedSectionStyle("missing", { marginBottom: 12 })}
-                                >
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                        <div style={{ fontSize: 13, fontWeight: 700 }}>Missing Requirements</div>
-                                        <button
-                                            onClick={() => {
-                                                if (!hasMissingRequirements) return;
-                                                setIsMissingRequirementsOpen((v) => !v);
-                                            }}
-                                            disabled={!hasMissingRequirements}
-                                            style={{
-                                                border: "1px solid #d1d5db",
-                                                background: "#ffffff",
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                cursor: hasMissingRequirements ? "pointer" : "not-allowed",
-                                                opacity: hasMissingRequirements ? 1 : 0.45,
-                                            }}
-                                        >
-                                            {isMissingRequirementsOpen ? "Collapse" : "Expand"}
-                                        </button>
-                                    </div>
-                                    <div style={{ fontSize: 12, color: missingItems.length === 0 ? "#166534" : "#991b1b", marginBottom: isMissingRequirementsOpen ? 6 : 0 }}>
-                                        {missingItems.length === 0
-                                            ? "No missing requirements."
-                                            : `${missingItems.length} missing requirement${missingItems.length === 1 ? "" : "s"}.`}
-                                    </div>
-                                    {isMissingRequirementsOpen && (
-                                        <div style={{ display: "grid", gap: 6 }}>
-                                            {missingItems.length === 0 && (
-                                                <div style={{ fontSize: 12, color: "#166534" }}>No missing requirements reported.</div>
-                                            )}
-                                            {missingItems.map((m, idx) => (
-                                                <div
-                                                    key={`${m}-${idx}`}
-                                                    style={{
-                                                        fontSize: 12,
-                                                        color: "#991b1b",
-                                                        border: "1px solid #fecaca",
-                                                        borderLeft: "4px solid #dc2626",
-                                                        borderRadius: 8,
-                                                        background: "#fef2f2",
-                                                        padding: "6px 8px",
-                                                    }}
-                                                >
-                                                    {m}
-                                                </div>
-                                            ))}
+                                {steopMandatoryChecklistPlanned
+                                    .filter((row) => !bachelorSteopPlannedComplete || row.done)
+                                    .map((row, idx) => (
+                                        <div key={`steop-man-planned-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                            {row.done ? "✓" : "○"} {row.label}
                                         </div>
-                                    )}
+                                    ))}
+                                <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
+                                    Pool requirement (need at least {steopPoolRequiredEcts.toFixed(1)} ECTS):
                                 </div>
-
-                                <div
-                                    draggable
-                                    onDragStart={() => handlePlannedSectionDragStart("warnings")}
-                                    onDragOver={(event) => handlePlannedSectionDragOver(event, "warnings")}
-                                    onDrop={() => handlePlannedSectionDrop("warnings")}
-                                    onDragEnd={handlePlannedSectionDragEnd}
-                                    style={plannedSectionStyle("warnings", { marginBottom: 12 })}
-                                >
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                                        <div style={{ fontSize: 13, fontWeight: 700 }}>Warnings</div>
-                                        <button
-                                            onClick={() => {
-                                                if (!hasWarnings) return;
-                                                setIsWarningsOpen((v) => !v);
-                                            }}
-                                            disabled={!hasWarnings}
-                                            style={{
-                                                border: "1px solid #d1d5db",
-                                                background: "#ffffff",
-                                                borderRadius: 999,
-                                                padding: "2px 8px",
-                                                fontSize: 11,
-                                                fontWeight: 700,
-                                                cursor: hasWarnings ? "pointer" : "not-allowed",
-                                                opacity: hasWarnings ? 1 : 0.45,
-                                            }}
-                                        >
-                                            {isWarningsOpen ? "Collapse" : "Expand"}
-                                        </button>
-                                    </div>
-                                    <div style={{ fontSize: 12, color: warnings.length === 0 ? "#6b7280" : "#92400e", marginBottom: isWarningsOpen ? 6 : 0 }}>
-                                        {warnings.length === 0
-                                            ? "No warnings."
-                                            : `${warnings.length} warning${warnings.length === 1 ? "" : "s"}.`}
-                                    </div>
-                                    {isWarningsOpen && (
-                                        <div style={{ display: "grid", gap: 6 }}>
-                                            {warnings.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No warnings.</div>}
-                                            {warnings.map((w, idx) => (
-                                                <div
-                                                    key={`${w}-${idx}`}
-                                                    style={{
-                                                        fontSize: 12,
-                                                        color: "#92400e",
-                                                        border: "1px solid #fde68a",
-                                                        borderLeft: "4px solid #f59e0b",
-                                                        borderRadius: 8,
-                                                        background: "#fffbeb",
-                                                        padding: "6px 8px",
-                                                    }}
-                                                >
-                                                    {w}
-                                                </div>
-                                            ))}
+                                {steopPoolChecklistPlanned
+                                    .filter((row) => !bachelorSteopPlannedComplete || row.done)
+                                    .map((row, idx) => (
+                                        <div key={`steop-pool-planned-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                            {row.done ? "✓" : "○"} {row.label}
                                         </div>
-                                    )}
-                                </div>
-
+                                    ))}
                             </>
                         )}
+                    </div>
+                </div>
+            )}
 
-                        <div style={{ fontSize: 12, color: "#6b7280", order: 9999, marginTop: 4 }}>
-                            Last update: {ruleCheckState.lastUpdatedAt ? new Date(ruleCheckState.lastUpdatedAt).toLocaleTimeString() : "-"}
+            {isBachelorDashboard && hasSelectedFocusArea && dashboardViewMode === "planning" && (
+                <div
+                    draggable
+                    onDragStart={() => handlePlannedSectionDragStart("focus")}
+                    onDragOver={(event) => handlePlannedSectionDragOver(event, "focus")}
+                    onDrop={() => handlePlannedSectionDrop("focus")}
+                    onDragEnd={handlePlannedSectionDragEnd}
+                    style={plannedSectionStyle("focus", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
+                        <button
+                            onClick={() => setIsFocusInfoOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                            title="Show Focus Area info"
+                        >
+                            i
+                        </button>
+                    </div>
+                    {isFocusInfoOpen && (
+                        <div
+                            style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                background: "#f9fafb",
+                                padding: 8,
+                                marginBottom: 8,
+                                fontSize: 11,
+                                color: "#374151",
+                                whiteSpace: "pre-line",
+                            }}
+                        >
+                            {FOCUS_INFO_TEXT}
                         </div>
-                    </aside>
-                );
+                    )}
+                    <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus || "-"}</strong></div>
+                        <div style={{ fontSize: 12 }}>
+                            Status: <strong style={{ color: bachelorFocusCompletePlanned ? "#166534" : "#991b1b" }}>
+                                {bachelorFocusCompletePlanned ? "completed" : "not completed"}
+                            </strong>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                            Checklist progress: <strong>{focusRequirementDoneCountPlanned}</strong> / {focusRequirementTotalCountPlanned}
+                        </div>
+                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ width: `${focusChecklistPctPlanned}%`, height: "100%", background: bachelorFocusCompletePlanned ? "#16a34a" : "#2563eb" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required modules</div>
+                            <button
+                                onClick={() => setIsFocusChecklistOpen((v) => !v)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 999,
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                {isFocusChecklistOpen ? "Collapse" : "Expand"}
+                            </button>
+                        </div>
+                        {isFocusChecklistOpen && (
+                            <>
+                                {focusChecklistPlanned.length === 0 && (
+                                    <div style={{ fontSize: 12, color: "#6b7280" }}>No detailed focus checklist available.</div>
+                                )}
+                                {focusRequiredItemsPlanned.length > 0 && (
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 2 }}>Mandatory modules</div>
+                                )}
+                                {focusRequiredItemsPlanned
+                                    .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
+                                    .map((item, idx) => (
+                                        <div key={`focus-req-planned-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                            {item?.done ? "✓" : "○"} {item?.label}
+                                        </div>
+                                    ))}
+                                {focusChooseItemsPlanned.length > 0 && (
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                        Choose {Number(focusChooseSummaryPlanned?.min || 0)} from {focusChooseItemsPlanned.length} modules
+                                        {focusChooseSummaryPlanned ? ` (${Number(focusChooseSummaryPlanned?.done || 0)} done)` : ""}
+                                    </div>
+                                )}
+                                {focusChooseItemsPlanned
+                                    .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
+                                    .map((item, idx) => (
+                                        <div key={`focus-choose-planned-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                            {item?.done ? "✓" : "○"} {item?.label}
+                                        </div>
+                                    ))}
+                                {focusChooseGroupRowsPlanned.map((group, gIdx) => (
+                                    <div key={`focus-group-planned-${gIdx}`} style={{ display: "grid", gap: 4 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                            Choose {Number(group?.summary?.min || 0)} from {group.items.length} modules
+                                            {group?.summary ? ` (${Number(group.summary?.done || 0)} done)` : ""}
+                                        </div>
+                                        {group.items
+                                            .filter((item) => !bachelorFocusCompletePlanned || Boolean(item?.done))
+                                            .map((item, idx) => (
+                                                <div key={`focus-group-item-planned-${gIdx}-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                    {item?.done ? "✓" : "○"} {item?.label}
+                                                </div>
+                                            ))}
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {dashboardViewMode === "planning" && (
+                <div
+                    draggable
+                    onDragStart={() => handlePlannedSectionDragStart("planned_exam_subject")}
+                    onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_exam_subject")}
+                    onDrop={() => handlePlannedSectionDrop("planned_exam_subject")}
+                    onDragEnd={handlePlannedSectionDragEnd}
+                    style={plannedSectionStyle("planned_exam_subject", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Per Exam Subject (ECTS)</div>
+                        <button
+                            onClick={() => setIsPlannedExamSubjectOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isPlannedExamSubjectOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ display: "grid", gap: 4, marginBottom: isPlannedExamSubjectOpen ? 6 : 0 }}>
+                        <div style={{ fontSize: 12, color: "#374151" }}>
+                            Planned <strong>{plannedEctsByExamSubjectTotal.toFixed(1)} ECTS</strong> across <strong>{plannedEctsByExamSubjectRows.length}</strong> exam subject{plannedEctsByExamSubjectRows.length === 1 ? "" : "s"}
+                        </div>
+                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", display: "flex" }}>
+                            {plannedEctsByExamSubjectRows.length === 0 && <div style={{ width: "100%", height: "100%", background: "#d1d5db" }} />}
+                            {plannedEctsByExamSubjectRows.map((row, idx) => {
+                                const pct = plannedEctsByExamSubjectTotal > 0
+                                    ? Math.max(0, Math.min(100, (Number(row?.ects || 0) / plannedEctsByExamSubjectTotal) * 100))
+                                    : 0;
+                                const color = subjectColors?.[row?.subject] || "#9ca3af";
+                                return (
+                                    <div
+                                        key={`planned-exam-segment-${idx}`}
+                                        title={`${row?.subject}: ${Number(row?.ects || 0).toFixed(1)} ECTS`}
+                                        style={{ width: `${pct}%`, height: "100%", background: color }}
+                                    />
+                                );
+                            })}
+                        </div>
+                    </div>
+                    {isPlannedExamSubjectOpen && (
+                        <div style={{ display: "grid", gap: 6 }}>
+                            {plannedEctsByExamSubjectRows.length === 0 && (
+                                <div style={{ fontSize: 12, color: "#6b7280" }}>No planned exam-subject ECTS yet.</div>
+                            )}
+                            {plannedEctsByExamSubjectRows.map((row, idx) => {
+                                const pct = plannedEctsByExamSubjectTotal > 0
+                                    ? Math.max(0, Math.min(100, (Number(row?.ects || 0) / plannedEctsByExamSubjectTotal) * 100))
+                                    : 0;
+                                const color = subjectColors?.[row?.subject] || "#9ca3af";
+                                return (
+                                    <div key={`${row?.subject}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{row?.subject}</div>
+                                        <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                                            {Number(row?.ects || 0).toFixed(1)} ECTS planned ({pct.toFixed(1)}%)
+                                        </div>
+                                        <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                            <div style={{ width: `${pct}%`, height: "100%", background: color }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "planning" && (
+                <div
+                    draggable
+                    onDragStart={() => handlePlannedSectionDragStart("planned_semester")}
+                    onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_semester")}
+                    onDrop={() => handlePlannedSectionDrop("planned_semester")}
+                    onDragEnd={handlePlannedSectionDragEnd}
+                    style={plannedSectionStyle("planned_semester", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Per Semester (ECTS)</div>
+                        <button
+                            onClick={() => setIsPerSemesterEctsOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isPerSemesterEctsOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isPerSemesterEctsOpen ? 6 : 0 }}>
+                        Target ~ {workloadTargetPerSemester.toFixed(1)} ECTS / semester
+                    </div>
+                    <div style={{ fontSize: 12, color: perSemesterWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isPerSemesterEctsOpen ? 6 : 0 }}>
+                        {perSemesterRows.length === 0
+                            ? "No semester data yet."
+                            : (perSemesterWithinDesiredWorkload
+                                ? "You are under your desired workload in every semester."
+                                : "At least one semester is above your desired workload.")}
+                    </div>
+                    {isPerSemesterEctsOpen && (
+                        <div style={{ display: "grid", gap: 8 }}>
+                            {perSemesterRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No semester data yet.</div>}
+                            {perSemesterRows.map((row) => {
+                                const rowPct = Math.max(0, Math.min(100, (row.ects / maxSemesterWorkloadForScale) * 100));
+                                const targetPct = Math.max(0, Math.min(100, (workloadTargetPerSemester / maxSemesterWorkloadForScale) * 100));
+                                const greenPct = Math.max(0, Math.min(rowPct, targetPct));
+                                const redPct = Math.max(0, rowPct - targetPct);
+                                return (
+                                    <div key={row.sem} style={{ display: "grid", gap: 4 }}>
+                                        <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                            <span>Semester {row.sem}</span>
+                                            <strong>{row.ects.toFixed(1)} ECTS</strong>
+                                        </div>
+                                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
+                                            <div style={{ display: "flex", height: "100%" }}>
+                                                <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
+                                                {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    position: "absolute",
+                                                    left: `${targetPct}%`,
+                                                    top: 0,
+                                                    width: 2,
+                                                    height: "100%",
+                                                    background: "#1f2937",
+                                                    opacity: 0.45,
+                                                    transform: "translateX(-1px)",
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "planning" && (
+                <div
+                    draggable
+                    onDragStart={() => handlePlannedSectionDragStart("planned_category")}
+                    onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_category")}
+                    onDrop={() => handlePlannedSectionDrop("planned_category")}
+                    onDragEnd={handlePlannedSectionDragEnd}
+                    style={plannedSectionStyle("planned_category", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Per Category (ECTS)</div>
+                        <button
+                            onClick={() => setIsByCategoryOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isByCategoryOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ display: "grid", gap: 4, marginBottom: isByCategoryOpen ? 6 : 0 }}>
+                        <div style={{ fontSize: 12, color: "#374151" }}>
+                            Total categorized: <strong>{byCategoryTotalEcts.toFixed(1)} ECTS</strong> across <strong>{byCategoryRows.length}</strong> categories
+                        </div>
+                        {topByCategoryRow && (
+                            <div style={{ fontSize: 12, color: "#374151" }}>
+                                Largest category: <strong>{topByCategoryRow.category}</strong> ({topByCategoryRow.ects.toFixed(1)} ECTS)
+                            </div>
+                        )}
+                    </div>
+                    {isByCategoryOpen && (
+                        <div style={{ display: "grid", gap: 6 }}>
+                            {byCategoryRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No category data yet.</div>}
+                            {byCategoryRows.map((row, idx) => {
+                                const pct = byCategoryTotalEcts > 0
+                                    ? Math.max(0, Math.min(100, (row.ects / byCategoryTotalEcts) * 100))
+                                    : 0;
+                                return (
+                                    <div key={`${row.category}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+                                            #{idx + 1} {row.category}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                            <span>{row.ects.toFixed(1)} ECTS</span>
+                                            <span>{pct.toFixed(1)}%</span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "planning" && (
+                <div
+                    draggable
+                    onDragStart={() => handlePlannedSectionDragStart("planned_hours")}
+                    onDragOver={(event) => handlePlannedSectionDragOver(event, "planned_hours")}
+                    onDrop={() => handlePlannedSectionDrop("planned_hours")}
+                    onDragEnd={handlePlannedSectionDragEnd}
+                    style={plannedSectionStyle("planned_hours", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Estimated Week-Hours per Semester</div>
+                        <button
+                            onClick={() => setIsPlannedEstimatedHoursOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isPlannedEstimatedHoursOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#374151", marginBottom: isPlannedEstimatedHoursOpen ? 6 : 0 }}>
+                        {plannedEstimatedHoursPerSemesterRows.length === 0
+                            ? "No estimated week-hours data yet."
+                            : `Estimated average week-hours ${plannedEstimatedHoursAverage.toFixed(1)} h across ${plannedEstimatedHoursPerSemesterRows.length} semester${plannedEstimatedHoursPerSemesterRows.length === 1 ? "" : "s"}.`}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isPlannedEstimatedHoursOpen ? 6 : 0 }}>
+                        Target ~ {recommendedWeekHoursPerSemester.toFixed(1)} h / week / semester
+                    </div>
+                    <div style={{ fontSize: 12, color: plannedWeekHoursWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isPlannedEstimatedHoursOpen ? 6 : 0 }}>
+                        {plannedEstimatedHoursPerSemesterRows.length === 0
+                            ? "No estimated week-hours data yet."
+                            : (plannedWeekHoursWithinDesiredWorkload
+                                ? "You are under your desired week-hours workload in every semester."
+                                : "At least one semester is above your desired week-hours workload.")}
+                    </div>
+                    {isPlannedEstimatedHoursOpen && (
+                        <div style={{ display: "grid", gap: 8 }}>
+                            {plannedEstimatedHoursPerSemesterRows.length === 0 && (
+                                <div style={{ fontSize: 12, color: "#6b7280" }}>No estimated week-hours data yet.</div>
+                            )}
+                            {plannedEstimatedHoursPerSemesterRows.map((row) => {
+                                const rowPct = Math.max(0, Math.min(100, (Number(row?.hours || 0) / maxWeekHoursForScale) * 100));
+                                const targetPct = Math.max(0, Math.min(100, (recommendedWeekHoursPerSemester / maxWeekHoursForScale) * 100));
+                                const greenPct = Math.max(0, Math.min(rowPct, targetPct));
+                                const redPct = Math.max(0, rowPct - targetPct);
+                                return (
+                                    <div key={`planned-hours-semester-${row.sem}`} style={{ display: "grid", gap: 4 }}>
+                                        <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                            <span>Semester {row.sem}</span>
+                                            <strong>{Number(row.hours).toFixed(1)} h</strong>
+                                        </div>
+                                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
+                                            <div style={{ display: "flex", height: "100%" }}>
+                                                <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
+                                                {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    position: "absolute",
+                                                    left: `${targetPct}%`,
+                                                    top: 0,
+                                                    width: 2,
+                                                    height: "100%",
+                                                    background: "#1f2937",
+                                                    opacity: 0.45,
+                                                    transform: "translateX(-1px)",
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {isBachelorDashboard && dashboardViewMode === "progress" && (
+                <div
+                    draggable
+                    onDragStart={() => handleDoneSectionDragStart("steop")}
+                    onDragOver={(event) => handleDoneSectionDragOver(event, "steop")}
+                    onDrop={() => handleDoneSectionDrop("steop")}
+                    onDragEnd={handleDoneSectionDragEnd}
+                    style={doneSectionStyle("steop", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>StEOP</div>
+                        <button
+                            onClick={() => setIsSteopInfoOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                            title="Show StEOP rules"
+                        >
+                            i
+                        </button>
+                    </div>
+                    {isSteopInfoOpen && (
+                        <div
+                            style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                background: "#f9fafb",
+                                padding: 8,
+                                marginBottom: 8,
+                                fontSize: 11,
+                                color: "#374151",
+                                whiteSpace: "pre-line",
+                            }}
+                        >
+                            {STEOP_RULES_TEXT}
+                        </div>
+                    )}
+                    <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 12 }}>
+                            Status: <strong style={{ color: bachelorSteopComplete ? "#166534" : "#991b1b" }}>
+                                {bachelorSteopComplete ? "completed" : "not completed"}
+                            </strong>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                            Complete in semester: <strong>{bachelorSteopLane == null ? "-" : bachelorSteopLane + 1}</strong>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                            Done progress: <strong>{steopDoneEcts.toFixed(1)}</strong> / {steopRequiredEcts.toFixed(1)} ECTS
+                            {" "}(
+                            mandatory {steopMandatoryDoneEcts.toFixed(1)}/{steopMandatoryRequiredEcts.toFixed(1)},
+                            {" "}pool {steopPoolDoneEcts.toFixed(1)}/{steopPoolRequiredEcts.toFixed(1)}
+                            )
+                        </div>
+                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ width: `${steopDonePct}%`, height: "100%", background: bachelorSteopComplete ? "#16a34a" : "#2563eb" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required courses</div>
+                            <button
+                                onClick={() => setIsSteopChecklistOpen((v) => !v)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 999,
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                {isSteopChecklistOpen ? "Collapse" : "Expand"}
+                            </button>
+                        </div>
+                        {isSteopChecklistOpen && (
+                            <>
+                                {steopMandatoryChecklist
+                                    .filter((row) => !bachelorSteopComplete || row.done)
+                                    .map((row, idx) => (
+                                        <div key={`steop-man-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                            {row.done ? "✓" : "○"} {row.label}
+                                        </div>
+                                    ))}
+                                <div style={{ fontSize: 12, color: "#374151", marginTop: 2 }}>
+                                    Pool requirement (need at least {steopPoolRequiredEcts.toFixed(1)} ECTS):
+                                </div>
+                                {steopPoolChecklist
+                                    .filter((row) => !bachelorSteopComplete || row.done)
+                                    .map((row, idx) => (
+                                        <div key={`steop-pool-${idx}`} style={{ fontSize: 12, color: row.done ? "#166534" : "#991b1b" }}>
+                                            {row.done ? "✓" : "○"} {row.label}
+                                        </div>
+                                    ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {isBachelorDashboard && hasSelectedFocusArea && dashboardViewMode === "progress" && (
+                <div
+                    draggable
+                    onDragStart={() => handleDoneSectionDragStart("focus")}
+                    onDragOver={(event) => handleDoneSectionDragOver(event, "focus")}
+                    onDrop={() => handleDoneSectionDrop("focus")}
+                    onDragEnd={handleDoneSectionDragEnd}
+                    style={doneSectionStyle("focus", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Focus Area</div>
+                        <button
+                            onClick={() => setIsFocusInfoOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 12,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                            title="Show Focus Area info"
+                        >
+                            i
+                        </button>
+                    </div>
+                    {isFocusInfoOpen && (
+                        <div
+                            style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 8,
+                                background: "#f9fafb",
+                                padding: 8,
+                                marginBottom: 8,
+                                fontSize: 11,
+                                color: "#374151",
+                                whiteSpace: "pre-line",
+                            }}
+                        >
+                            {FOCUS_INFO_TEXT}
+                        </div>
+                    )}
+                    <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 12 }}>Selected: <strong>{bachelorFocus?.selected || selectedFocus || "-"}</strong></div>
+                        <div style={{ fontSize: 12 }}>
+                            Status: <strong style={{ color: bachelorFocusComplete ? "#166534" : "#991b1b" }}>
+                                {bachelorFocusComplete ? "completed" : "not completed"}
+                            </strong>
+                        </div>
+                        <div style={{ fontSize: 12 }}>
+                            Checklist progress: <strong>{focusRequirementDoneCount}</strong> / {focusRequirementTotalCount}
+                        </div>
+                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ width: `${focusChecklistPct}%`, height: "100%", background: bachelorFocusComplete ? "#16a34a" : "#2563eb" }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 2 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>Required modules</div>
+                            <button
+                                onClick={() => setIsFocusChecklistOpen((v) => !v)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 999,
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                {isFocusChecklistOpen ? "Collapse" : "Expand"}
+                            </button>
+                        </div>
+                        {isFocusChecklistOpen && (
+                            <>
+                                {focusChecklist.length === 0 && (
+                                    <div style={{ fontSize: 12, color: "#6b7280" }}>No detailed focus checklist available.</div>
+                                )}
+                                {focusRequiredItems.length > 0 && (
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 2 }}>Mandatory modules</div>
+                                )}
+                                {focusRequiredItems
+                                    .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
+                                    .map((item, idx) => (
+                                        <div key={`focus-req-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                            {item?.done ? "✓" : "○"} {item?.label}
+                                        </div>
+                                    ))}
+                                {focusChooseItems.length > 0 && (
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                        Choose {Number(focusChooseSummary?.min || 0)} from {focusChooseItems.length} modules
+                                        {focusChooseSummary ? ` (${Number(focusChooseSummary?.done || 0)} done)` : ""}
+                                    </div>
+                                )}
+                                {focusChooseItems
+                                    .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
+                                    .map((item, idx) => (
+                                        <div key={`focus-choose-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                            {item?.done ? "✓" : "○"} {item?.label}
+                                        </div>
+                                    ))}
+                                {focusChooseGroupRows.map((group, gIdx) => (
+                                    <div key={`focus-group-${gIdx}`} style={{ display: "grid", gap: 4 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginTop: 4 }}>
+                                            Choose {Number(group?.summary?.min || 0)} from {group.items.length} modules
+                                            {group?.summary ? ` (${Number(group.summary?.done || 0)} done)` : ""}
+                                        </div>
+                                        {group.items
+                                            .filter((item) => !bachelorFocusComplete || Boolean(item?.done))
+                                            .map((item, idx) => (
+                                                <div key={`focus-group-item-${gIdx}-${idx}`} style={{ fontSize: 12, color: item?.done ? "#166534" : "#991b1b" }}>
+                                                    {item?.done ? "✓" : "○"} {item?.label}
+                                                </div>
+                                            ))}
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {dashboardViewMode === "progress" && (
+                <div
+                    draggable
+                    onDragStart={() => handleDoneSectionDragStart("exam_subject")}
+                    onDragOver={(event) => handleDoneSectionDragOver(event, "exam_subject")}
+                    onDrop={() => handleDoneSectionDrop("exam_subject")}
+                    onDragEnd={handleDoneSectionDragEnd}
+                    style={doneSectionStyle("exam_subject", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Per Exam Subject (ECTS)</div>
+                        <button
+                            onClick={() => setIsExamSubjectProgressOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isExamSubjectProgressOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ display: "grid", gap: 4, marginBottom: isExamSubjectProgressOpen ? 6 : 0 }}>
+                        <div style={{ fontSize: 12, color: "#374151" }}>
+                            Done <strong>{examSubjectTotalDoneCount}/{examSubjectTotalCourseCount}</strong> courses •{" "}
+                            <strong>{examSubjectDoneEctsTotal.toFixed(1)}/{examSubjectTotalEctsTotal.toFixed(1)} ECTS</strong>
+                        </div>
+                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                            <div style={{ width: `${examSubjectAggregatePct}%`, height: "100%", background: examSubjectAggregatePct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
+                        </div>
+                    </div>
+                    {isExamSubjectProgressOpen && (
+                        <div style={{ display: "grid", gap: 6 }}>
+                            {examSubjectProgress.length === 0 && (
+                                <div style={{ fontSize: 12, color: "#6b7280" }}>No exam-subject progress available yet.</div>
+                            )}
+                            {examSubjectProgress.map((row, idx) => {
+                                const totalEcts = Number(row?.totalEcts || 0);
+                                const doneEcts = Number(row?.doneEcts || 0);
+                                const donePct = totalEcts > 0 ? Math.max(0, Math.min(100, (doneEcts / totalEcts) * 100)) : 0;
+                                return (
+                                    <div key={`${row?.subject}-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>{row?.subject}</div>
+                                        <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                                            Done {row.doneCount}/{row.totalCount} courses • {doneEcts.toFixed(1)}/{totalEcts.toFixed(1)} ECTS
+                                        </div>
+                                        <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                            <div style={{ width: `${donePct}%`, height: "100%", background: donePct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "progress" && (
+                <div
+                    draggable
+                    onDragStart={() => handleDoneSectionDragStart("done_semester")}
+                    onDragOver={(event) => handleDoneSectionDragOver(event, "done_semester")}
+                    onDrop={() => handleDoneSectionDrop("done_semester")}
+                    onDragEnd={handleDoneSectionDragEnd}
+                    style={doneSectionStyle("done_semester", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Per Semester (ECTS)</div>
+                        <button
+                            onClick={() => setIsDonePerSemesterEctsOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isDonePerSemesterEctsOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280", marginBottom: isDonePerSemesterEctsOpen ? 6 : 0 }}>
+                        Target ~ {workloadTargetPerSemester.toFixed(1)} ECTS / semester
+                    </div>
+                    <div style={{ fontSize: 12, color: donePerSemesterWithinDesiredWorkload ? "#166534" : "#991b1b", marginBottom: isDonePerSemesterEctsOpen ? 6 : 0 }}>
+                        {donePerSemesterRows.length === 0
+                            ? "No done semester data yet."
+                            : (donePerSemesterWithinDesiredWorkload
+                                ? `Done total ${donePerSemesterTotal.toFixed(1)} ECTS and under desired workload in every semester.`
+                                : `Done total ${donePerSemesterTotal.toFixed(1)} ECTS; at least one semester is above desired workload.`)}
+                    </div>
+                    {isDonePerSemesterEctsOpen && (
+                        <div style={{ display: "grid", gap: 8 }}>
+                            {donePerSemesterRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No done semester data yet.</div>}
+                            {donePerSemesterRows.map((row) => {
+                                const rowPct = Math.max(0, Math.min(100, (row.ects / maxDoneSemesterWorkloadForScale) * 100));
+                                const targetPct = Math.max(0, Math.min(100, (workloadTargetPerSemester / maxDoneSemesterWorkloadForScale) * 100));
+                                const greenPct = Math.max(0, Math.min(rowPct, targetPct));
+                                const redPct = Math.max(0, rowPct - targetPct);
+                                return (
+                                    <div key={`done-semester-row-${row.sem}`} style={{ display: "grid", gap: 4 }}>
+                                        <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                            <span>Semester {row.sem}</span>
+                                            <strong>{row.ects.toFixed(1)} ECTS</strong>
+                                        </div>
+                                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden", position: "relative" }}>
+                                            <div style={{ display: "flex", height: "100%" }}>
+                                                <div style={{ width: `${greenPct}%`, height: "100%", background: "#16a34a" }} />
+                                                {redPct > 0 && <div style={{ width: `${redPct}%`, height: "100%", background: "#dc2626" }} />}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    position: "absolute",
+                                                    left: `${targetPct}%`,
+                                                    top: 0,
+                                                    width: 2,
+                                                    height: "100%",
+                                                    background: "#1f2937",
+                                                    opacity: 0.45,
+                                                    transform: "translateX(-1px)",
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "progress" && (
+                <div
+                    draggable
+                    onDragStart={() => handleDoneSectionDragStart("category")}
+                    onDragOver={(event) => handleDoneSectionDragOver(event, "category")}
+                    onDrop={() => handleDoneSectionDrop("category")}
+                    onDragEnd={handleDoneSectionDragEnd}
+                    style={doneSectionStyle("category", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Per Category (ECTS)</div>
+                        <button
+                            onClick={() => setIsDoneByCategoryOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isDoneByCategoryOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ display: "grid", gap: 4, marginBottom: isDoneByCategoryOpen ? 6 : 0 }}>
+                        <div style={{ fontSize: 12, color: "#374151" }}>
+                            Done <strong>{donePerCategoryDoneTotalEcts.toFixed(1)} / {donePerCategoryPlannedTotalEcts.toFixed(1)} ECTS</strong> across <strong>{donePerCategoryProgressRows.length}</strong> categories
+                        </div>
+                        {donePerCategoryProgressRows.length > 0 && (
+                            <div style={{ fontSize: 12, color: "#374151" }}>
+                                Fully done categories: <strong>{donePerCategoryCompleteCount}</strong> / {donePerCategoryProgressRows.length}
+                            </div>
+                        )}
+                    </div>
+                    {isDoneByCategoryOpen && (
+                        <div style={{ display: "grid", gap: 6 }}>
+                            {donePerCategoryProgressRows.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No done category data yet.</div>}
+                            {donePerCategoryProgressRows.map((row, idx) => {
+                                return (
+                                    <div key={`done-by-category-row-${idx}`} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: "#111827", marginBottom: 4 }}>
+                                            #{idx + 1} {row.category}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: "#374151", marginBottom: 4 }}>
+                                            {row.doneEcts.toFixed(1)} / {row.plannedEcts.toFixed(1)} ECTS done ({row.pct.toFixed(1)}%)
+                                        </div>
+                                        <div style={{ height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                            <div style={{ width: `${row.pct}%`, height: "100%", background: row.pct >= 100 - 1e-6 ? "#16a34a" : "#2563eb" }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "progress" && (
+                <div
+                    draggable
+                    onDragStart={() => handleDoneSectionDragStart("done_grade")}
+                    onDragOver={(event) => handleDoneSectionDragOver(event, "done_grade")}
+                    onDrop={() => handleDoneSectionDrop("done_grade")}
+                    onDragEnd={handleDoneSectionDragEnd}
+                    style={doneSectionStyle("done_grade", { marginBottom: 12 })}
+                >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700 }}>Grade per Semester</div>
+                        <button
+                            onClick={() => setIsDoneGradePerSemesterOpen((v) => !v)}
+                            style={{
+                                border: "1px solid #d1d5db",
+                                background: "#ffffff",
+                                borderRadius: 999,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                            }}
+                        >
+                            {isDoneGradePerSemesterOpen ? "Collapse" : "Expand"}
+                        </button>
+                    </div>
+                    <div style={{ fontSize: 12, color: "#374151", marginBottom: isDoneGradePerSemesterOpen ? 6 : 0 }}>
+                        {doneGradeOverall == null
+                            ? "No done grades with ECTS weighting yet."
+                            : (
+                                <>
+                                    Overall ECTS-weighted grade: <strong>{doneGradeOverall.toFixed(2)}</strong> across {doneGradePerSemesterRows.length} semester{doneGradePerSemesterRows.length === 1 ? "" : "s"}.
+                                </>
+                            )}
+                    </div>
+                    <div style={{ fontSize: 12, color: missingDoneGradesCount === 0 ? "#166534" : "#991b1b", marginBottom: isDoneGradePerSemesterOpen ? 6 : 0 }}>
+                        {missingDoneGradesCount === 0
+                            ? "All done courses have a grade."
+                            : `Missing grades for ${missingDoneGradesCount} done course${missingDoneGradesCount === 1 ? "" : "s"}.`}
+                    </div>
+                    {isDoneGradePerSemesterOpen && (
+                        <div style={{ display: "grid", gap: 8 }}>
+                            {doneGradePerSemesterRows.length === 0 && (
+                                <div style={{ fontSize: 12, color: "#6b7280" }}>No done grades with ECTS weighting yet.</div>
+                            )}
+                            {doneGradePerSemesterRows.map((row) => {
+                                const normalized = Math.max(0, Math.min(100, ((5 - Number(row.grade || 0)) / 4) * 100));
+                                return (
+                                    <div key={`done-grade-semester-${row.sem}`} style={{ display: "grid", gap: 4 }}>
+                                        <div style={{ fontSize: 12, color: "#374151", display: "flex", justifyContent: "space-between" }}>
+                                            <span>Semester {row.sem}</span>
+                                            <strong>{Number(row.grade).toFixed(2)}</strong>
+                                        </div>
+                                        <div style={{ height: 8, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
+                                            <div style={{ width: `${normalized}%`, height: "100%", background: "#16a34a" }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {missingDoneGradesCount > 0 && (
+                                <div style={{ display: "grid", gap: 6, marginTop: 2 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: "#991b1b" }}>Missing grade entries</div>
+                                    {missingDoneGradesBySemester.map((row) => (
+                                        <div key={`missing-grade-sem-${row.sem}`} style={{ border: "1px solid #fecaca", borderRadius: 8, padding: 8, background: "#fef2f2" }}>
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: "#7f1d1d", marginBottom: 4 }}>
+                                                Semester {row.sem}
+                                            </div>
+                                            <div style={{ display: "grid", gap: 3 }}>
+                                                {row.missingCourses.map((course, idx) => (
+                                                    <div key={`missing-grade-course-${row.sem}-${idx}`} style={{ fontSize: 12, color: "#991b1b" }}>
+                                                        {course?.code || "-"}{course?.name ? ` · ${course.name}` : ""}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {dashboardViewMode === "planning" && (
+                <>
+                    <div
+                        draggable
+                        onDragStart={() => handlePlannedSectionDragStart("missing")}
+                        onDragOver={(event) => handlePlannedSectionDragOver(event, "missing")}
+                        onDrop={() => handlePlannedSectionDrop("missing")}
+                        onDragEnd={handlePlannedSectionDragEnd}
+                        style={plannedSectionStyle("missing", { marginBottom: 12 })}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>Missing Requirements</div>
+                            <button
+                                onClick={() => {
+                                    if (!hasMissingRequirements) return;
+                                    setIsMissingRequirementsOpen((v) => !v);
+                                }}
+                                disabled={!hasMissingRequirements}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 999,
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: hasMissingRequirements ? "pointer" : "not-allowed",
+                                    opacity: hasMissingRequirements ? 1 : 0.45,
+                                }}
+                            >
+                                {isMissingRequirementsOpen ? "Collapse" : "Expand"}
+                            </button>
+                        </div>
+                        <div style={{ fontSize: 12, color: missingItems.length === 0 ? "#166534" : "#991b1b", marginBottom: isMissingRequirementsOpen ? 6 : 0 }}>
+                            {missingItems.length === 0
+                                ? "No missing requirements."
+                                : `${missingItems.length} missing requirement${missingItems.length === 1 ? "" : "s"}.`}
+                        </div>
+                        {isMissingRequirementsOpen && (
+                            <div style={{ display: "grid", gap: 6 }}>
+                                {missingItems.length === 0 && (
+                                    <div style={{ fontSize: 12, color: "#166534" }}>No missing requirements reported.</div>
+                                )}
+                                {missingItems.map((m, idx) => (
+                                    <div
+                                        key={`${m}-${idx}`}
+                                        style={{
+                                            fontSize: 12,
+                                            color: "#991b1b",
+                                            border: "1px solid #fecaca",
+                                            borderLeft: "4px solid #dc2626",
+                                            borderRadius: 8,
+                                            background: "#fef2f2",
+                                            padding: "6px 8px",
+                                        }}
+                                    >
+                                        {m}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div
+                        draggable
+                        onDragStart={() => handlePlannedSectionDragStart("warnings")}
+                        onDragOver={(event) => handlePlannedSectionDragOver(event, "warnings")}
+                        onDrop={() => handlePlannedSectionDrop("warnings")}
+                        onDragEnd={handlePlannedSectionDragEnd}
+                        style={plannedSectionStyle("warnings", { marginBottom: 12 })}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700 }}>Warnings</div>
+                            <button
+                                onClick={() => {
+                                    if (!hasWarnings) return;
+                                    setIsWarningsOpen((v) => !v);
+                                }}
+                                disabled={!hasWarnings}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: "#ffffff",
+                                    borderRadius: 999,
+                                    padding: "2px 8px",
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    cursor: hasWarnings ? "pointer" : "not-allowed",
+                                    opacity: hasWarnings ? 1 : 0.45,
+                                }}
+                            >
+                                {isWarningsOpen ? "Collapse" : "Expand"}
+                            </button>
+                        </div>
+                        <div style={{ fontSize: 12, color: warnings.length === 0 ? "#6b7280" : "#92400e", marginBottom: isWarningsOpen ? 6 : 0 }}>
+                            {warnings.length === 0
+                                ? "No warnings."
+                                : `${warnings.length} warning${warnings.length === 1 ? "" : "s"}.`}
+                        </div>
+                        {isWarningsOpen && (
+                            <div style={{ display: "grid", gap: 6 }}>
+                                {warnings.length === 0 && <div style={{ fontSize: 12, color: "#6b7280" }}>No warnings.</div>}
+                                {warnings.map((w, idx) => (
+                                    <div
+                                        key={`${w}-${idx}`}
+                                        style={{
+                                            fontSize: 12,
+                                            color: "#92400e",
+                                            border: "1px solid #fde68a",
+                                            borderLeft: "4px solid #f59e0b",
+                                            borderRadius: 8,
+                                            background: "#fffbeb",
+                                            padding: "6px 8px",
+                                        }}
+                                    >
+                                        {w}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                </>
+            )}
+
+            <div style={{ fontSize: 12, color: "#6b7280", order: 9999, marginTop: 4 }}>
+                Last update: {ruleCheckState.lastUpdatedAt ? new Date(ruleCheckState.lastUpdatedAt).toLocaleTimeString() : "-"}
+            </div>
+        </aside>
+    );
 
     if (viewMode === "graph") {
         return (
@@ -4496,6 +5062,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         onToggleModuleDone={toggleGraphModuleDone}
                         onRemoveFromPlan={removeGraphCourseFromPlan}
                         onRemoveModuleFromPlan={removeGraphModuleFromPlan}
+                        getCourseMeta={getCourseMeta}
+                        onUpdateCourseMeta={updateCourseMeta}
                         semesterOptions={sidebarSemesters}
                         getValidSemestersForCourse={validSemestersForCourse}
                         getValidSemestersForModule={validSemestersForModule}
@@ -4607,6 +5175,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     onToggleModuleDone={toggleGraphModuleDone}
                     onRemoveCourseFromPlan={removeGraphCourseFromPlan}
                     onRemoveModuleFromPlan={removeGraphModuleFromPlan}
+                    getCourseMeta={getCourseMeta}
+                    onUpdateCourseMeta={updateCourseMeta}
                     semesterOptions={sidebarSemesters}
                     getValidSemestersForCourse={validSemestersForCourse}
                     getValidSemestersForModule={validSemestersForModule}

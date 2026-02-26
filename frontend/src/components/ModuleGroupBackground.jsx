@@ -27,6 +27,9 @@ export default function ModuleGroupBackground({ data }) {
         moduleCourseCodes,
         onToggleModuleDone,
         groupId,
+        onAddModuleToPlan,
+        semestersForModule,
+        modulePayload,
     } = data || {};
     const fallback = colorForType(category);
     const baseColor = subjectColor ?? fallback.border;
@@ -102,6 +105,37 @@ export default function ModuleGroupBackground({ data }) {
             >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                     <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        {status === "todo" && onAddModuleToPlan && (
+                            <button
+                                onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsMenuOpen((v) => !v);
+                                }}
+                                title="Add to plan"
+                                aria-label="Add to plan"
+                                style={{
+                                    border: "1px solid #60a5fa",
+                                    background: "#eff6ff",
+                                    color: "#1d4ed8",
+                                    borderRadius: 6,
+                                    fontSize: 12,
+                                    width: 24,
+                                    height: 20,
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                +
+                            </button>
+                        )}
                         {onToggleModuleDone && (status === "in_plan" || status === "done") && (
                             <button
                                 onPointerDown={(e) => {
@@ -120,7 +154,7 @@ export default function ModuleGroupBackground({ data }) {
                                 aria-label={isDone ? "Mark module as in plan" : "Mark module as done"}
                                 style={{
                                     border: `1px solid ${isDone ? "#9ca3af" : baseColor}`,
-                                    background: isDone ? "#10b981" : hexToRgba(baseColor, 0.08),
+                                    background: isDone ? "#10b981" : "#ffffff",
                                     color: isDone ? "#ffffff" : "#111827",
                                     borderRadius: 6,
                                     fontSize: 12,
@@ -133,8 +167,7 @@ export default function ModuleGroupBackground({ data }) {
                                 ✓
                             </button>
                         )}
-                        {onRemove && (
-                            <div style={{ position: "relative" }}>
+                        {onRemove && (status === "in_plan" || status === "done") && (
                             <button
                                 onPointerDown={(e) => {
                                     e.preventDefault();
@@ -146,14 +179,14 @@ export default function ModuleGroupBackground({ data }) {
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setIsMenuOpen((v) => !v);
+                                    onRemove();
                                 }}
-                                title="Options"
-                                aria-label="Options"
+                                title="Remove from plan"
+                                aria-label="Remove from plan"
                                 style={{
-                                    border: `1px solid ${isDone ? "#9ca3af" : borderColor}`,
-                                    background: "#ffffff",
-                                    color: isDone ? "#6b7280" : "#111827",
+                                    border: "1px solid #fca5a5",
+                                    background: "#fef2f2",
+                                    color: "#b91c1c",
                                     borderRadius: 6,
                                     fontSize: 12,
                                     width: 24,
@@ -162,27 +195,30 @@ export default function ModuleGroupBackground({ data }) {
                                     cursor: "pointer",
                                 }}
                             >
-                                ...
+                                ×
                             </button>
-                            {isMenuOpen && (
-                                <div
-                                    ref={menuRef}
-                                    style={{
-                                        position: "absolute",
-                                        top: 24,
-                                        right: 0,
-                                        width: 170,
-                                        border: "1px solid #d1d5db",
-                                        borderRadius: 8,
-                                        background: "#ffffff",
-                                        boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-                                        padding: 6,
-                                        display: "grid",
-                                        gap: 4,
-                                        zIndex: 30,
-                                    }}
-                                >
+                        )}
+                        {isMenuOpen && status === "todo" && onAddModuleToPlan && (
+                            <div
+                                ref={menuRef}
+                                style={{
+                                    position: "absolute",
+                                    top: 24,
+                                    right: 0,
+                                    width: 170,
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 8,
+                                    background: "#ffffff",
+                                    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+                                    padding: 6,
+                                    display: "grid",
+                                    gap: 4,
+                                    zIndex: 30,
+                                }}
+                            >
+                                {(Array.isArray(semestersForModule) ? semestersForModule : []).map((semester) => (
                                     <button
+                                        key={semester.id}
                                         onPointerDown={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
@@ -193,24 +229,14 @@ export default function ModuleGroupBackground({ data }) {
                                         }}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            onRemove();
+                                            onAddModuleToPlan(modulePayload, (Number(semester.id) || 1) - 1);
                                             setIsMenuOpen(false);
                                         }}
-                                        style={{
-                                            border: "1px solid #e5e7eb",
-                                            borderRadius: 6,
-                                            padding: "5px 8px",
-                                            textAlign: "left",
-                                            background: "#ffffff",
-                                            cursor: "pointer",
-                                            fontSize: 12,
-                                            fontWeight: 600,
-                                        }}
+                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                                     >
-                                        Remove from plan
+                                        {semester.title}
                                     </button>
-                                </div>
-                            )}
+                                ))}
                             </div>
                         )}
                     </div>

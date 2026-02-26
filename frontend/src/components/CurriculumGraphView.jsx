@@ -329,6 +329,8 @@ function relaxFiltersForExpandedSubtree({
 
 function layoutTree(root, collapsedIds, options = {}) {
     const getCourseStatus = options?.getCourseStatus;
+    const getCourseMeta = options?.getCourseMeta;
+    const onUpdateCourseMeta = options?.onUpdateCourseMeta;
     const onAddToPlan = options?.onAddToPlan;
     const onToggleDone = options?.onToggleDone;
     const onAddModuleToPlan = options?.onAddModuleToPlan;
@@ -361,6 +363,7 @@ function layoutTree(root, collapsedIds, options = {}) {
         const prefix = node.level !== "root" && canExpand ? (isCollapsed ? "▶ " : "▼ ") : "";
         const x = X_BY_LEVEL[node.level] ?? depth * 320;
         let status = null;
+        const courseMeta = node?.courseCode ? (getCourseMeta?.(node.courseCode) || {}) : {};
         if (node.level === "course" || node.level === "courseDirect") {
             status = getCourseStatus?.(node?.courseCode) ?? "todo";
         } else if (node.level === "module") {
@@ -405,6 +408,10 @@ function layoutTree(root, collapsedIds, options = {}) {
                 programCode,
                 moduleCount: node?.moduleCount ?? null,
                 status,
+                notes: String(courseMeta?.notes ?? ""),
+                estimatedHours: String(courseMeta?.estimatedHours ?? ""),
+                grade: String(courseMeta?.grade ?? ""),
+                onUpdateCourseMeta: (node.level === "course" || node.level === "courseDirect") ? onUpdateCourseMeta : null,
                 courseType: node?.courseType ?? null,
                 onAddToPlan: (node.level === "course" || node.level === "courseDirect") ? onAddToPlan : null,
                 onToggleDone: (node.level === "course" || node.level === "courseDirect") ? onToggleDone : null,
@@ -588,6 +595,8 @@ export default function CurriculumGraphView({
     bachelorProgramCode,
     bachelorFocusOptions,
     getCourseStatus,
+    getCourseMeta,
+    onUpdateCourseMeta,
     onAddToPlan,
     onToggleDone,
     onAddModuleToPlan,
@@ -792,6 +801,8 @@ export default function CurriculumGraphView({
     const { nodes, edges: autoEdges } = useMemo(() => {
         return layoutTree(root, effectiveCollapsedIds, {
             getCourseStatus,
+            getCourseMeta,
+            onUpdateCourseMeta,
             onAddToPlan,
             onToggleDone,
             onAddModuleToPlan,
@@ -807,6 +818,8 @@ export default function CurriculumGraphView({
         root,
         effectiveCollapsedIds,
         getCourseStatus,
+        getCourseMeta,
+        onUpdateCourseMeta,
         onAddToPlan,
         onToggleDone,
         onAddModuleToPlan,

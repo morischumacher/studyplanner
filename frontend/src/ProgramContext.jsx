@@ -20,12 +20,68 @@ const EMPTY_GRAPH_VIEW_STATE = {
 const DEFAULT_SEMESTER_LOAD_LIMITS = {
     maxEctsPerSemester: 42,
     recommendedEctsPerSemester: 30,
+    maxWeekHoursPerSemester: 50,
+    recommendedWeekHoursPerSemester: 40,
 };
+const EMPTY_COURSE_META = Object.freeze({
+    notes: "",
+    estimatedHours: "",
+    grade: "",
+});
+
+function sanitizeCourseMetaEntry(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const notes = typeof source.notes === "string" ? source.notes : "";
+    const estimatedHoursRaw = source.estimatedHours;
+    const estimatedHours = estimatedHoursRaw == null ? "" : String(estimatedHoursRaw);
+    const gradeRaw = source.grade;
+    let grade = gradeRaw == null ? "" : String(gradeRaw);
+    const normalizedGrade = grade.trim().replace(",", ".");
+    const parsedGrade = Number(normalizedGrade);
+    if (normalizedGrade && Number.isFinite(parsedGrade) && parsedGrade > 5) {
+        grade = "5";
+    }
+    return { notes, estimatedHours, grade };
+}
+
+function sanitizeCourseMetaByProgram(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const normalized = {};
+    for (const [program, byCourse] of Object.entries(source)) {
+        if (!byCourse || typeof byCourse !== "object") continue;
+        const normalizedByCourse = {};
+        for (const [courseCode, meta] of Object.entries(byCourse)) {
+            const code = String(courseCode || "").trim();
+            if (!code) continue;
+            normalizedByCourse[code] = sanitizeCourseMetaEntry(meta);
+        }
+        normalized[program] = normalizedByCourse;
+    }
+    return normalized;
+}
+
+function sanitizeSemesterNotesByProgram(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const normalized = {};
+    for (const [program, bySemester] of Object.entries(source)) {
+        if (!bySemester || typeof bySemester !== "object") continue;
+        const normalizedBySemester = {};
+        for (const [semesterId, note] of Object.entries(bySemester)) {
+            const sem = Number(semesterId);
+            if (!Number.isInteger(sem) || sem < 1) continue;
+            normalizedBySemester[sem] = typeof note === "string" ? note : "";
+        }
+        normalized[program] = normalizedBySemester;
+    }
+    return normalized;
+}
 
 function sanitizeSemesterLoadLimits(value) {
     const source = value && typeof value === "object" ? value : {};
     const parsedMax = Number(source.maxEctsPerSemester);
     const parsedRecommended = Number(source.recommendedEctsPerSemester);
+    const parsedMaxWeekHours = Number(source.maxWeekHoursPerSemester);
+    const parsedRecommendedWeekHours = Number(source.recommendedWeekHoursPerSemester);
     const maxEctsPerSemester = Number.isFinite(parsedMax) && parsedMax > 0
         ? parsedMax
         : DEFAULT_SEMESTER_LOAD_LIMITS.maxEctsPerSemester;
@@ -33,7 +89,19 @@ function sanitizeSemesterLoadLimits(value) {
         ? parsedRecommended
         : DEFAULT_SEMESTER_LOAD_LIMITS.recommendedEctsPerSemester;
     const recommendedEctsPerSemester = Math.min(recommendedRaw, maxEctsPerSemester);
-    return { maxEctsPerSemester, recommendedEctsPerSemester };
+    const maxWeekHoursPerSemester = Number.isFinite(parsedMaxWeekHours) && parsedMaxWeekHours > 0
+        ? parsedMaxWeekHours
+        : DEFAULT_SEMESTER_LOAD_LIMITS.maxWeekHoursPerSemester;
+    const recommendedWeekHoursRaw = Number.isFinite(parsedRecommendedWeekHours) && parsedRecommendedWeekHours > 0
+        ? parsedRecommendedWeekHours
+        : DEFAULT_SEMESTER_LOAD_LIMITS.recommendedWeekHoursPerSemester;
+    const recommendedWeekHoursPerSemester = Math.min(recommendedWeekHoursRaw, maxWeekHoursPerSemester);
+    return {
+        maxEctsPerSemester,
+        recommendedEctsPerSemester,
+        maxWeekHoursPerSemester,
+        recommendedWeekHoursPerSemester,
+    };
 }
 
 function sanitizeGraphFilters(filters) {
@@ -234,6 +302,8 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
     const [selectedFocusByProgram, setSelectedFocusByProgram] = useState({});
     const [graphViewByProgram, setGraphViewByProgram] = useState({});
     const [semesterLoadLimitsByProgram, setSemesterLoadLimitsByProgram] = useState({});
+    const [courseMetaByProgram, setCourseMetaByProgram] = useState({});
+    const [semesterNotesByProgram, setSemesterNotesByProgram] = useState({});
 
     const semesterBounds = semesterBoundsForProgram(programCode);
     const emptyPlanForProgram = useMemo(() => emptyCoursesOnlyPlan(semesterBounds.min), [semesterBounds.min]);
@@ -244,6 +314,8 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
     const semesterLoadLimits = sanitizeSemesterLoadLimits(
         semesterLoadLimitsByProgram?.[programCode] ?? DEFAULT_SEMESTER_LOAD_LIMITS
     );
+    const courseMetaByCode = courseMetaByProgram?.[programCode] ?? {};
+    const semesterNotesBySemesterId = semesterNotesByProgram?.[programCode] ?? {};
 
     const setCoursesFromNodes = useCallback((nodes) => {
         const bounds = semesterBoundsForProgram(programCode);
@@ -257,13 +329,36 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         });
 
         const plannedCodes = new Set(flattenBySemester(nextPlan, bounds.min, bounds.max).map((c) => c?.code).filter(Boolean));
+        const removedDoneByPrune = (doneByProgram?.[programCode] ?? []).filter((code) => !plannedCodes.has(code));
         setDoneByProgram((prev) => {
             const currentDone = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
             const pruned = currentDone.filter((code) => plannedCodes.has(code));
             if (pruned.length === currentDone.length) return prev;
             return { ...prev, [programCode]: pruned };
         });
-    }, [programCode]);
+        if (removedDoneByPrune.length > 0) {
+            setCourseMetaByProgram((prev) => {
+                const byCode = prev?.[programCode] && typeof prev[programCode] === "object"
+                    ? prev[programCode]
+                    : {};
+                let changed = false;
+                const nextByCode = { ...byCode };
+                for (const code of removedDoneByPrune) {
+                    const key = String(code || "").trim();
+                    if (!key) continue;
+                    const entry = sanitizeCourseMetaEntry(nextByCode?.[key] ?? EMPTY_COURSE_META);
+                    if (!entry.grade) continue;
+                    nextByCode[key] = { ...entry, grade: "" };
+                    changed = true;
+                }
+                if (!changed) return prev;
+                return {
+                    ...(prev || {}),
+                    [programCode]: nextByCode,
+                };
+            });
+        }
+    }, [doneByProgram, programCode]);
 
     const getCoursesForSemester = useCallback((semesterId) => {
         return coursesBySemester[semesterId] ?? [];
@@ -310,6 +405,24 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
             const updated = target ? [...current, courseCode] : current.filter((code) => code !== courseCode);
             return { ...prev, [programCode]: updated };
         });
+        if (!nextDone) {
+            setCourseMetaByProgram((prev) => {
+                const byCode = prev?.[programCode] && typeof prev[programCode] === "object"
+                    ? prev[programCode]
+                    : {};
+                const key = String(courseCode || "").trim();
+                if (!key) return prev;
+                const entry = sanitizeCourseMetaEntry(byCode?.[key] ?? EMPTY_COURSE_META);
+                if (!entry.grade) return prev;
+                return {
+                    ...(prev || {}),
+                    [programCode]: {
+                        ...byCode,
+                        [key]: { ...entry, grade: "" },
+                    },
+                };
+            });
+        }
         setLastPlanChange({
             id: Date.now(),
             type: "course_status_toggled",
@@ -320,6 +433,44 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
             semesterNumber: currentLaneIndex != null ? currentLaneIndex + 1 : null,
         });
     }, [coursesBySemester, programCode, semesterBounds.max, semesterBounds.min]);
+
+    const getCourseMeta = useCallback((courseCode) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return EMPTY_COURSE_META;
+        return courseMetaByProgram?.[programCode]?.[code] ?? EMPTY_COURSE_META;
+    }, [courseMetaByProgram, programCode]);
+
+    const setCourseMeta = useCallback((courseCode, nextMetaOrUpdater) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return;
+        setCourseMetaByProgram((prev) => {
+            const currentByCode = prev?.[programCode] && typeof prev[programCode] === "object"
+                ? prev[programCode]
+                : {};
+            const currentEntry = sanitizeCourseMetaEntry(currentByCode?.[code] ?? EMPTY_COURSE_META);
+            const patchCandidate = typeof nextMetaOrUpdater === "function"
+                ? nextMetaOrUpdater(currentEntry)
+                : nextMetaOrUpdater;
+            const nextEntry = sanitizeCourseMetaEntry({
+                ...currentEntry,
+                ...(patchCandidate && typeof patchCandidate === "object" ? patchCandidate : {}),
+            });
+            if (
+                currentEntry.notes === nextEntry.notes &&
+                currentEntry.estimatedHours === nextEntry.estimatedHours &&
+                currentEntry.grade === nextEntry.grade
+            ) {
+                return prev;
+            }
+            return {
+                ...(prev || {}),
+                [programCode]: {
+                    ...currentByCode,
+                    [code]: nextEntry,
+                },
+            };
+        });
+    }, [programCode]);
 
     const setSelectedFocus = useCallback((focusName) => {
         const nextValue = typeof focusName === "string" ? focusName : "";
@@ -408,7 +559,9 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
             const next = sanitizeSemesterLoadLimits(patchCandidate);
             if (
                 current.maxEctsPerSemester === next.maxEctsPerSemester &&
-                current.recommendedEctsPerSemester === next.recommendedEctsPerSemester
+                current.recommendedEctsPerSemester === next.recommendedEctsPerSemester &&
+                current.maxWeekHoursPerSemester === next.maxWeekHoursPerSemester &&
+                current.recommendedWeekHoursPerSemester === next.recommendedWeekHoursPerSemester
             ) {
                 return prev;
             }
@@ -417,10 +570,39 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
                 type: "semester_load_limits_updated",
                 maxEctsPerSemester: next.maxEctsPerSemester,
                 recommendedEctsPerSemester: next.recommendedEctsPerSemester,
+                maxWeekHoursPerSemester: next.maxWeekHoursPerSemester,
+                recommendedWeekHoursPerSemester: next.recommendedWeekHoursPerSemester,
             });
             return {
                 ...(prev || {}),
                 [programCode]: next,
+            };
+        });
+    }, [programCode]);
+
+    const getSemesterNote = useCallback((semesterId) => {
+        const sem = Number(semesterId);
+        if (!Number.isInteger(sem) || sem < 1) return "";
+        const note = semesterNotesByProgram?.[programCode]?.[sem];
+        return typeof note === "string" ? note : "";
+    }, [semesterNotesByProgram, programCode]);
+
+    const setSemesterNote = useCallback((semesterId, note) => {
+        const sem = Number(semesterId);
+        if (!Number.isInteger(sem) || sem < 1) return;
+        const nextNote = typeof note === "string" ? note : "";
+        setSemesterNotesByProgram((prev) => {
+            const currentBySemester = prev?.[programCode] && typeof prev[programCode] === "object"
+                ? prev[programCode]
+                : {};
+            const current = typeof currentBySemester?.[sem] === "string" ? currentBySemester[sem] : "";
+            if (current === nextNote) return prev;
+            return {
+                ...(prev || {}),
+                [programCode]: {
+                    ...currentBySemester,
+                    [sem]: nextNote,
+                },
             };
         });
     }, [programCode]);
@@ -430,10 +612,12 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         programCode,
         coursesByProgram,
         doneByProgram,
+        courseMetaByProgram,
+        semesterNotesByProgram,
         selectedFocusByProgram,
         graphViewByProgram,
         semesterLoadLimitsByProgram,
-    }), [programCode, coursesByProgram, doneByProgram, selectedFocusByProgram, graphViewByProgram, semesterLoadLimitsByProgram]);
+    }), [programCode, coursesByProgram, doneByProgram, courseMetaByProgram, semesterNotesByProgram, selectedFocusByProgram, graphViewByProgram, semesterLoadLimitsByProgram]);
 
     const importPlannerStateSnapshot = useCallback((snapshot) => {
         if (!snapshot || typeof snapshot !== "object") return;
@@ -447,6 +631,8 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         }
         setCoursesByProgram(normalizedCoursesByProgram);
         setDoneByProgram(snapshot?.doneByProgram && typeof snapshot.doneByProgram === "object" ? snapshot.doneByProgram : {});
+        setCourseMetaByProgram(sanitizeCourseMetaByProgram(snapshot?.courseMetaByProgram));
+        setSemesterNotesByProgram(sanitizeSemesterNotesByProgram(snapshot?.semesterNotesByProgram));
         setSelectedFocusByProgram(snapshot?.selectedFocusByProgram && typeof snapshot.selectedFocusByProgram === "object" ? snapshot.selectedFocusByProgram : {});
         const rawGraphViewByProgram =
             snapshot?.graphViewByProgram && typeof snapshot.graphViewByProgram === "object"
@@ -500,6 +686,8 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         setSelectedFocusByProgram({});
         setGraphViewByProgram({});
         setSemesterLoadLimitsByProgram({});
+        setCourseMetaByProgram({});
+        setSemesterNotesByProgram({});
     }, []);
 
     const value = useMemo(() => ({
@@ -508,6 +696,12 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         coursesBySemester,
         setCoursesFromNodes,
         doneCourseCodes,
+        courseMetaByCode,
+        semesterNotesBySemesterId,
+        getCourseMeta,
+        setCourseMeta,
+        getSemesterNote,
+        setSemesterNote,
         selectedFocus,
         setSelectedFocus,
         setSelectedFocusForProgram,
@@ -528,6 +722,12 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         coursesBySemester,
         setCoursesFromNodes,
         doneCourseCodes,
+        courseMetaByCode,
+        semesterNotesBySemesterId,
+        getCourseMeta,
+        setCourseMeta,
+        getSemesterNote,
+        setSemesterNote,
         selectedFocus,
         setSelectedFocus,
         setSelectedFocusForProgram,

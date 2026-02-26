@@ -22,8 +22,9 @@ export default function GraphModuleNode({ data }) {
     const cardBorderColor = isDone ? color : (stateMeta.borderColor || color);
     const stateShadow = isDone ? "none" : stateMeta.extraShadow;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [menuView, setMenuView] = useState("root");
+    const [menuView, setMenuView] = useState(null);
     const menuRef = useRef(null);
+    const rootRef = useRef(null);
 
     useEffect(() => {
         if (!isMenuOpen) return;
@@ -32,6 +33,18 @@ export default function GraphModuleNode({ data }) {
         };
         document.addEventListener("mousedown", handlePointerDown);
         return () => document.removeEventListener("mousedown", handlePointerDown);
+    }, [isMenuOpen]);
+
+    useEffect(() => {
+        const nodeEl = rootRef.current?.closest?.(".react-flow__node");
+        if (!nodeEl) return;
+        if (isMenuOpen) {
+            nodeEl.style.zIndex = "100000";
+            return () => {
+                nodeEl.style.zIndex = "";
+            };
+        }
+        nodeEl.style.zIndex = "";
     }, [isMenuOpen]);
 
     const statusStyle = (() => {
@@ -43,6 +56,7 @@ export default function GraphModuleNode({ data }) {
 
     return (
         <div
+            ref={rootRef}
             style={{
                 width: CARD_WIDTH,
                 minHeight: NODE_HEIGHT,
@@ -60,7 +74,7 @@ export default function GraphModuleNode({ data }) {
                 boxShadow: combinedCardShadow(typeShadow, stateShadow),
                 fontWeight: 600,
                 fontSize: 12,
-                opacity: stateMeta.opacity,
+                opacity: isMenuOpen ? 1 : stateMeta.opacity,
             }}
         >
             <Handle id="left-target" type="target" position={Position.Left} />
@@ -68,6 +82,29 @@ export default function GraphModuleNode({ data }) {
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    {status === "todo" && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                const nextView = "semesters";
+                                setIsMenuOpen((v) => (menuView === nextView ? !v : true));
+                                setMenuView(nextView);
+                            }}
+                            title="Add to plan"
+                            aria-label="Add to plan"
+                            style={{
+                                border: "1px solid #60a5fa",
+                                background: "#eff6ff",
+                                color: "#1d4ed8",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                padding: "1px 6px",
+                                cursor: "pointer",
+                            }}
+                        >
+                            +
+                        </button>
+                    )}
                     {(isInPlan || isDone) && (
                         <button
                             onClick={(e) => {
@@ -78,7 +115,7 @@ export default function GraphModuleNode({ data }) {
                             aria-label={isDone ? "Mark module as in plan" : "Mark module as done"}
                             style={{
                                 border: `1px solid ${isDone ? "#9ca3af" : color}`,
-                                background: isDone ? "#10b981" : hexToRgba(color, 0.08),
+                                background: isDone ? "#10b981" : "#ffffff",
                                 color: isDone ? "#ffffff" : "#111827",
                                 borderRadius: 6,
                                 fontSize: 12,
@@ -89,31 +126,28 @@ export default function GraphModuleNode({ data }) {
                             ✓
                         </button>
                     )}
-                    <div style={{ position: "relative" }}>
+                    {(isInPlan || isDone) && (
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                setIsMenuOpen((v) => {
-                                    const next = !v;
-                                    if (next) setMenuView("root");
-                                    return next;
-                                });
+                                data?.onRemoveModuleFromPlan?.(data?.modulePayload);
                             }}
-                            title="Options"
-                            aria-label="Options"
+                            title="Remove from plan"
+                            aria-label="Remove from plan"
                             style={{
-                                border: `1px solid ${isDone ? "#9ca3af" : color}`,
-                                background: "#ffffff",
+                                border: "1px solid #fca5a5",
+                                background: "#fef2f2",
+                                color: "#b91c1c",
                                 borderRadius: 6,
                                 fontSize: 12,
-                                width: 24,
-                                height: 20,
-                                lineHeight: 1,
+                                padding: "1px 6px",
                                 cursor: "pointer",
                             }}
                         >
-                            ...
+                            ×
                         </button>
+                    )}
+                    <div style={{ position: "relative" }}>
                         {isMenuOpen && (
                             <div
                                 ref={menuRef}
@@ -129,53 +163,9 @@ export default function GraphModuleNode({ data }) {
                                     padding: 6,
                                     display: "grid",
                                     gap: 4,
-                                    zIndex: 20,
+                                    zIndex: 100001,
                                 }}
                             >
-                        {menuView === "root" && status === "todo" && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setMenuView("semesters");
-                                }}
-                                style={{
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: 6,
-                                    padding: "5px 8px",
-                                    textAlign: "left",
-                                    background: "#ffffff",
-                                    cursor: "pointer",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: "#111827",
-                                }}
-                            >
-                                Add to plan
-                            </button>
-                        )}
-                        {menuView === "root" && (isInPlan || isDone) && (
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    data?.onRemoveModuleFromPlan?.(data?.modulePayload);
-                                    setIsMenuOpen(false);
-                                    setMenuView("root");
-                                }}
-                                style={{
-                                    border: "1px solid #e5e7eb",
-                                    borderRadius: 6,
-                                    padding: "5px 8px",
-                                    textAlign: "left",
-                                    background: "#ffffff",
-                                    cursor: "pointer",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    color: "#111827",
-                                }}
-                            >
-                                Remove from plan
-                            </button>
-                        )}
                         {menuView === "semesters" && (
                             <>
                                 {(Array.isArray(data?.semestersForModule) ? data.semestersForModule : []).map((semester) => (
@@ -185,7 +175,7 @@ export default function GraphModuleNode({ data }) {
                                             e.stopPropagation();
                                             data?.onAddModuleToPlan?.(data?.modulePayload, (Number(semester.id) || 1) - 1);
                                             setIsMenuOpen(false);
-                                            setMenuView("root");
+                                            setMenuView(null);
                                         }}
                                         style={{
                                             border: "1px solid #e5e7eb",
@@ -205,7 +195,8 @@ export default function GraphModuleNode({ data }) {
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        setMenuView("root");
+                                        setMenuView(null);
+                                        setIsMenuOpen(false);
                                     }}
                                     style={{
                                         border: "1px solid #e5e7eb",

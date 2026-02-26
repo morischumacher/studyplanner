@@ -29,6 +29,8 @@ export default function Sidebar({
     onToggleModuleDone,
     onRemoveCourseFromPlan,
     onRemoveModuleFromPlan,
+    getCourseMeta,
+    onUpdateCourseMeta,
     semesterOptions,
     getValidSemestersForCourse,
     getValidSemestersForModule,
@@ -50,6 +52,75 @@ export default function Sidebar({
     const closeMenu = () => {
         setPlusRevealCount(0);
         setMenuState({ key: null, view: "root", variantId: null });
+    };
+    const toggleMenuView = (key, view, variantId = null) => {
+        setPlusRevealCount(0);
+        setMenuState((prev) => {
+            const sameKey = prev?.key === key;
+            const sameView = prev?.view === view;
+            const sameVariant = (prev?.variantId ?? null) === (variantId ?? null);
+            if (sameKey && sameView && sameVariant) {
+                return { key: null, view: "root", variantId: null };
+            }
+            return { key, view, variantId };
+        });
+    };
+    const renderCourseDetailsMenu = (courseCode, status, onBack) => {
+        const code = String(courseCode || "").trim();
+        if (!code) return null;
+        const meta = getCourseMeta?.(code) || {};
+        const notes = String(meta?.notes ?? "");
+        const estimatedHours = String(meta?.estimatedHours ?? "");
+        const grade = String(meta?.grade ?? "");
+        const isDone = status === "done";
+        return (
+            <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#6b7280" }}>
+                    Notes
+                    <textarea
+                        draggable={false}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        value={notes}
+                        onChange={(e) => onUpdateCourseMeta?.(code, { notes: e.target.value })}
+                        rows={3}
+                        placeholder="Add notes"
+                        style={{ resize: "vertical", border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 12 }}
+                    />
+                </label>
+                <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#6b7280" }}>
+                    Estimated hours per week
+                    <input
+                        draggable={false}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={estimatedHours}
+                        onChange={(e) => onUpdateCourseMeta?.(code, { estimatedHours: e.target.value })}
+                        onWheel={(e) => e.currentTarget.blur()}
+                        placeholder="0"
+                        style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 12 }}
+                    />
+                </label>
+                <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#6b7280" }}>
+                    Grade
+                    <input
+                        draggable={false}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        type="text"
+                        value={grade}
+                        onChange={(e) => onUpdateCourseMeta?.(code, { grade: e.target.value })}
+                        placeholder={isDone ? "e.g. 1.7" : "Only when done"}
+                        disabled={!isDone}
+                        style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 12, background: isDone ? "#ffffff" : "#f3f4f6" }}
+                    />
+                </label>
+                <button onClick={onBack} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+            </div>
+        );
     };
     const gotoSemesters = (key, variantId = null) => {
         setPlusRevealCount(0);
@@ -319,11 +390,11 @@ export default function Sidebar({
                                                         boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
                                                         padding: "12px 12px",
                                                         cursor: standaloneStatus === "todo" ? "grab" : "default",
-                                                        opacity: stateMeta.opacity,
+                                                        opacity: menuState.key === menuKey ? 1 : stateMeta.opacity,
                                                         display: "grid",
                                                         gap: 8,
                                                         position: "relative",
-                                                        zIndex: menuState.key === menuKey ? 20 : 1,
+                                                        zIndex: menuState.key === menuKey ? 3000 : 1,
                                                         width: "100%",
                                                         boxSizing: "border-box",
                                                         minWidth: 0,
@@ -332,36 +403,60 @@ export default function Sidebar({
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    toggleMenuView(menuKey, "details");
+                                                                }}
+                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                            >
+                                                                i
+                                                            </button>
+                                                            {standaloneStatus === "todo" && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        gotoSemesters(menuKey);
+                                                                    }}
+                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            )}
                                                             {(standaloneStatus === "in_plan" || standaloneStatus === "done") && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         onToggleCourseDone?.(moduleCodeFallback, standaloneStatus !== "done");
                                                                     }}
-                                                                    style={{ border: `1px solid ${standaloneStatus === "done" ? "#9ca3af" : subjectColor}`, background: standaloneStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: standaloneStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: `1px solid ${standaloneStatus === "done" ? "#9ca3af" : subjectColor}`, background: standaloneStatus === "done" ? "#10b981" : "#ffffff", color: standaloneStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     ✓
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (menuState.key === menuKey) closeMenu();
-                                                                    else openMenu(menuKey);
-                                                                }}
-                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
-                                                            >
-                                                                ...
-                                                            </button>
+                                                            {(standaloneStatus === "in_plan" || standaloneStatus === "done") && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onRemoveCourseFromPlan?.(moduleCodeFallback);
+                                                                    }}
+                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     {menuState.key === menuKey && (
-                                                        <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
                                                             {menuState.view === "root" && standaloneStatus === "todo" && (
                                                                 <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
                                                             {menuState.view === "root" && (standaloneStatus === "in_plan" || standaloneStatus === "done") && (
                                                                 <button onClick={(e) => { e.stopPropagation(); onRemoveCourseFromPlan?.(moduleCodeFallback); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
+                                                            )}
+                                                            {menuState.view === "root" && (
+                                                                <button onClick={(e) => { e.stopPropagation(); setMenuState((prev) => ({ ...prev, view: "details" })); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Edit details</button>
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
@@ -376,9 +471,10 @@ export default function Sidebar({
                                                                             + Add next semester
                                                                         </button>
                                                                     )}
-                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                 </>
                                                             )}
+                                                            {menuState.view === "details" && renderCourseDetailsMenu(moduleCodeFallback, standaloneStatus, (e) => { e?.stopPropagation?.(); closeMenu(); })}
                                                         </div>
                                                     )}
                                                     <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: standaloneStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{displayCourseTitle(mod?.name)}</div>
@@ -427,11 +523,11 @@ export default function Sidebar({
                                                         boxShadow: combinedCardShadow(typeShadow, stateMeta.extraShadow),
                                                         padding: "12px 12px",
                                                         cursor: courseStatus === "todo" ? "grab" : "default",
-                                                        opacity: stateMeta.opacity,
+                                                        opacity: menuState.key === menuKey ? 1 : stateMeta.opacity,
                                                         display: "grid",
                                                         gap: 8,
                                                         position: "relative",
-                                                        zIndex: menuState.key === menuKey ? 20 : 1,
+                                                        zIndex: menuState.key === menuKey ? 3000 : 1,
                                                         width: "100%",
                                                         boxSizing: "border-box",
                                                         minWidth: 0,
@@ -443,36 +539,60 @@ export default function Sidebar({
                                                             {displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}
                                                         </div>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    toggleMenuView(menuKey, "details");
+                                                                }}
+                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                            >
+                                                                i
+                                                            </button>
+                                                            {courseStatus === "todo" && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        gotoSemesters(menuKey);
+                                                                    }}
+                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            )}
                                                             {(courseStatus === "in_plan" || courseStatus === "done") && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         onToggleCourseDone?.(course.code ?? mod.code, courseStatus !== "done");
                                                                     }}
-                                                                    style={{ border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`, background: courseStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: courseStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`, background: courseStatus === "done" ? "#10b981" : "#ffffff", color: courseStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     ✓
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (menuState.key === menuKey) closeMenu();
-                                                                    else openMenu(menuKey);
-                                                                }}
-                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
-                                                            >
-                                                                ...
-                                                            </button>
+                                                            {(courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onRemoveCourseFromPlan?.(course.code ?? mod.code);
+                                                                    }}
+                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     {menuState.key === menuKey && (
-                                                        <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
                                                             {menuState.view === "root" && courseStatus === "todo" && (
                                                                 <button onClick={(e) => { e.stopPropagation(); gotoSemesters(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Add to plan</button>
                                                             )}
                                                             {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
                                                                 <button onClick={(e) => { e.stopPropagation(); onRemoveCourseFromPlan?.(course.code ?? mod.code); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
+                                                            )}
+                                                            {menuState.view === "root" && (
+                                                                <button onClick={(e) => { e.stopPropagation(); setMenuState((prev) => ({ ...prev, view: "details" })); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Edit details</button>
                                                             )}
                                                             {menuState.view === "semesters" && (
                                                                 <>
@@ -487,9 +607,10 @@ export default function Sidebar({
                                                                             + Add next semester
                                                                         </button>
                                                                     )}
-                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                 </>
                                                             )}
+                                                            {menuState.view === "details" && renderCourseDetailsMenu(course.code ?? mod.code, courseStatus, (e) => { e?.stopPropagation?.(); closeMenu(); })}
                                                         </div>
                                                     )}
                                                     <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{displayCourseTitle(course?.name ?? mod?.name)}</div>
@@ -570,6 +691,10 @@ export default function Sidebar({
                                         const groupBorderColor = groupStateMeta.borderColor || subjectColor;
                                         const isGroupDone = groupStatus === "done";
                                         const moduleMenuKey = `module-${pfIdx}-${mod.code || modIdx}`;
+                                        const childMenuPrefix = `child-${pfIdx}-${mod.code}-`;
+                                        const isModuleLayerActive =
+                                            menuState.key === moduleMenuKey ||
+                                            (typeof menuState.key === "string" && menuState.key.startsWith(childMenuPrefix));
                                         const moduleBlocked = courses
                                             .map((c) => getCourseStatus?.(c?.code) ?? "todo")
                                             .some((s) => isBlockedStatus(s));
@@ -584,7 +709,7 @@ export default function Sidebar({
                                                     background: "#fff",
                                                     overflow: "visible",
                                                     position: "relative",
-                                                    zIndex: menuState.key === moduleMenuKey ? 15 : 1,
+                                                    zIndex: isModuleLayerActive ? 3000 : 1,
                                                 }}
                                             >
                                                 <div
@@ -605,7 +730,7 @@ export default function Sidebar({
                                                         display: "grid",
                                                         gap: 8,
                                                         cursor: groupStatus === "todo" && !moduleBlocked ? "grab" : "default",
-                                                        opacity: moduleBlocked ? 0.85 : groupStateMeta.opacity,
+                                                        opacity: menuState.key === moduleMenuKey ? 1 : (moduleBlocked ? 0.85 : groupStateMeta.opacity),
                                                         position: "relative",
                                                         boxSizing: "border-box",
                                                         minWidth: 0,
@@ -616,31 +741,43 @@ export default function Sidebar({
                                                 >
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8 }}>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                                            {groupStatus === "todo" && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        gotoSemesters(moduleMenuKey);
+                                                                    }}
+                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", color: "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    +
+                                                                </button>
+                                                            )}
                                                             {(groupStatus === "in_plan" || groupStatus === "done") && (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
                                                                         onToggleModuleDone?.(courses.map((c) => c?.code).filter(Boolean), groupStatus !== "done");
                                                                     }}
-                                                                    style={{ border: `1px solid ${groupStatus === "done" ? "#9ca3af" : subjectColor}`, background: groupStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: groupStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: `1px solid ${groupStatus === "done" ? "#9ca3af" : subjectColor}`, background: groupStatus === "done" ? "#10b981" : "#ffffff", color: groupStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     ✓
                                                                 </button>
                                                             )}
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (menuState.key === moduleMenuKey) closeMenu();
-                                                                    else openMenu(moduleMenuKey);
-                                                                }}
-                                                                style={{ border: `1px solid ${isGroupDone ? "#9ca3af" : subjectColor}`, background: "#fff", color: isGroupDone ? "#6b7280" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
-                                                            >
-                                                                ...
-                                                            </button>
+                                                            {(groupStatus === "in_plan" || groupStatus === "done") && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onRemoveModuleFromPlan?.(modulePayload);
+                                                                    }}
+                                                                    style={{ border: `1px solid ${isGroupDone ? "#9ca3af" : subjectColor}`, background: "#fff", color: isGroupDone ? "#6b7280" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                >
+                                                                    ×
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     {menuState.key === moduleMenuKey && (
-                                                        <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
                                                             {menuState.view === "root" && groupStatus === "todo" && (
                                                                 hasSplitVariants
                                                                     ? (
@@ -674,7 +811,7 @@ export default function Sidebar({
                                                                             + Add next semester
                                                                         </button>
                                                                     )}
-                                                                    <button onClick={(e) => { e.stopPropagation(); openMenu(moduleMenuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                    <button onClick={(e) => { e.stopPropagation(); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                 </>
                                                             )}
                                                         </div>
@@ -745,11 +882,11 @@ export default function Sidebar({
                                                                     background: childBackground,
                                                                     boxShadow: combinedCardShadow(childTypeShadow, childStateMeta.extraShadow),
                                                                     padding: "10px 10px",
-                                                                    opacity: childStateMeta.opacity,
+                                                                    opacity: menuState.key === menuKey ? 1 : childStateMeta.opacity,
                                                                     display: "grid",
                                                                     gap: 8,
                                                                     position: "relative",
-                                                                    zIndex: menuState.key === menuKey ? 20 : 1,
+                                                                    zIndex: menuState.key === menuKey ? 3000 : 1,
                                                                     width: "100%",
                                                                     boxSizing: "border-box",
                                                                     minWidth: 0,
@@ -759,31 +896,52 @@ export default function Sidebar({
                                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                                                     <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}</div>
                                                                     <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                toggleMenuView(menuKey, "details");
+                                                                            }}
+                                                                            style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                        >
+                                                                            i
+                                                                        </button>
+                                                                        {courseStatus === "todo" && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    hasSplitVariants ? gotoSemesters(menuKey, variantOptions?.[0]?.id ?? null) : gotoSemesters(menuKey);
+                                                                                }}
+                                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                            >
+                                                                                +
+                                                                            </button>
+                                                                        )}
                                                                         {(courseStatus === "in_plan" || courseStatus === "done") && (
                                                                             <button
                                                                                 onClick={(e) => {
                                                                                     e.stopPropagation();
                                                                                     onToggleModuleDone?.(courses.map((c) => c?.code).filter(Boolean), courseStatus !== "done");
                                                                                 }}
-                                                                                style={{ border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`, background: courseStatus === "done" ? "#10b981" : hexToRgba(subjectColor, 0.08), color: courseStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                                style={{ border: `1px solid ${courseStatus === "done" ? "#9ca3af" : subjectColor}`, background: courseStatus === "done" ? "#10b981" : "#ffffff", color: courseStatus === "done" ? "#fff" : "#111827", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                             >
                                                                                 ✓
                                                                             </button>
                                                                         )}
-                                                                        <button
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                if (menuState.key === menuKey) closeMenu();
-                                                                                else openMenu(menuKey);
-                                                                            }}
-                                                                            style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
-                                                                        >
-                                                                            ...
-                                                                        </button>
+                                                                        {(courseStatus === "in_plan" || courseStatus === "done") && (
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    onRemoveModuleFromPlan?.(modulePayload);
+                                                                                }}
+                                                                                style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                                 {menuState.key === menuKey && (
-                                                                    <div style={{ position: "absolute", top: 34, right: -8, width: 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 2000 }}>
+                                                        <div style={{ position: "absolute", top: 34, right: -8, width: menuState.view === "details" ? 240 : 190, border: "1px solid #d1d5db", borderRadius: 8, background: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,0.12)", padding: 6, display: "grid", gap: 4, zIndex: 4000 }}>
                                                                         {menuState.view === "root" && courseStatus === "todo" && (
                                                                             hasSplitVariants
                                                                                 ? (
@@ -804,6 +962,9 @@ export default function Sidebar({
                                                                         {menuState.view === "root" && (courseStatus === "in_plan" || courseStatus === "done") && (
                                                                             <button onClick={(e) => { e.stopPropagation(); onRemoveModuleFromPlan?.(modulePayload); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Remove from plan</button>
                                                                         )}
+                                                                        {menuState.view === "root" && (
+                                                                            <button onClick={(e) => { e.stopPropagation(); setMenuState((prev) => ({ ...prev, view: "details" })); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Edit details</button>
+                                                                        )}
                                                                         {menuState.view === "semesters" && (
                                                                             <>
                                                                                 {semestersForModule(activeVariantCourses).map((semester) => (
@@ -817,9 +978,10 @@ export default function Sidebar({
                                                                                         + Add next semester
                                                                                     </button>
                                                                                 )}
-                                                                                <button onClick={(e) => { e.stopPropagation(); openMenu(menuKey); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
+                                                                                <button onClick={(e) => { e.stopPropagation(); closeMenu(); }} style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Back</button>
                                                                             </>
                                                                         )}
+                                                                        {menuState.view === "details" && renderCourseDetailsMenu(course?.code ?? mod.code, courseStatus, (e) => { e?.stopPropagation?.(); closeMenu(); })}
                                                                     </div>
                                                                 )}
                                                                 <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.25, color: courseStatus === "done" ? "#6b7280" : "#111827", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{displayCourseTitle(course?.name ?? mod?.name)}</div>

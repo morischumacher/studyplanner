@@ -20,8 +20,8 @@ export const DEFAULT_PLANNED_SECTION_ORDER = [
     "steop",
     "focus",
     "planned_exam_subject",
-    "key_buckets",
     "planned_semester",
+    "planned_hours",
     "planned_category",
     "missing",
     "warnings",
@@ -32,6 +32,7 @@ export const DEFAULT_DONE_SECTION_ORDER = [
     "focus",
     "exam_subject",
     "done_semester",
+    "done_grade",
     "category",
 ];
 

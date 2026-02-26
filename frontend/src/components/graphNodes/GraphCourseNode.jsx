@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
 import { CARD_WIDTH, NODE_HEIGHT } from "../../utils/constants.js";
+import { hexToRgba } from "../../utils/examSubjectColors.js";
 import {
     combinedCardShadow,
     layeredTypeShadow,
@@ -12,7 +13,6 @@ import { displayCourseHeader, displayCourseTitle } from "../../utils/courseCodeD
 export default function GraphCourseNode({ data }) {
     const color = data?.color || "#4b5563";
     const status = data?.status || "todo";
-    const isModuleChild = Boolean(data?.parentModulePayload);
     const visualStatus = status;
     const isDone = status === "done";
     const isInPlan = status === "in_plan";
@@ -23,8 +23,13 @@ export default function GraphCourseNode({ data }) {
     const cardBorderColor = isDone ? color : (stateMeta.borderColor || color);
     const stateShadow = isDone ? "none" : stateMeta.extraShadow;
     const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [menuView, setMenuView] = useState("root");
+    const [menuView, setMenuView] = useState(null);
     const menuRef = useRef(null);
+    const rootRef = useRef(null);
+    const courseCode = data?.courseCode;
+    const notes = String(data?.notes ?? "");
+    const estimatedHours = String(data?.estimatedHours ?? "");
+    const grade = String(data?.grade ?? "");
 
     useEffect(() => {
         if (!isMenuOpen) return;
@@ -33,6 +38,18 @@ export default function GraphCourseNode({ data }) {
         };
         document.addEventListener("mousedown", handlePointerDown);
         return () => document.removeEventListener("mousedown", handlePointerDown);
+    }, [isMenuOpen]);
+
+    useEffect(() => {
+        const nodeEl = rootRef.current?.closest?.(".react-flow__node");
+        if (!nodeEl) return;
+        if (isMenuOpen) {
+            nodeEl.style.zIndex = "100000";
+            return () => {
+                nodeEl.style.zIndex = "";
+            };
+        }
+        nodeEl.style.zIndex = "";
     }, [isMenuOpen]);
 
     const statusStyle = (() => {
@@ -44,6 +61,7 @@ export default function GraphCourseNode({ data }) {
 
     return (
         <div
+            ref={rootRef}
             style={{
                 width: CARD_WIDTH,
                 minHeight: NODE_HEIGHT,
@@ -61,7 +79,7 @@ export default function GraphCourseNode({ data }) {
                 boxShadow: combinedCardShadow(typeShadow, stateShadow),
                 fontWeight: 600,
                 fontSize: 12,
-                opacity: stateMeta.opacity,
+                opacity: isMenuOpen ? 1 : stateMeta.opacity,
             }}
         >
             <Handle id="left-target" type="target" position={Position.Left} />
@@ -72,52 +90,111 @@ export default function GraphCourseNode({ data }) {
                     {headerCode}
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    {(isInPlan || isDone) && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                data?.onToggleDone?.(data?.courseCode, !isDone);
-                            }}
-                            title={isDone ? "Mark as in plan" : "Mark as done"}
-                            aria-label={isDone ? "Mark as in plan" : "Mark as done"}
-                            style={{
-                                border: `1px solid ${isDone ? "#9ca3af" : color}`,
-                                background: isDone ? "#10b981" : "#d1fae5",
-                                color: isDone ? "#ffffff" : "#065f46",
-                                borderRadius: 6,
-                                fontSize: 12,
-                                padding: "1px 6px",
-                                cursor: "pointer",
-                            }}
-                        >
-                            ✓
-                        </button>
-                    )}
                     <div style={{ position: "relative" }}>
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsMenuOpen((v) => {
-                                    const next = !v;
-                                    if (next) setMenuView("root");
-                                    return next;
-                                });
-                            }}
-                            title="Options"
-                            aria-label="Options"
-                            style={{
-                                border: `1px solid ${isDone ? "#9ca3af" : color}`,
-                                background: "#ffffff",
-                                borderRadius: 6,
-                                fontSize: 12,
-                                width: 24,
-                                height: 20,
-                                lineHeight: 1,
-                                cursor: "pointer",
-                            }}
-                        >
-                            ...
-                        </button>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    const nextView = "details";
+                                    setIsMenuOpen((v) => (menuView === nextView ? !v : true));
+                                    setMenuView(nextView);
+                                }}
+                                title="Details"
+                                aria-label="Details"
+                                style={{
+                                    border: `1px solid ${isDone ? "#9ca3af" : color}`,
+                                    background: "#ffffff",
+                                    borderRadius: 6,
+                                    fontSize: 12,
+                                    width: 24,
+                                    height: 20,
+                                    lineHeight: 1,
+                                    cursor: "pointer",
+                                }}
+                            >
+                                i
+                            </button>
+                            {status === "todo" && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextView = "semesters";
+                                        setIsMenuOpen((v) => (menuView === nextView ? !v : true));
+                                        setMenuView(nextView);
+                                    }}
+                                    title="Add to plan"
+                                    aria-label="Add to plan"
+                                    style={{
+                                        border: "1px solid #60a5fa",
+                                        background: "#eff6ff",
+                                        color: "#1d4ed8",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        width: 24,
+                                        height: 20,
+                                        lineHeight: 1,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    +
+                                </button>
+                            )}
+                            {(isInPlan || isDone) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        data?.onToggleDone?.(data?.courseCode, !isDone);
+                                    }}
+                                    title={isDone ? "Mark as in plan" : "Mark as done"}
+                                    aria-label={isDone ? "Mark as in plan" : "Mark as done"}
+                                    style={{
+                                        border: `1px solid ${isDone ? "#9ca3af" : color}`,
+                                        background: isDone ? "#10b981" : "#ffffff",
+                                        color: isDone ? "#ffffff" : "#111827",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        width: 24,
+                                        height: 20,
+                                        lineHeight: 1,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    ✓
+                                </button>
+                            )}
+                            {(isInPlan || isDone) && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (data?.parentModulePayload && data?.onRemoveModuleFromPlan) {
+                                            const moduleName = data?.parentModulePayload?.name || "this module";
+                                            const confirmed = window.confirm(
+                                                `${data?.courseCode || "This course"} belongs to ${moduleName}. Removing it will remove all module courses from your plan. Continue?`
+                                            );
+                                            if (!confirmed) return;
+                                            data.onRemoveModuleFromPlan(data.parentModulePayload);
+                                        } else {
+                                            data?.onRemoveFromPlan?.(data?.courseCode);
+                                        }
+                                    }}
+                                    title="Remove from plan"
+                                    aria-label="Remove from plan"
+                                    style={{
+                                        border: "1px solid #fca5a5",
+                                        background: "#fef2f2",
+                                        color: "#b91c1c",
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        width: 24,
+                                        height: 20,
+                                        lineHeight: 1,
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    ×
+                                </button>
+                            )}
+                        </div>
                         {isMenuOpen && (
                             <div
                                 ref={menuRef}
@@ -125,7 +202,7 @@ export default function GraphCourseNode({ data }) {
                                     position: "absolute",
                                     top: 24,
                                     right: 0,
-                                    width: 180,
+                                    width: menuView === "details" ? 240 : 180,
                                     border: "1px solid #d1d5db",
                                     borderRadius: 8,
                                     background: "#ffffff",
@@ -133,42 +210,9 @@ export default function GraphCourseNode({ data }) {
                                     padding: 6,
                                     display: "grid",
                                     gap: 4,
-                                    zIndex: 20,
+                                    zIndex: 100001,
                                 }}
                             >
-                                {menuView === "root" && status === "todo" && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setMenuView("semesters");
-                                        }}
-                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#ffffff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-                                    >
-                                        Add to plan
-                                    </button>
-                                )}
-                                {menuView === "root" && (isInPlan || isDone) && (
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (data?.parentModulePayload && data?.onRemoveModuleFromPlan) {
-                                                const moduleName = data?.parentModulePayload?.name || "this module";
-                                                const confirmed = window.confirm(
-                                                    `${data?.courseCode || "This course"} belongs to ${moduleName}. Removing it will remove all module courses from your plan. Continue?`
-                                                );
-                                                if (!confirmed) return;
-                                                data.onRemoveModuleFromPlan(data.parentModulePayload);
-                                            } else {
-                                                data?.onRemoveFromPlan?.(data?.courseCode);
-                                            }
-                                            setIsMenuOpen(false);
-                                            setMenuView("root");
-                                        }}
-                                        style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#ffffff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-                                    >
-                                        Remove from plan
-                                    </button>
-                                )}
                                 {menuView === "semesters" && (
                                     <>
                                         {(Array.isArray(data?.semesters) ? data.semesters : []).map((semester) => (
@@ -194,7 +238,7 @@ export default function GraphCourseNode({ data }) {
                                                         }, laneIndex);
                                                     }
                                                     setIsMenuOpen(false);
-                                                    setMenuView("root");
+                                                    setMenuView(null);
                                                 }}
                                                 style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#ffffff", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                                             >
@@ -204,7 +248,68 @@ export default function GraphCourseNode({ data }) {
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setMenuView("root");
+                                                setMenuView(null);
+                                                setIsMenuOpen(false);
+                                            }}
+                                            style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                                        >
+                                            Back
+                                        </button>
+                                    </>
+                                )}
+                                {menuView === "details" && (
+                                    <>
+                                        <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#6b7280" }}>
+                                            Notes
+                                            <textarea
+                                                className="nodrag nopan"
+                                                draggable={false}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onPointerDown={(e) => e.stopPropagation()}
+                                                value={notes}
+                                                onChange={(e) => data?.onUpdateCourseMeta?.(courseCode, { notes: e.target.value })}
+                                                rows={3}
+                                                placeholder="Add notes"
+                                                style={{ resize: "vertical", border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 12 }}
+                                            />
+                                        </label>
+                                        <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#6b7280" }}>
+                                            Estimated hours per week
+                                            <input
+                                                className="nodrag nopan"
+                                                draggable={false}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onPointerDown={(e) => e.stopPropagation()}
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                value={estimatedHours}
+                                                onChange={(e) => data?.onUpdateCourseMeta?.(courseCode, { estimatedHours: e.target.value })}
+                                                onWheel={(e) => e.currentTarget.blur()}
+                                                placeholder="0"
+                                                style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 12 }}
+                                            />
+                                        </label>
+                                        <label style={{ display: "grid", gap: 4, fontSize: 11, color: "#6b7280" }}>
+                                            Grade
+                                            <input
+                                                className="nodrag nopan"
+                                                draggable={false}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onPointerDown={(e) => e.stopPropagation()}
+                                                type="text"
+                                                value={grade}
+                                                onChange={(e) => data?.onUpdateCourseMeta?.(courseCode, { grade: e.target.value })}
+                                                placeholder={isDone ? "e.g. 1.7" : "Only when done"}
+                                                disabled={!isDone}
+                                                style={{ border: "1px solid #d1d5db", borderRadius: 6, padding: "6px 8px", fontSize: 12, background: isDone ? "#ffffff" : "#f3f4f6" }}
+                                            />
+                                        </label>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setMenuView(null);
+                                                setIsMenuOpen(false);
                                             }}
                                             style={{ border: "1px solid #e5e7eb", borderRadius: 6, padding: "5px 8px", textAlign: "left", background: "#f9fafb", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
                                         >
