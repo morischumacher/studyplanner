@@ -11,6 +11,7 @@ class RuleCheckResult:
     # Data for the persistent status dashboard
     stats: Dict[str, Any] = field(default_factory=dict)
     missing: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
 
 
 class RuleChecker:
@@ -341,11 +342,11 @@ class RuleChecker:
                     missing.append(m)
 
         if violations:
-            stats["violations"] = violations
+            stats["errors"] = violations
             msg = self._make_actionable_message(payload, violations[0])
-            return RuleCheckResult(ok=False, message=msg, stats=stats, missing=missing)
+            return RuleCheckResult(ok=False, message=msg, stats=stats, missing=missing, errors=violations)
 
-        return RuleCheckResult(ok=True, message="accepted", stats=stats, missing=missing)
+        return RuleCheckResult(ok=True, message="accepted", stats=stats, missing=missing, errors=[])
 
     # ----------------------------
     # Parsing & normalization

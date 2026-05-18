@@ -47,6 +47,7 @@ body,
     margin-top: -5px;
 }
 
+
 .dual-range-input::-moz-range-thumb {
     pointer-events: all;
     width: 14px;
@@ -56,3 +57,6 @@ body,
     background: #ffffff;
     cursor: pointer;
 }
+
+
+

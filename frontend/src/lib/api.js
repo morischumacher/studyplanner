@@ -166,3 +166,36 @@ export async function saveCourseTerms({ programCode, updates }) {
     });
     return parseJsonOrError(res, "Save course terms failed");
 }
+
+export async function saveRecommendationProfile({ programCode, interests, careerDirection, recommendationToggles }) {
+    const url = new URL("/profile-settings/recommendation-profile", BASE);
+    const res = await fetch(url.toString(), {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify({
+            program_code: programCode,
+            interests: interests || [],
+            career_direction: careerDirection || "",
+            recommendation_toggles: recommendationToggles || {},
+        }),
+    });
+    return parseJsonOrError(res, "Save recommendation profile failed");
+}
+
+export async function fetchRecommendations(payload) {
+    const url = new URL("/recommendations", BASE);
+    const res = await fetch(url.toString(), {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
+        body: JSON.stringify(payload ?? {}),
+    });
+    return parseJsonOrError(res, "Fetch recommendations failed");
+}

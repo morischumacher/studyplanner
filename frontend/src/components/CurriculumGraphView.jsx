@@ -342,6 +342,7 @@ function layoutTree(root, collapsedIds, options = {}) {
     const semesterOptions = Array.isArray(options?.semesterOptions) ? options.semesterOptions : [];
     const getValidSemestersForCourse = options?.getValidSemestersForCourse;
     const getValidSemestersForModule = options?.getValidSemestersForModule;
+    const recommendedCourseMap = options?.recommendedCourseMap instanceof Map ? options.recommendedCourseMap : new Map();
     const nodes = [];
     const edges = [];
     let leafIndex = 0;
@@ -431,6 +432,8 @@ function layoutTree(root, collapsedIds, options = {}) {
                 onRemoveFromPlan: (node.level === "course" || node.level === "courseDirect") ? onRemoveFromPlan : null,
                 onRemoveModuleFromPlan: (node.level === "module" || node.level === "course") ? onRemoveModuleFromPlan : null,
                 semestersForModule: node.level === "module" ? semestersForModule : null,
+                isRecommended: (node.level === "course" || node.level === "courseDirect") && node?.courseCode ? recommendedCourseMap.has(String(node.courseCode)) : false,
+                recommendationType: (node.level === "course" || node.level === "courseDirect") && node?.courseCode ? (recommendedCourseMap.get(String(node.courseCode)) ?? null) : null,
             },
             sourcePosition: "right",
             targetPosition: "left",
@@ -615,6 +618,7 @@ export default function CurriculumGraphView({
     onToggleRuleDashboard,
     isLegendOpen,
     onToggleLegend,
+    recommendedCourseMap = new Map(),
 }) {
     const rfRef = useRef(null);
     const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
@@ -815,6 +819,7 @@ export default function CurriculumGraphView({
             getValidSemestersForCourse,
             getValidSemestersForModule,
             programCode,
+            recommendedCourseMap,
         });
     }, [
         root,
@@ -832,6 +837,7 @@ export default function CurriculumGraphView({
         getValidSemestersForCourse,
         getValidSemestersForModule,
         programCode,
+        recommendedCourseMap,
     ]);
     const subjectOrder = useMemo(
         () => (root?.children || []).map((s) => s.id),

@@ -31,6 +31,13 @@ class CourseTermsPayload(BaseModel):
     updates: List[CourseTermUpdate] = Field(default_factory=list)
 
 
+class RecommendationProfilePayload(BaseModel):
+    program_code: str = Field(min_length=1, max_length=64)
+    interests: List[str] = Field(default_factory=list)
+    career_direction: str | None = None
+    recommendation_toggles: dict = Field(default_factory=dict)
+
+
 @router.get("/profile-settings")
 async def get_profile_settings(
     program_code: str = Query(...),
@@ -54,7 +61,8 @@ async def get_profile_settings(
         )
         start_term_row = await conn.fetchrow(
             """
-            SELECT start_term_season::text AS season, start_term_year AS year
+            SELECT start_term_season::text AS season, start_term_year AS year,
+                   interests, career_direction, recommendation_toggles
             FROM user_program_profile
             WHERE user_id = $1 AND program_code = $2
             """,
@@ -82,6 +90,11 @@ async def get_profile_settings(
             if start_term_row
             else None
         ),
+        "interests": start_term_row["interests"] if start_term_row and start_term_row["interests"] is not None else [],
+        "career_direction": start_term_row["career_direction"] if start_term_row else None,
+        "recommendation_toggles": start_term_row["recommendation_toggles"] if start_term_row and start_term_row["recommendation_toggles"] is not None else {
+            "interest": True, "similarity": True, "sequence": True, "completed": True, "internship": True
+        },
         "start_term_locked": bool(start_term_row),
         "locked_program_code": (
             str(locked_program_row["program_code"]).strip()
@@ -191,3 +204,35 @@ async def put_course_terms(payload: CourseTermsPayload, user=Depends(require_cur
                 update.term_availability,
             )
     return {"ok": True, "updated": len(payload.updates)}
+
+
+@router.put("/profile-settings/recommendation-profile")
+async def put_recommendation_profile(payload: RecommendationProfilePayload, user=Depends(require_current_user)):
+    program_code = _normalize_program_code(payload.program_code)
+    if not program_code:
+        raise HTTPException(status_code=400, detail="program_code is required")
+
+    import json
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            """
+            UPDATE user_program_profile
+            SET interests = $1,
+                career_direction = $2,
+                recommendation_toggles = $3::jsonb,
+                updated_at = now()
+            WHERE user_id = $4 AND program_code = $5
+            """,
+            payload.interests,
+            payload.career_direction,
+            json.dumps(payload.recommendation_toggles),
+            user["sub"],
+            program_code,
+        )
+        # If no row exists, we shouldn't insert here because start_term is required first (setup).
+        # We can just return success or fail if not set up yet.
+        if result == "UPDATE 0":
+             raise HTTPException(status_code=400, detail="Please complete initial setup (start semester) before saving profile.")
+             
+    return {"ok": True}

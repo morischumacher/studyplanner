@@ -8,6 +8,7 @@ from .routes.rulecheck import router as rulecheck_router
 from .routes.auth import router as auth_router
 from .routes.planner_state import router as planner_state_router
 from .routes.profile_settings import router as profile_settings_router
+from .routes.recommendations import router as recommendations_router
 
 app = FastAPI(
     title="My Service",
@@ -53,3 +54,4 @@ app.include_router(rulecheck_router)
 app.include_router(auth_router)
 app.include_router(planner_state_router)
 app.include_router(profile_settings_router)
+app.include_router(recommendations_router)

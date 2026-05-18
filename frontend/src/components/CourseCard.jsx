@@ -3,10 +3,11 @@ import { Handle, Position } from "reactflow";
 import { CARD_WIDTH, NODE_HEIGHT, colorForType } from "../utils/constants.js";
 import { hexToRgba } from "../utils/examSubjectColors.js";
 import {
-    combinedCardShadow,
-    layeredTypeShadow,
     mapTypeForProgram,
     stateVisualByStatus,
+    renderRecommendationPatch,
+    layeredTypeShadow,
+    combinedCardShadow,
 } from "../utils/courseVisuals.js";
 import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
 import { BACHELOR_PROGRAM_CODE } from "../utils/semesters.js";
@@ -135,8 +136,8 @@ export default function CourseCard({ data }) {
                 minHeight: NODE_HEIGHT,
                 background: cardBackground,
                 border: `1px solid ${cardBorderColor}`,
-                borderRadius: 10,
-                padding: 16,
+                borderRadius: 12,
+                padding: 12,
                 boxShadow: combinedCardShadow(typeShadow, stateShadow),
                 opacity: isMenuOpen ? 1 : stateMeta.opacity,
                 display: "flex",
@@ -144,6 +145,9 @@ export default function CourseCard({ data }) {
                 gap: 10,
             }}
         >
+            {/* ── Recommendation Patch ── */}
+            {/* Removed from main plan view per user request (RP only) */}
+
             {/* four handles with IDs so edges can target specific sides */}
             {!data?.groupId && (
                 <>

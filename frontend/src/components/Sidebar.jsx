@@ -8,6 +8,7 @@ import {
     layeredTypeShadow,
     mapTypeForProgram,
     stateVisualByStatus,
+    renderRecommendationPatch,
 } from "../utils/courseVisuals.js";
 import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
 import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
@@ -38,6 +39,7 @@ export default function Sidebar({
     topOffset = 56,
     bottomOffset = 84,
     leftOffset = 0,
+    recommendations = [],
 }) {
     const [menuState, setMenuState] = useState({ key: null, view: "root", variantId: null });
     const [plusRevealCount, setPlusRevealCount] = useState(0);
@@ -554,7 +556,13 @@ export default function Sidebar({
                                                         minWidth: 0,
                                                         overflow: "visible",
                                                     }}
-                                                >
+                                                 >
+                                                     {(() => {
+                                                         const code = course?.code || mod?.code;
+                                                         const rec = (recommendations || []).find((r) => r.courseCode === code);
+                                                         {/* Recommendation patches intentionally omitted here (only in RP) */}
+                                                        return null;
+                                                     })()}
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                                                         <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                             {displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}

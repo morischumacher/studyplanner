@@ -25,13 +25,16 @@ import {
     fetchPlannerState,
     saveCourseTerms,
     savePlannerState,
+    saveRecommendationProfile,
     saveStartTerm,
     sendRuleCheckUpdate,
+    fetchRecommendations,
 } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
 import PlannerNotifications from "./components/app/PlannerNotifications.jsx";
+import RecommendationPanel from "./components/RecommendationPanel.jsx";
 import {
     CANVAS_HEIGHT,
     COLLISION_GAP,
@@ -107,6 +110,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const MIN_GROUP_CHILD_Y = MIN_MODULE_GROUP_TOP_Y + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT;
     const SIDEBAR_WIDTH = 300;
     const SIDEBAR_VISUAL_WIDTH = 333;
+    const REC_PANEL_WIDTH = 320;
     const SIDEBAR_LEFT_OFFSET = 12;
     const TABLE_TOP_CONTROLS_TOP = 12;
     const TABLE_TOP_CONTROLS_HEIGHT = 78;
@@ -147,6 +151,19 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [catalogError, setCatalogError] = useState("");
     const [ruleCheckStateByProgram, setRuleCheckStateByProgram] = useState({});
     const [isRuleDashboardOpen, setIsRuleDashboardOpen] = useState(false);
+    const [rightPanelTab, setRightPanelTab] = useState("dashboard");
+    const [recommendations, setRecommendations] = useState([]);
+
+    // ── Recommendation state derived data ────────────────────────────────────
+    const recommendedCourseMap = useMemo(() => {
+        const map = new Map();
+        for (const rec of Array.isArray(recommendations) ? recommendations : []) {
+            if (rec?.courseCode) {
+                map.set(String(rec.courseCode), { type: rec.type || "interest", content: rec.content || [] });
+            }
+        }
+        return map;
+    }, [recommendations]);
     const [dashboardViewMode, setDashboardViewMode] = useState("planning");
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isSteopInfoOpen, setIsSteopInfoOpen] = useState(false);
@@ -210,7 +227,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [profileDraftRecommendedEcts, setProfileDraftRecommendedEcts] = useState(30);
     const [profileDraftMaxWeekHours, setProfileDraftMaxWeekHours] = useState(50);
     const [profileDraftRecommendedWeekHours, setProfileDraftRecommendedWeekHours] = useState(40);
+    const [profileDraftInterests, setProfileDraftInterests] = useState("");
+    const [profileDraftCareer, setProfileDraftCareer] = useState("");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isRecPanelOpen, setIsRecPanelOpen] = useState(false);
     const [isParkingCollapsed, setIsParkingCollapsed] = useState(false);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
     const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
@@ -383,6 +403,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         startTerm,
                         startTermLocked: Boolean(payload?.start_term_locked ?? startTerm),
                         courseTermOverrides: normalizedOverrides,
+                        interests: payload?.interests || [],
+                        careerDirection: payload?.careerDirection || "",
+                        recommendation_toggles: payload?.recommendation_toggles || {},
                     },
                 }));
             } catch (error) {
@@ -577,6 +600,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setProfileDraftRecommendedEcts(Number(semesterLoadLimits?.recommendedEctsPerSemester ?? 30));
         setProfileDraftMaxWeekHours(Number(semesterLoadLimits?.maxWeekHoursPerSemester ?? 50));
         setProfileDraftRecommendedWeekHours(Number(semesterLoadLimits?.recommendedWeekHoursPerSemester ?? 40));
+        setProfileDraftInterests(Array.isArray(profileSettingsForProgram?.interests) ? profileSettingsForProgram.interests.join(", ") : "");
+        setProfileDraftCareer(profileSettingsForProgram?.careerDirection || "");
     }, [
         isProfileOpen,
         selectedFocus,
@@ -585,7 +610,11 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         semesterLoadLimits?.maxEctsPerSemester,
         semesterLoadLimits?.recommendedEctsPerSemester,
         semesterLoadLimits?.maxWeekHoursPerSemester,
+        semesterLoadLimits?.recommendedEctsPerSemester,
+        semesterLoadLimits?.maxWeekHoursPerSemester,
         semesterLoadLimits?.recommendedWeekHoursPerSemester,
+        profileSettingsForProgram?.interests,
+        profileSettingsForProgram?.careerDirection,
     ]);
 
     const effectiveCourseTermByCode = useMemo(() => {
@@ -1593,7 +1622,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         const now = Date.now();
         const id = `${courseCode}-${now}-graph`;
         const examSubject = course?.examSubject || getExamSubjectForCode(catalog, courseCode);
-        const courseType = course?.type ?? getCourseTypeForCode(catalog, courseCode);
+        const courseType = course?.courseType ?? getCourseTypeForCode(catalog, courseCode);
         const resolvedSubjectColor =
             course?.subjectColor ||
             (examSubject ? subjectColors?.[examSubject] : null) ||
@@ -2078,12 +2107,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         onAddToPlan: needsAddToPlanHandler ? addGraphCourseToPlan : node?.data?.onAddToPlan,
                         onAddModuleToPlan: needsAddModuleToPlanHandler ? addGraphModuleToPlan : node?.data?.onAddModuleToPlan,
                         semesters: nextSemesters,
+                        recommendation: recommendedCourseMap.get(code) || null,
                     },
                 };
             });
             return changed ? next : prev;
         });
-    }, [addGraphCourseToPlan, addGraphModuleToPlan, courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta, validSemestersForCourse]);
+    }, [addGraphCourseToPlan, addGraphModuleToPlan, courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta, validSemestersForCourse, recommendedCourseMap]);
 
     const removeGraphCoursesFromPlan = useCallback((courseCodes) => {
         const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
@@ -2681,6 +2711,126 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 pendingInitialSyncProgramRef.current = null;
             });
     }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, semesterLoadLimits?.maxWeekHoursPerSemester, semesterLoadLimits?.recommendedWeekHoursPerSemester, setProgramRuleCheckState]);
+
+    // Notify backend recommendations endpoint on each plan/status change
+    const latestRecChangeIdRef = useRef({});
+    useEffect(() => {
+        if (!lastPlanChange) return;
+        const requestProgramCode = programCode;
+        latestRecChangeIdRef.current = {
+            ...(latestRecChangeIdRef.current || {}),
+            [requestProgramCode]: lastPlanChange.id ?? null,
+        };
+        const doneSet = new Set(doneCourseCodes || []);
+        const allCourses = Object.values(coursesBySemester || {})
+            .flat()
+            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
+        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
+        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
+        const changeIdSnapshot = lastPlanChange.id ?? null;
+
+        fetchRecommendations({
+            programCode: requestProgramCode,
+            plannedCourses,
+            doneCourses,
+            parkedCourses: parkedCourseCodes,
+        })
+            .then((response) => {
+                if ((latestRecChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
+                if (response?.ok && response?.recommendations) {
+                    setRecommendations(response.recommendations);
+                } else {
+                    setRecommendations([]);
+                }
+            })
+            .catch((err) => {
+                console.error("Failed to fetch recommendations", err);
+                if ((latestRecChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
+                setRecommendations([]);
+            });
+    }, [lastPlanChange, programCode, coursesBySemester, doneCourseCodes, parkedCourseCodes]);
+
+    // Initial recommendations fetch
+    useEffect(() => {
+        if (!plannerHydrated || !programCode || lastPlanChange) return;
+        const requestProgramCode = programCode;
+        if (latestRecChangeIdRef.current?.[requestProgramCode] === "initial") return;
+        latestRecChangeIdRef.current = {
+            ...(latestRecChangeIdRef.current || {}),
+            [requestProgramCode]: "initial",
+        };
+        const doneSet = new Set(doneCourseCodes || []);
+        const allCourses = Object.values(coursesBySemester || {})
+            .flat()
+            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
+        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
+        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
+
+        fetchRecommendations({
+            programCode: requestProgramCode,
+            plannedCourses,
+            doneCourses,
+            parkedCourses: parkedCourseCodes,
+        })
+            .then((response) => {
+                if (latestRecChangeIdRef.current?.[requestProgramCode] !== "initial") return;
+                if (response?.ok && response?.recommendations) {
+                    setRecommendations(response.recommendations);
+                } else {
+                    setRecommendations([]);
+                }
+            })
+            .catch((err) => {
+                console.error("Failed to fetch initial recommendations", err);
+                if (latestRecChangeIdRef.current?.[requestProgramCode] !== "initial") return;
+                setRecommendations([]);
+            });
+    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, lastPlanChange, parkedCourseCodes]);
+
+    const handleRecommendationToggle = useCallback(async (key, newValue) => {
+        const nextToggles = {
+            ...(profileSettingsForProgram?.recommendation_toggles || {
+                interest: true, similarity: true, sequence: true, completed: true, internship: true, peer: true
+            }),
+            [key]: newValue
+        };
+        
+        // Optimistic UI update
+        setProfileSettingsByProgram(prev => ({
+            ...(prev || {}),
+            [programCode]: {
+                ...(prev?.[programCode] || {}),
+                recommendation_toggles: nextToggles
+            }
+        }));
+
+        try {
+            await saveRecommendationProfile({
+                programCode,
+                interests: profileSettingsForProgram?.interests || [],
+                careerDirection: profileSettingsForProgram?.careerDirection || "",
+                recommendationToggles: nextToggles,
+            });
+            // trigger refetch of recommendations
+            const doneSet = new Set(doneCourseCodes || []);
+            const allCourses = Object.values(coursesBySemester || {})
+                .flat()
+                .map((course) => normalizeRulecheckCategoryForProgram(course, programCode));
+            const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
+            const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
+            const response = await fetchRecommendations({ 
+                programCode, 
+                plannedCourses, 
+                doneCourses,
+                parkedCourses: parkedCourseCodes
+            });
+            if (response?.ok && response?.recommendations) {
+                setRecommendations(response.recommendations);
+            }
+        } catch (e) {
+            console.error("Failed to save toggle", e);
+        }
+    }, [programCode, profileSettingsForProgram, doneCourseCodes, coursesBySemester, parkedCourseCodes]);
 
     useEffect(() => {
         if (!stickyViolation?.message) return;
@@ -3584,9 +3734,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         try {
             const normalizedSeason = normalizeStartSeason(profileDraftStartSeason);
             const normalizedYear = Number(profileDraftStartYear) || new Date().getFullYear();
-            const shouldSaveStartTerm =
-                !isStartTermLocked &&
-                (normalizedSeason !== startTermSeason || normalizedYear !== startTermYear);
+            const shouldSaveStartTerm = !isStartTermLocked;
             if (shouldSaveStartTerm) {
                 await saveStartTerm({
                     programCode,
@@ -3632,6 +3780,23 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 setPendingCourseTermUpdateByCode({});
             }
 
+            // Save Recommendation Profile (interests, career).
+            const parsedInterests = profileDraftInterests.split(",").map(i => i.trim()).filter(Boolean);
+            await saveRecommendationProfile({
+                programCode,
+                interests: parsedInterests,
+                careerDirection: profileDraftCareer,
+                recommendationToggles: profileSettingsForProgram?.recommendation_toggles || {},
+            });
+            setProfileSettingsByProgram((prev) => ({
+                ...(prev || {}),
+                [programCode]: {
+                    ...(prev?.[programCode] || {}),
+                    interests: parsedInterests,
+                    careerDirection: profileDraftCareer,
+                },
+            }));
+
             if ((selectedFocus || "") !== (profileDraftFocus || "")) {
                 setSelectedFocus?.(profileDraftFocus || "");
             }
@@ -3642,6 +3807,25 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 recommendedWeekHoursPerSemester: Number(profileDraftRecommendedWeekHours) || 40,
             });
             setIsProfileOpen(false);
+
+            // Refetch recommendations to reflect newly saved interests/career
+            const doneSet = new Set(doneCourseCodes || []);
+            const allCourses = Object.values(coursesBySemester || {})
+                .flat()
+                .map((course) => normalizeRulecheckCategoryForProgram(course, programCode));
+            const doneCoursesList = allCourses.filter((c) => c?.code && doneSet.has(c.code));
+            const plannedCoursesList = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
+            const response = await fetchRecommendations({ 
+                programCode, 
+                plannedCourses: plannedCoursesList, 
+                doneCourses: doneCoursesList,
+                parkedCourses: parkedCourseCodes
+            });
+            if (response?.ok && response?.recommendations) {
+                setRecommendations(response.recommendations);
+            } else {
+                setRecommendations([]);
+            }
         } catch (error) {
             console.error("Failed to save profile settings", error);
             setStickyViolation({
@@ -3669,8 +3853,18 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         profileDraftRecommendedEcts,
         profileDraftMaxWeekHours,
         profileDraftRecommendedWeekHours,
-        setSelectedFocus,
+        profileDraftInterests,
+        profileDraftCareer,
+        profileSettingsForProgram,
+        doneCourseCodes,
+        coursesBySemester,
+        parkedCourseCodes,
+        setRecommendations,
         setSemesterLoadLimits,
+        setIsProfileOpen,
+        setStickyViolation,
+        setIsSavingProfileSettings,
+        setSelectedFocus,
     ]);
     const togglePf = useCallback((name) => {
         setExpandedPf((prev) => {
@@ -3834,6 +4028,14 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         getExamSubjectForCode,
     });
     const hasSelectedFocusArea = Boolean(String(selectedFocus || bachelorFocus?.selected || "").trim());
+
+    // ── Recommendation state derived data ────────────────────────────────────
+    const dismissRecommendation = useCallback((id) => {
+        setRecommendations((prev) => prev.filter((r) => r.id !== id));
+    }, []);
+    const parkRecommendation = useCallback((payload) => {
+        addGraphCourseToPlan(payload, -1);
+    }, [addGraphCourseToPlan]);
     useEffect(() => {
         if (!hasMissingRequirements && isMissingRequirementsOpen) setIsMissingRequirementsOpen(false);
     }, [hasMissingRequirements, isMissingRequirementsOpen]);
@@ -4314,6 +4516,51 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     )}
                     </div>
                 )}
+                {!isCurriculumSettingsOpen && (
+                    <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Recommendation Preferences</div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "#374151" }}>Interests (comma separated)</label>
+                            <input
+                                type="text"
+                                value={profileDraftInterests}
+                                placeholder="e.g. machine learning, react, robotics"
+                                onChange={(e) => setProfileDraftInterests(e.target.value)}
+                                disabled={isSavingProfileSettings}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: isSavingProfileSettings ? "#f3f4f6" : "#ffffff",
+                                    color: isSavingProfileSettings ? "#6b7280" : "#111827",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontSize: 12,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                        <div style={{ display: "grid", gap: 4 }}>
+                            <label style={{ fontSize: 11, color: "#374151" }}>Career Direction / Internship Target</label>
+                            <input
+                                type="text"
+                                value={profileDraftCareer}
+                                placeholder="e.g. Data Scientist, Security Analyst"
+                                onChange={(e) => setProfileDraftCareer(e.target.value)}
+                                disabled={isSavingProfileSettings}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    background: isSavingProfileSettings ? "#f3f4f6" : "#ffffff",
+                                    color: isSavingProfileSettings ? "#6b7280" : "#111827",
+                                    borderRadius: 8,
+                                    padding: "8px 10px",
+                                    fontSize: 12,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        </div>
+                    </div>
+                )}
                 <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
                     {isCurriculumSettingsOpen && (
                         <>
@@ -4514,8 +4761,19 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 alignSelf: "flex-start",
             }}
         >
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <div style={{ fontSize: 16, fontWeight: 700 }}>Rule Engine Dashboard</div>
+            {/* ── Right-panel tab bar ───────────────────────────────────── */}
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 12,
+                    gap: 8,
+                }}
+            >
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", padding: "5px 0" }}>
+                    Planner Dashboard
+                </div>
                 <button
                     onClick={() => setIsRuleDashboardOpen(false)}
                     style={{
@@ -4525,11 +4783,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         padding: "6px 10px",
                         fontWeight: 600,
                         cursor: "pointer",
+                        fontSize: 12,
                     }}
                 >
                     Close
                 </button>
             </div>
+
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
                 <div>Program: {programCode}</div>
@@ -5714,7 +5974,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             </div>
                         )}
                     </div>
-
                 </>
             )}
 
@@ -5765,6 +6024,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         }}
                         isRuleDashboardOpen={isRuleDashboardOpen}
                         onToggleRuleDashboard={() => setIsRuleDashboardOpen((v) => !v)}
+                        recommendedCourseMap={recommendedCourseMap}
                         isLegendOpen={isLegendOpen}
                         onToggleLegend={() => setIsLegendOpen((v) => !v)}
                         ruleFeedback={{
@@ -5834,7 +6094,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 <button
                     onClick={() => setIsSidebarOpen((v) => !v)}
                     style={{
-                        gridColumn: "1 / -1",
                         border: "1px solid #d1d5db",
                         background: "#ffffff",
                         borderRadius: 8,
@@ -5846,6 +6105,21 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     }}
                 >
                     {isSidebarOpen ? "☰ Hide Sidebar" : "☰ Show Sidebar"}
+                </button>
+                <button
+                    onClick={() => setIsRecPanelOpen((v) => !v)}
+                    style={{
+                        border: "1px solid #d1d5db",
+                        background: "#ffffff",
+                        borderRadius: 8,
+                        padding: "6px 8px",
+                        textAlign: "center",
+                        whiteSpace: "nowrap",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                    }}
+                >
+                    {isRecPanelOpen ? "★ Hide Recs" : "★ Show Recs"}
                 </button>
             </div>
             {isSidebarOpen && (
@@ -5874,6 +6148,33 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     leftOffset={SIDEBAR_LEFT_OFFSET}
                     topOffset={TABLE_SIDEBAR_TOP_OFFSET}
                     bottomOffset={TABLE_SIDEBAR_BOTTOM_OFFSET}
+                    recommendations={recommendations}
+                />
+            )}
+
+            {isRecPanelOpen && (
+                <RecommendationPanel
+                    recommendations={recommendations}
+                    onDismiss={(id) => setRecommendations((prev) => prev.filter((r) => r.id !== id))}
+                    onAddToPlan={(payload, laneIndex) => {
+                        addGraphCourseToPlan(payload, laneIndex, { allowDirectLaneSelection: true });
+                    }}
+                    semesterOptions={sidebarSemesters}
+                    getValidSemestersForCourse={validSemestersForCourse}
+                    toggles={profileSettingsByProgram?.[programCode]?.recommendation_toggles || {}}
+                    onToggleChange={handleRecommendationToggle}
+                    width={REC_PANEL_WIDTH}
+                    leftOffset={isSidebarOpen ? (SIDEBAR_VISUAL_WIDTH + SIDEBAR_LEFT_OFFSET + 8) : SIDEBAR_LEFT_OFFSET}
+                    topOffset={TABLE_SIDEBAR_TOP_OFFSET}
+                    bottomOffset={TABLE_SIDEBAR_BOTTOM_OFFSET}
+                    programCode={programCode}
+                    getCourseStatus={getCourseStatus}
+                    onDragStart={handleDragStart}
+                    subjectColors={subjectColors}
+                    onToggleCourseDone={toggleGraphCourseDone}
+                    onRemoveCourseFromPlan={removeGraphCourseFromPlan}
+                    getCourseMeta={getCourseMeta}
+                    onUpdateCourseMeta={updateCourseMeta}
                 />
             )}
 

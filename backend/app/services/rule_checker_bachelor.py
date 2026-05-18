@@ -11,6 +11,7 @@ class RuleCheckResult:
     message: str = "accepted"
     stats: Dict[str, Any] = field(default_factory=dict)
     missing: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
 
 
 class RuleChecker:
@@ -1154,6 +1155,7 @@ class RuleChecker:
             "focus": focus_stats,
             "moduleProgress": module_progress,
             "warnings": warnings,
+            "errors": errors,
         }
 
         # ----------------------------
@@ -1167,6 +1169,6 @@ class RuleChecker:
                 msg = f"rejected: cannot apply change ({ctype}) for '{ccode}': {errors[0].replace('rejected: ', '')}"
             else:
                 msg = errors[0]
-            return RuleCheckResult(ok=False, message=msg, stats=stats, missing=missing)
+            return RuleCheckResult(ok=False, message=msg, stats=stats, missing=missing, errors=errors)
 
-        return RuleCheckResult(ok=True, message="accepted", stats=stats, missing=missing)
+        return RuleCheckResult(ok=True, message="accepted", stats=stats, missing=missing, errors=[])

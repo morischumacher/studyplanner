@@ -10,6 +10,8 @@ import {
 } from "../../utils/courseVisuals.js";
 import { displayCourseHeader, displayCourseTitle } from "../../utils/courseCodeDisplay.js";
 
+
+
 export default function GraphCourseNode({ data }) {
     const color = data?.color || "#4b5563";
     const status = data?.status || "todo";
