@@ -41,6 +41,33 @@ export default function CourseCard({ data }) {
     const estimatedHours = String(data?.estimatedHours ?? "");
     const grade = String(data?.grade ?? "");
 
+    const [isParentHovered, setIsParentHovered] = useState(false);
+
+    useEffect(() => {
+        if (!data?.groupId) return;
+        const handleParentHover = (e) => {
+            if (e.detail?.groupId === data.groupId) {
+                setIsParentHovered(e.detail.hovered);
+            }
+        };
+        window.addEventListener("module-group-hover", handleParentHover);
+        return () => {
+            window.removeEventListener("module-group-hover", handleParentHover);
+        };
+    }, [data?.groupId]);
+
+    useEffect(() => {
+        return () => {
+            if (data?.groupId) {
+                window.dispatchEvent(
+                    new CustomEvent("module-group-hover", {
+                        detail: { groupId: data.groupId, hovered: false },
+                    })
+                );
+            }
+        };
+    }, [data?.groupId]);
+
     useEffect(() => {
         if (!isMenuOpen) return;
         const handlePointerDown = (event) => {
@@ -53,16 +80,17 @@ export default function CourseCard({ data }) {
     useEffect(() => {
         const nodeEl = rootRef.current?.closest?.(".react-flow__node");
         if (!nodeEl) return;
-        const baseZIndex = data?.groupId ? "2" : "1";
+        const baseZIndex = isParentHovered ? "11" : (data?.groupId ? "2" : "1");
         if (isMenuOpen) {
-            nodeEl.style.zIndex = "1000";
+            nodeEl.style.zIndex = "100000";
             return () => {
                 nodeEl.style.zIndex = baseZIndex;
             };
         }
         nodeEl.style.zIndex = baseZIndex;
         return undefined;
-    }, [data?.groupId, isMenuOpen]);
+    }, [data?.groupId, isMenuOpen, isParentHovered]);
+
 
     const handleRemove = (e) => {
         e.stopPropagation();
@@ -130,6 +158,24 @@ export default function CourseCard({ data }) {
         <div
             className="card"
             ref={rootRef}
+            onMouseEnter={() => {
+                if (data?.groupId) {
+                    window.dispatchEvent(
+                        new CustomEvent("module-group-hover", {
+                            detail: { groupId: data.groupId, hovered: true },
+                        })
+                    );
+                }
+            }}
+            onMouseLeave={() => {
+                if (data?.groupId) {
+                    window.dispatchEvent(
+                        new CustomEvent("module-group-hover", {
+                            detail: { groupId: data.groupId, hovered: false },
+                        })
+                    );
+                }
+            }}
             style={{
                 width: CARD_WIDTH,
                 position: "relative",

@@ -89,6 +89,23 @@ export default function ModuleGroupBackground({ data }) {
     ];
     const canRevealMoreSemesters = plusRevealCount < plusSemesterOptions.length;
 
+    const [isHoveredFromCard, setIsHoveredFromCard] = useState(false);
+    const [isSelfHovered, setIsSelfHovered] = useState(false);
+
+    useEffect(() => {
+        const handleCardHover = (e) => {
+            if (e.detail?.groupId === groupId) {
+                setIsHoveredFromCard(e.detail.hovered);
+            }
+        };
+        window.addEventListener("module-group-hover", handleCardHover);
+        return () => {
+            window.removeEventListener("module-group-hover", handleCardHover);
+        };
+    }, [groupId]);
+
+    const isVisible = isSelfHovered || isHoveredFromCard;
+
     useEffect(() => {
         if (!isMenuOpen) return;
         const handlePointerDown = (event) => {
@@ -105,21 +122,24 @@ export default function ModuleGroupBackground({ data }) {
     useEffect(() => {
         const nodeEl = rootRef.current?.closest?.(".react-flow__node");
         if (!nodeEl) return;
+        const baseZ = isVisible ? "10" : "0";
         if (isMenuOpen) {
             nodeEl.style.zIndex = "100000";
             return () => {
-                nodeEl.style.zIndex = "";
+                nodeEl.style.zIndex = baseZ;
             };
         }
-        nodeEl.style.zIndex = "";
+        nodeEl.style.zIndex = baseZ;
         return undefined;
-    }, [isMenuOpen]);
+    }, [isMenuOpen, isVisible]);
 
     return (
         <div
             ref={rootRef}
+            onMouseEnter={() => setIsSelfHovered(true)}
+            onMouseLeave={() => setIsSelfHovered(false)}
             style={{
-                pointerEvents: "all",
+                pointerEvents: isVisible ? "all" : "none",
                 width,
                 height,
                 overflow: "hidden",
@@ -130,6 +150,8 @@ export default function ModuleGroupBackground({ data }) {
                 padding: GROUP_PADDING_Y,
                 paddingTop: GROUP_PADDING_Y,
                 boxSizing: "border-box",
+                opacity: isVisible ? 1 : 0,
+                transition: "opacity 0.2s ease-in-out",
             }}
         >
             {/* top */}
