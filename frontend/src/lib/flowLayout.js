@@ -112,7 +112,7 @@ function nodeBBox(n) {
 }
 
 function isRelevantForCollision(n) {
-    return n.type === "moduleBg" || (n.type === "course" && !n.data?.groupId);
+    return n.type === "course";
 }
 
 function coveredLaneIndicesForNode(n, maxSemesterCount) {
@@ -180,10 +180,8 @@ function enforceStackingOrder(allNodes) {
 
 export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
-
-    // Pass 1: Resolve compact layout for moduleBg nodes
-    const bgCandidates = nodes
-        .filter((n) => n.type === "moduleBg")
+    const candidates = nodes
+        .filter((n) => n.type === "course")
         .sort((a, b) => {
             const ay = Number(a?.position?.y || 0);
             const by = Number(b?.position?.y || 0);
@@ -193,56 +191,14 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
             return ax - bx;
         });
 
-    const bgPlaced = [];
-    for (const candidate of bgCandidates) {
-        const current = nodes.find((n) => n.id === candidate.id);
-        if (!current) continue;
-        const cBox = nodeBBox(current);
-        let minAllowedY = minModuleGroupTopY;
-
-        for (const placedId of bgPlaced) {
-            const prior = nodes.find((n) => n.id === placedId);
-            if (!prior) continue;
-            const pBox = nodeBBox(prior);
-            const xOverlap =
-                cBox.x1 < pBox.x2 + COLLISION_GAP &&
-                cBox.x2 + COLLISION_GAP > pBox.x1;
-            if (!xOverlap) continue;
-            minAllowedY = Math.max(minAllowedY, pBox.y2 + COLLISION_GAP);
-        }
-
-        if (cBox.y1 > minAllowedY) {
-            const dy = minAllowedY - cBox.y1;
-            nodes = nodes.map((n) =>
-                n.id === current.id
-                    ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
-                    : n
-            );
-            nodes = applyDeltaToGroupChildren(nodes, current.id, 0, dy);
-        }
-        bgPlaced.push(candidate.id);
-    }
-
-    // Pass 2: Resolve compact layout for standalone courses
-    const courseCandidates = nodes
-        .filter((n) => n.type === "course" && !n.data?.groupId)
-        .sort((a, b) => {
-            const ay = Number(a?.position?.y || 0);
-            const by = Number(b?.position?.y || 0);
-            if (ay !== by) return ay - by;
-            const ax = Number(a?.position?.x || 0);
-            const bx = Number(b?.position?.x || 0);
-            return ax - bx;
-        });
-
-    const coursePlaced = [];
-    for (const candidate of courseCandidates) {
+    const placed = [];
+    for (const candidate of candidates) {
         const current = nodes.find((n) => n.id === candidate.id);
         if (!current) continue;
         const cBox = nodeBBox(current);
         let minAllowedY = 96;
 
-        for (const placedId of coursePlaced) {
+        for (const placedId of placed) {
             const prior = nodes.find((n) => n.id === placedId);
             if (!prior) continue;
             const pBox = nodeBBox(prior);
@@ -261,64 +217,33 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
                     : n
             );
         }
-        coursePlaced.push(candidate.id);
+        placed.push(candidate.id);
     }
 
-    return enforceStackingOrder(enforceModuleHeaderClearance(nodes, minModuleGroupTopY));
+    const headerSafe = enforceModuleHeaderClearance(nodes, minModuleGroupTopY);
+    const groupIds = [...new Set(headerSafe.filter(n => n.type === "course" && n.data?.groupId).map(n => n.data.groupId))];
+    let resolved = headerSafe;
+    for (const gId of groupIds) {
+        resolved = recomputeGroupFromChildren(resolved, gId);
+    }
+
+    return enforceStackingOrder(resolved);
 }
 
 export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
 
-    // Pass 1: Resolve collisions among moduleBg nodes
-    const bgLanes = new Map();
+    const lanes = new Map();
     for (const n of nodes) {
-        if (n.type !== "moduleBg") continue;
+        if (n.type !== "course") continue;
         const laneIndices = coveredLaneIndicesForNode(n, maxSemesterCount);
         for (const li of laneIndices) {
-            if (!bgLanes.has(li)) bgLanes.set(li, []);
-            bgLanes.get(li).push(n.id);
+            if (!lanes.has(li)) lanes.set(li, []);
+            lanes.get(li).push(n.id);
         }
     }
 
-    for (const ids of bgLanes.values()) {
-        const laneNodes = ids
-            .map((id) => nodes.find((n) => n.id === id))
-            .filter(Boolean)
-            .sort((a, b) => a.position.y - b.position.y);
-
-        let prev = null;
-        for (const curr of laneNodes) {
-            if (!prev) {
-                prev = curr;
-                continue;
-            }
-            const prevB = nodeBBox(prev);
-            const curB = nodeBBox(curr);
-            const minY = prevB.y2 + COLLISION_GAP;
-            if (curB.y1 < minY) {
-                const dy = minY - curB.y1;
-                nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: n.position.y + dy } } : n));
-                nodes = applyDeltaToGroupChildren(nodes, curr.id, 0, dy);
-                const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
-                if (idx !== -1) laneNodes[idx] = { ...curr, position: { x: curr.position.x, y: curr.position.y + dy } };
-            }
-            prev = laneNodes.find((ln) => ln.id === curr.id) || curr;
-        }
-    }
-
-    // Pass 2: Resolve collisions among standalone courses
-    const courseLanes = new Map();
-    for (const n of nodes) {
-        if (n.type !== "course" || n.data?.groupId) continue;
-        const laneIndices = coveredLaneIndicesForNode(n, maxSemesterCount);
-        for (const li of laneIndices) {
-            if (!courseLanes.has(li)) courseLanes.set(li, []);
-            courseLanes.get(li).push(n.id);
-        }
-    }
-
-    for (const ids of courseLanes.values()) {
+    for (const ids of lanes.values()) {
         const laneNodes = ids
             .map((id) => nodes.find((n) => n.id === id))
             .filter(Boolean)
@@ -344,5 +269,11 @@ export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGro
     }
 
     const headerSafe = enforceModuleHeaderClearance(nodes, minModuleGroupTopY);
-    return enforceStackingOrder(pushStandaloneCoursesBelowModuleBackgrounds(headerSafe));
+    const groupIds = [...new Set(headerSafe.filter(n => n.type === "course" && n.data?.groupId).map(n => n.data.groupId))];
+    let resolved = headerSafe;
+    for (const gId of groupIds) {
+        resolved = recomputeGroupFromChildren(resolved, gId);
+    }
+
+    return enforceStackingOrder(resolved);
 }
