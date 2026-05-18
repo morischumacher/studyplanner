@@ -60,7 +60,7 @@ export default function CourseCard({ data }) {
         return () => {
             if (data?.groupId) {
                 window.dispatchEvent(
-                    new CustomEvent("module-group-hover", {
+                    new CustomEvent("module-card-hover", {
                         detail: { groupId: data.groupId, hovered: false },
                     })
                 );
@@ -161,7 +161,7 @@ export default function CourseCard({ data }) {
             onMouseEnter={() => {
                 if (data?.groupId) {
                     window.dispatchEvent(
-                        new CustomEvent("module-group-hover", {
+                        new CustomEvent("module-card-hover", {
                             detail: { groupId: data.groupId, hovered: true },
                         })
                     );
@@ -170,7 +170,7 @@ export default function CourseCard({ data }) {
             onMouseLeave={() => {
                 if (data?.groupId) {
                     window.dispatchEvent(
-                        new CustomEvent("module-group-hover", {
+                        new CustomEvent("module-card-hover", {
                             detail: { groupId: data.groupId, hovered: false },
                         })
                     );

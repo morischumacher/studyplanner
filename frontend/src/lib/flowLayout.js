@@ -157,40 +157,7 @@ function enforceModuleHeaderClearance(allNodes, minModuleGroupTopY) {
 }
 
 function pushStandaloneCoursesBelowModuleBackgrounds(allNodes) {
-    let nodes = allNodes.slice();
-    const maxPasses = 8;
-    for (let pass = 0; pass < maxPasses; pass += 1) {
-        let changed = false;
-        const moduleNodes = nodes.filter((n) => n?.type === "moduleBg");
-        const standaloneCourses = nodes.filter((n) => n?.type === "course" && !n?.data?.groupId);
-
-        for (const courseNode of standaloneCourses) {
-            const currentCourse = nodes.find((n) => n.id === courseNode.id) || courseNode;
-            const cBox = nodeBBox(currentCourse);
-            let minAllowedY = cBox.y1;
-
-            for (const moduleNode of moduleNodes) {
-                const mBox = nodeBBox(moduleNode);
-                const xOverlap = cBox.x1 < mBox.x2 && cBox.x2 > mBox.x1;
-                if (!xOverlap) continue;
-                const yOverlap = cBox.y1 < (mBox.y2 + COLLISION_GAP) && cBox.y2 > (mBox.y1 - COLLISION_GAP);
-                if (!yOverlap) continue;
-                minAllowedY = Math.max(minAllowedY, mBox.y2 + COLLISION_GAP);
-            }
-
-            if (minAllowedY > cBox.y1) {
-                changed = true;
-                nodes = nodes.map((n) => (
-                    n.id === currentCourse.id
-                        ? { ...n, position: { x: n.position.x, y: minAllowedY } }
-                        : n
-                ));
-            }
-        }
-
-        if (!changed) break;
-    }
-    return nodes;
+    return allNodes;
 }
 
 function enforceStackingOrder(allNodes) {
@@ -213,8 +180,10 @@ function enforceStackingOrder(allNodes) {
 
 export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
-    const candidates = nodes
-        .filter((n) => isRelevantForCollision(n))
+
+    // Pass 1: Resolve compact layout for moduleBg nodes
+    const bgCandidates = nodes
+        .filter((n) => n.type === "moduleBg")
         .sort((a, b) => {
             const ay = Number(a?.position?.y || 0);
             const by = Number(b?.position?.y || 0);
@@ -224,14 +193,14 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
             return ax - bx;
         });
 
-    const placed = [];
-    for (const candidate of candidates) {
+    const bgPlaced = [];
+    for (const candidate of bgCandidates) {
         const current = nodes.find((n) => n.id === candidate.id);
         if (!current) continue;
         const cBox = nodeBBox(current);
-        let minAllowedY = current.type === "moduleBg" ? minModuleGroupTopY : 96;
+        let minAllowedY = minModuleGroupTopY;
 
-        for (const placedId of placed) {
+        for (const placedId of bgPlaced) {
             const prior = nodes.find((n) => n.id === placedId);
             if (!prior) continue;
             const pBox = nodeBBox(prior);
@@ -249,11 +218,50 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
                     ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
                     : n
             );
-            if (current.type === "moduleBg") {
-                nodes = applyDeltaToGroupChildren(nodes, current.id, 0, dy);
-            }
+            nodes = applyDeltaToGroupChildren(nodes, current.id, 0, dy);
         }
-        placed.push(candidate.id);
+        bgPlaced.push(candidate.id);
+    }
+
+    // Pass 2: Resolve compact layout for standalone courses
+    const courseCandidates = nodes
+        .filter((n) => n.type === "course" && !n.data?.groupId)
+        .sort((a, b) => {
+            const ay = Number(a?.position?.y || 0);
+            const by = Number(b?.position?.y || 0);
+            if (ay !== by) return ay - by;
+            const ax = Number(a?.position?.x || 0);
+            const bx = Number(b?.position?.x || 0);
+            return ax - bx;
+        });
+
+    const coursePlaced = [];
+    for (const candidate of courseCandidates) {
+        const current = nodes.find((n) => n.id === candidate.id);
+        if (!current) continue;
+        const cBox = nodeBBox(current);
+        let minAllowedY = 96;
+
+        for (const placedId of coursePlaced) {
+            const prior = nodes.find((n) => n.id === placedId);
+            if (!prior) continue;
+            const pBox = nodeBBox(prior);
+            const xOverlap =
+                cBox.x1 < pBox.x2 + COLLISION_GAP &&
+                cBox.x2 + COLLISION_GAP > pBox.x1;
+            if (!xOverlap) continue;
+            minAllowedY = Math.max(minAllowedY, pBox.y2 + COLLISION_GAP);
+        }
+
+        if (cBox.y1 > minAllowedY) {
+            const dy = minAllowedY - cBox.y1;
+            nodes = nodes.map((n) =>
+                n.id === current.id
+                    ? { ...n, position: { x: n.position.x, y: n.position.y + dy } }
+                    : n
+            );
+        }
+        coursePlaced.push(candidate.id);
     }
 
     return enforceStackingOrder(enforceModuleHeaderClearance(nodes, minModuleGroupTopY));
@@ -262,17 +270,18 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
 export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
 
-    const lanes = new Map();
+    // Pass 1: Resolve collisions among moduleBg nodes
+    const bgLanes = new Map();
     for (const n of nodes) {
-        if (!isRelevantForCollision(n)) continue;
+        if (n.type !== "moduleBg") continue;
         const laneIndices = coveredLaneIndicesForNode(n, maxSemesterCount);
         for (const li of laneIndices) {
-            if (!lanes.has(li)) lanes.set(li, []);
-            lanes.get(li).push(n.id);
+            if (!bgLanes.has(li)) bgLanes.set(li, []);
+            bgLanes.get(li).push(n.id);
         }
     }
 
-    for (const ids of lanes.values()) {
+    for (const ids of bgLanes.values()) {
         const laneNodes = ids
             .map((id) => nodes.find((n) => n.id === id))
             .filter(Boolean)
@@ -290,7 +299,43 @@ export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGro
             if (curB.y1 < minY) {
                 const dy = minY - curB.y1;
                 nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: n.position.y + dy } } : n));
-                if (curr.type === "moduleBg") nodes = applyDeltaToGroupChildren(nodes, curr.id, 0, dy);
+                nodes = applyDeltaToGroupChildren(nodes, curr.id, 0, dy);
+                const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
+                if (idx !== -1) laneNodes[idx] = { ...curr, position: { x: curr.position.x, y: curr.position.y + dy } };
+            }
+            prev = laneNodes.find((ln) => ln.id === curr.id) || curr;
+        }
+    }
+
+    // Pass 2: Resolve collisions among standalone courses
+    const courseLanes = new Map();
+    for (const n of nodes) {
+        if (n.type !== "course" || n.data?.groupId) continue;
+        const laneIndices = coveredLaneIndicesForNode(n, maxSemesterCount);
+        for (const li of laneIndices) {
+            if (!courseLanes.has(li)) courseLanes.set(li, []);
+            courseLanes.get(li).push(n.id);
+        }
+    }
+
+    for (const ids of courseLanes.values()) {
+        const laneNodes = ids
+            .map((id) => nodes.find((n) => n.id === id))
+            .filter(Boolean)
+            .sort((a, b) => a.position.y - b.position.y);
+
+        let prev = null;
+        for (const curr of laneNodes) {
+            if (!prev) {
+                prev = curr;
+                continue;
+            }
+            const prevB = nodeBBox(prev);
+            const curB = nodeBBox(curr);
+            const minY = prevB.y2 + COLLISION_GAP;
+            if (curB.y1 < minY) {
+                const dy = minY - curB.y1;
+                nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: n.position.y + dy } } : n));
                 const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
                 if (idx !== -1) laneNodes[idx] = { ...curr, position: { x: curr.position.x, y: curr.position.y + dy } };
             }

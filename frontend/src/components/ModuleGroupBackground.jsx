@@ -98,13 +98,21 @@ export default function ModuleGroupBackground({ data }) {
                 setIsHoveredFromCard(e.detail.hovered);
             }
         };
-        window.addEventListener("module-group-hover", handleCardHover);
+        window.addEventListener("module-card-hover", handleCardHover);
         return () => {
-            window.removeEventListener("module-group-hover", handleCardHover);
+            window.removeEventListener("module-card-hover", handleCardHover);
         };
     }, [groupId]);
 
     const isVisible = isSelfHovered || isHoveredFromCard;
+
+    useEffect(() => {
+        window.dispatchEvent(
+            new CustomEvent("module-group-hover", {
+                detail: { groupId, hovered: isVisible },
+            })
+        );
+    }, [groupId, isVisible]);
 
     useEffect(() => {
         if (!isMenuOpen) return;
