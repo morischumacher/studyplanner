@@ -288,7 +288,7 @@ export default function CourseCard({ data }) {
                                     +
                                 </button>
                             )}
-                            {(data.status === "in_plan" || data.status === "done") && data?.onToggleDone && !isChildCourse && (
+                            {(data.status === "in_plan" || data.status === "done") && data?.onToggleDone && (
                                 <button
                                     onClick={handleToggleDone}
                                     aria-label={isDone ? "Mark as in plan" : "Mark as done"}

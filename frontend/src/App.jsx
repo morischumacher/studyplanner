@@ -1319,18 +1319,64 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         const revertedDone = !attemptedDone;
 
         rollbackCourseDone(courseCode, revertedDone);
-        setNodes((prev) => prev.map((n) => {
-            if (n.type !== "course" || n?.data?.code !== courseCode) return n;
-            return { ...n, data: { ...n.data, status: revertedDone ? "done" : "in_plan" } };
-        }));
+        setNodes((prev) => {
+            const updated = prev.map((n) => {
+                if (n.type === "course" && n.data?.code === courseCode) {
+                    return { ...n, data: { ...n.data, status: revertedDone ? "done" : "in_plan" } };
+                }
+                return n;
+            });
+            const groupIds = prev
+                .filter((n) => n.type === "course" && n.data?.code === courseCode)
+                .map((n) => n.data?.groupId)
+                .filter(Boolean);
+            if (groupIds.length > 0) {
+                let currentNodes = updated;
+                for (const groupId of [...new Set(groupIds)]) {
+                    const groupCourses = currentNodes.filter((n) => n.type === "course" && n.data?.groupId === groupId);
+                    const allDone = groupCourses.length > 0 && groupCourses.every((n) => n.data?.status === "done");
+                    currentNodes = currentNodes.map((n) => {
+                        if (n.type === "moduleBg" && n.id === groupId) {
+                            return { ...n, data: { ...n.data, status: allDone ? "done" : "in_plan" } };
+                        }
+                        return n;
+                    });
+                }
+                return currentNodes;
+            }
+            return updated;
+        });
     }, [rollbackCourseDone, setNodes]);
 
     const toggleCourseDone = useCallback((courseCode, nextDone, nodeId) => {
         setCourseDone(courseCode, nextDone);
-        setNodes((prev) => prev.map((n) => {
-            if (n.id !== nodeId) return n;
-            return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
-        }));
+        setNodes((prev) => {
+            const updated = prev.map((n) => {
+                if (n.type === "course" && n.data?.code === courseCode) {
+                    return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
+                }
+                return n;
+            });
+            const groupIds = prev
+                .filter((n) => n.type === "course" && n.data?.code === courseCode)
+                .map((n) => n.data?.groupId)
+                .filter(Boolean);
+            if (groupIds.length > 0) {
+                let currentNodes = updated;
+                for (const groupId of [...new Set(groupIds)]) {
+                    const groupCourses = currentNodes.filter((n) => n.type === "course" && n.data?.groupId === groupId);
+                    const allDone = groupCourses.length > 0 && groupCourses.every((n) => n.data?.status === "done");
+                    currentNodes = currentNodes.map((n) => {
+                        if (n.type === "moduleBg" && n.id === groupId) {
+                            return { ...n, data: { ...n.data, status: allDone ? "done" : "in_plan" } };
+                        }
+                        return n;
+                    });
+                }
+                return currentNodes;
+            }
+            return updated;
+        });
     }, [setCourseDone, setNodes]);
 
     const updateCourseEcts = useCallback((nodeId, nextEcts) => {

@@ -162,7 +162,7 @@ export default function GraphCourseNode({ data }) {
                                     +
                                 </button>
                             )}
-                            {(isInPlan || isDone) && !isChildCourse && (
+                            {(isInPlan || isDone) && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
