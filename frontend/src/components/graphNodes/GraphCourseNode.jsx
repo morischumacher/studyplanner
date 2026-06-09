@@ -137,7 +137,7 @@ export default function GraphCourseNode({ data }) {
                             >
                                 i
                             </button>
-                            {((status === "todo" || status === "parked") || isChildCourse) && (
+                            {(status === "todo" || status === "parked") && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

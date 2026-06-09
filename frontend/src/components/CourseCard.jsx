@@ -264,7 +264,7 @@ export default function CourseCard({ data }) {
                             >
                                 i
                             </button>
-                            {((data?.status === "todo" || data?.status === "parked") || isChildCourse) && data?.onAddToPlan && (
+                            {(data?.status === "todo" || data?.status === "parked") && data?.onAddToPlan && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
