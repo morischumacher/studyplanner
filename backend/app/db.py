@@ -31,16 +31,38 @@ async def run_sql_file(conn: asyncpg.Connection, path: str):
 async def migrate_on_boot():
     pool = await get_pool()
     async with pool.acquire() as conn:
+        # Create a migration history table to track executed migrations
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS migration_history (
+                filename TEXT PRIMARY KEY,
+                executed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
         base = settings.MIGRATIONS_DIR
         # Run all SQL migrations in lexical order: 001..., 002..., 003..., 004...
         files = sorted(glob.glob(os.path.join(base, "*.sql")))
+
+        # Fetch already executed migrations
+        rows = await conn.fetch("SELECT filename FROM migration_history")
+        executed_files = {row["filename"] for row in rows}
+
         for f in files:
+            fname = os.path.basename(f)
+            if fname in executed_files:
+                print(f"⏭️ Skipping already executed migration: {fname}")
+                continue
+
             if os.path.exists(f):
                 try:
                     await run_sql_file(conn, f)
-                    print(f"✅ {os.path.basename(f)}")
+                    await conn.execute(
+                        "INSERT INTO migration_history (filename) VALUES ($1) ON CONFLICT DO NOTHING",
+                        fname
+                    )
+                    print(f"✅ {fname}")
                 except Exception as e:
                     # keep parity with Node’s behavior: report but don’t crash
-                    print(f"❌ {os.path.basename(f)}: {e}")
+                    print(f"❌ {fname}: {e}")
         # quick “attach versions” / health step equivalent
         await conn.execute("DO $$ BEGIN PERFORM 1; END $$;")
