@@ -475,6 +475,37 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         });
     }, [coursesBySemester, programCode, semesterBounds.max, semesterBounds.min]);
 
+    const rollbackCourseDone = useCallback((courseCode, nextDone) => {
+        if (!courseCode) return;
+        setDoneByProgram((prev) => {
+            const current = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
+            const exists = current.includes(courseCode);
+            const target = Boolean(nextDone);
+            if ((target && exists) || (!target && !exists)) return prev;
+            const updated = target ? [...current, courseCode] : current.filter((code) => code !== courseCode);
+            return { ...prev, [programCode]: updated };
+        });
+        if (!nextDone) {
+            setCourseMetaByProgram((prev) => {
+                const byCode = prev?.[programCode] && typeof prev[programCode] === "object"
+                    ? prev[programCode]
+                    : {};
+                const key = String(courseCode || "").trim();
+                if (!key) return prev;
+                const entry = sanitizeCourseMetaEntry(byCode?.[key] ?? EMPTY_COURSE_META);
+                if (!entry.grade) return prev;
+                return {
+                    ...(prev || {}),
+                    [programCode]: {
+                        ...byCode,
+                        [key]: { ...entry, grade: "" },
+                    },
+                };
+            });
+        }
+    }, [programCode]);
+
+
     const getCourseMeta = useCallback((courseCode) => {
         const code = String(courseCode || "").trim();
         if (!code) return EMPTY_COURSE_META;
@@ -751,6 +782,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         setSelectedFocus,
         setSelectedFocusForProgram,
         setCourseDone,
+        rollbackCourseDone,
         getCourseStatus,
         lastPlanChange,
         graphViewState,
@@ -778,6 +810,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         setSelectedFocus,
         setSelectedFocusForProgram,
         setCourseDone,
+        rollbackCourseDone,
         getCourseStatus,
         lastPlanChange,
         graphViewState,

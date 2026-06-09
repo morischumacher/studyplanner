@@ -134,6 +134,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setSelectedFocus,
         setSelectedFocusForProgram,
         setCourseDone,
+        rollbackCourseDone,
         getCourseStatus,
         lastPlanChange,
         graphViewState,
@@ -1317,12 +1318,12 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         const attemptedDone = change?.toStatus === "done";
         const revertedDone = !attemptedDone;
 
-        setCourseDone(courseCode, revertedDone);
+        rollbackCourseDone(courseCode, revertedDone);
         setNodes((prev) => prev.map((n) => {
             if (n.type !== "course" || n?.data?.code !== courseCode) return n;
             return { ...n, data: { ...n.data, status: revertedDone ? "done" : "in_plan" } };
         }));
-    }, [setCourseDone, setNodes]);
+    }, [rollbackCourseDone, setNodes]);
 
     const toggleCourseDone = useCallback((courseCode, nextDone, nodeId) => {
         setCourseDone(courseCode, nextDone);
