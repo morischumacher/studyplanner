@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from ..auth_utils import generate_session_token, hash_password, verify_password
 from ..db import get_pool
 from ..deps import get_current_user
+from ..settings import settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -23,12 +24,16 @@ def _normalize_username(value: str) -> str:
 
 
 def _set_session_cookie(response: Response, token: str):
+    is_prod = False
+    if settings.CORS_ORIGIN and "localhost" not in settings.CORS_ORIGIN and "127.0.0.1" not in settings.CORS_ORIGIN:
+        is_prod = True
+
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=False,
+        samesite="none" if is_prod else "lax",
+        secure=True if is_prod else False,
         max_age=SESSION_TTL_DAYS * 24 * 60 * 60,
         path="/",
     )
@@ -118,7 +123,16 @@ async def signout(
         async with pool.acquire() as conn:
             await conn.execute("DELETE FROM auth_session WHERE token = $1", token)
 
-    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    is_prod = False
+    if settings.CORS_ORIGIN and "localhost" not in settings.CORS_ORIGIN and "127.0.0.1" not in settings.CORS_ORIGIN:
+        is_prod = True
+
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        samesite="none" if is_prod else "lax",
+        secure=True if is_prod else False,
+    )
     return {"ok": True}
 
 

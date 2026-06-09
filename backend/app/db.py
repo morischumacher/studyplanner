@@ -25,9 +25,8 @@ async def get_pool() -> asyncpg.pool.Pool:
 
 async def run_sql_file(conn: asyncpg.Connection, path: str):
     sql = open(path, "r", encoding="utf-8").read()
-    # run whole file in a tx, like your Node db.js
-    async with conn.transaction():
-        await conn.execute(sql)
+    # run whole file directly, since SQL files contain custom COMMIT statements
+    await conn.execute(sql)
 
 async def migrate_on_boot():
     pool = await get_pool()
