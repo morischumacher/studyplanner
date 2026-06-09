@@ -7,7 +7,7 @@ import {
 
 const BACHELOR_PROGRAM_CODE = "033 521";
 
-export default function VisualLegend({ programCode }) {
+export default function VisualLegend({ programCode, onClose }) {
     const isBachelor = programCode === BACHELOR_PROGRAM_CODE;
     const mandatory = mapTypeForProgram("mandatory", programCode);
     const core = mapTypeForProgram("core", programCode);
@@ -71,8 +71,34 @@ export default function VisualLegend({ programCode }) {
     );
 
     return (
-        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, background: "#ffffff", padding: 10, width: 330 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8 }}>Visual Legend</div>
+        <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, background: "#ffffff", padding: 10, width: 330, position: "relative" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 800 }}>Visual Legend</div>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: 14,
+                            fontWeight: "bold",
+                            color: "#9ca3af",
+                            padding: "2px 6px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            lineHeight: 1,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "#4b5563")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "#9ca3af")}
+                        title="Close Legend"
+                        aria-label="Close Legend"
+                    >
+                        ✕
+                    </button>
+                )}
+            </div>
             <div style={{ display: "grid", gap: 8 }}>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>

@@ -1646,7 +1646,7 @@ export default function CurriculumGraphView({
             )}
             {isLegendOpen && (
                 <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 5 }}>
-                    <VisualLegend programCode={programCode} />
+                    <VisualLegend programCode={programCode} onClose={() => onToggleLegend?.()} />
                 </div>
             )}
             {isProgramSwitching ? (

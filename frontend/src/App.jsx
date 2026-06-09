@@ -6620,7 +6620,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     </div>
                     {isLegendOpen && (
                         <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 6 }}>
-                            <VisualLegend programCode={programCode} />
+                            <VisualLegend programCode={programCode} onClose={() => setIsLegendOpen(false)} />
                         </div>
                     )}
                 </div>
