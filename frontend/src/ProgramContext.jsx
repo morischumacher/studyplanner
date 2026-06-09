@@ -475,6 +475,57 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         });
     }, [coursesBySemester, programCode, semesterBounds.max, semesterBounds.min]);
 
+    const setMultipleCoursesDone = useCallback((courseCodes, nextDone) => {
+        const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
+        if (codes.length === 0) return;
+
+        setDoneByProgram((prev) => {
+            const current = Array.isArray(prev?.[programCode]) ? prev[programCode] : [];
+            let updated = [...current];
+            const target = Boolean(nextDone);
+            for (const code of codes) {
+                const exists = updated.includes(code);
+                if (target && !exists) {
+                    updated.push(code);
+                } else if (!target && exists) {
+                    updated = updated.filter((c) => c !== code);
+                }
+            }
+            return { ...prev, [programCode]: updated };
+        });
+
+        if (!nextDone) {
+            setCourseMetaByProgram((prev) => {
+                const byCode = prev?.[programCode] && typeof prev[programCode] === "object"
+                    ? prev[programCode]
+                    : {};
+                let updatedByCode = { ...byCode };
+                let modified = false;
+                for (const code of codes) {
+                    const key = String(code || "").trim();
+                    if (!key) continue;
+                    const entry = sanitizeCourseMetaEntry(byCode?.[key] ?? EMPTY_COURSE_META);
+                    if (entry.grade) {
+                        updatedByCode[key] = { ...entry, grade: "" };
+                        modified = true;
+                    }
+                }
+                if (!modified) return prev;
+                return {
+                    ...(prev || {}),
+                    [programCode]: updatedByCode,
+                };
+            });
+        }
+
+        setLastPlanChange({
+            id: Date.now(),
+            type: "course_status_toggled",
+            courseCodes: codes,
+            toStatus: nextDone ? "done" : "in_plan",
+        });
+    }, [programCode]);
+
     const rollbackCourseDone = useCallback((courseCode, nextDone) => {
         if (!courseCode) return;
         setDoneByProgram((prev) => {
@@ -782,6 +833,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         setSelectedFocus,
         setSelectedFocusForProgram,
         setCourseDone,
+        setMultipleCoursesDone,
         rollbackCourseDone,
         getCourseStatus,
         lastPlanChange,
@@ -810,6 +862,7 @@ export function ProgramProvider({ children, initialProgramCode = "066 937" }) {
         setSelectedFocus,
         setSelectedFocusForProgram,
         setCourseDone,
+        setMultipleCoursesDone,
         rollbackCourseDone,
         getCourseStatus,
         lastPlanChange,

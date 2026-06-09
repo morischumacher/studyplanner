@@ -134,6 +134,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setSelectedFocus,
         setSelectedFocusForProgram,
         setCourseDone,
+        setMultipleCoursesDone,
         rollbackCourseDone,
         getCourseStatus,
         lastPlanChange,
@@ -1312,22 +1313,25 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
     const rollbackCourseStatusToggle = useCallback((change) => {
         if (change?.type !== "course_status_toggled") return;
-        const courseCode = change?.courseCode;
-        if (!courseCode) return;
+        const courseCodes = change?.courseCodes || (change?.courseCode ? [change.courseCode] : []);
+        if (courseCodes.length === 0) return;
 
         const attemptedDone = change?.toStatus === "done";
         const revertedDone = !attemptedDone;
 
-        rollbackCourseDone(courseCode, revertedDone);
+        for (const courseCode of courseCodes) {
+            rollbackCourseDone(courseCode, revertedDone);
+        }
+
         setNodes((prev) => {
             const updated = prev.map((n) => {
-                if (n.type === "course" && n.data?.code === courseCode) {
+                if (n.type === "course" && courseCodes.includes(n.data?.code)) {
                     return { ...n, data: { ...n.data, status: revertedDone ? "done" : "in_plan" } };
                 }
                 return n;
             });
             const groupIds = prev
-                .filter((n) => n.type === "course" && n.data?.code === courseCode)
+                .filter((n) => n.type === "course" && courseCodes.includes(n.data?.code))
                 .map((n) => n.data?.groupId)
                 .filter(Boolean);
             if (groupIds.length > 0) {
@@ -1403,9 +1407,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         const codes = codesFromGroup.length ? codesFromGroup : codesFromPayload;
         const uniqueCodes = [...new Set(codes)];
         if (!uniqueCodes.length) return;
-        for (const code of uniqueCodes) {
-            setCourseDone(code, Boolean(nextDone));
-        }
+        setMultipleCoursesDone(uniqueCodes, Boolean(nextDone));
         setNodes((prev) => {
             const patched = prev.map((n) => {
                 if (n.type !== "course" || !uniqueCodes.includes(n?.data?.code)) return n;
@@ -1427,7 +1429,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             }
             return patched;
         });
-    }, [nodes, setCourseDone, setNodes]);
+    }, [nodes, setMultipleCoursesDone, setNodes]);
 
     const parkCourseCodes = useCallback((courseCodes) => {
         const input = Array.isArray(courseCodes) ? courseCodes : [courseCodes];
@@ -2157,14 +2159,12 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         const codes = codesFromGroup.length ? codesFromGroup : codesFromPayload;
         if (!codes.length) return;
         const uniqueCodes = [...new Set(codes)];
-        for (const code of uniqueCodes) {
-            setCourseDone(code, Boolean(nextDone));
-        }
+        setMultipleCoursesDone(uniqueCodes, Boolean(nextDone));
         setNodes((prev) => prev.map((n) => {
             if (n.type !== "course" || !uniqueCodes.includes(n?.data?.code)) return n;
             return { ...n, data: { ...n.data, status: nextDone ? "done" : "in_plan" } };
         }));
-    }, [nodes, setCourseDone, setNodes]);
+    }, [nodes, setMultipleCoursesDone, setNodes]);
 
     const updateCourseMeta = useCallback((courseCode, patch) => {
         const code = String(courseCode || "").trim();
