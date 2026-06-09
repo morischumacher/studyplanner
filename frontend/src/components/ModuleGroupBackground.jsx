@@ -58,7 +58,7 @@ export default function ModuleGroupBackground({ data }) {
     const borderColor = stateMeta.borderColor || baseColor;
     const statusLabel = status === "done" ? "done" : (status === "in_plan" ? "planned" : (status === "parked" ? "parked" : "not planned"));
     const statusTextColor = status === "done" ? "#166534" : (status === "in_plan" ? "#1d4ed8" : "#4b5563");
-    const panelFill = visualStatus === "todo" ? moduleColor : stateMeta.background;
+    const panelFill = visualStatus === "todo" ? moduleColor : hexToRgba(stateMeta.background || "#f3f4f6", MODULE_GROUP_COLOR_ALPHA);
     const isDone = status === "done";
     const isParked = status === "parked";
     const isAddable = status === "todo" || isParked;
