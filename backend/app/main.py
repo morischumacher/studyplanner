@@ -43,6 +43,10 @@ async def log_http_requests(request: Request, call_next):
 async def _startup():
     await migrate_on_boot()
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Study Planner API is running"}
+
 @app.get("/health")
 async def health():
     pool = await get_pool()
