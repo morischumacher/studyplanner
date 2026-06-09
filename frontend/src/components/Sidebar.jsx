@@ -438,7 +438,7 @@ export default function Sidebar({
                                                                         e.stopPropagation();
                                                                         gotoSemesters(menuKey);
                                                                     }}
-                                                                    style={{ border: "1px solid #fca5a5", background: "#fef2f2", color: "#b91c1c", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
+                                                                    style={{ border: `1px solid ${subjectColor}`, background: "#fff", borderRadius: 6, fontSize: 12, padding: "2px 6px", cursor: "pointer" }}
                                                                 >
                                                                     +
                                                                 </button>
