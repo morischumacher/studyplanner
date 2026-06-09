@@ -41,11 +41,16 @@ export default function LaneColumn({ data }) {
     return (
         <div
             ref={rootRef}
+            id={isParkingLane ? "parking-stage-lane" : `semester-lane-${data.semesterId}`}
             style={{
                 height: laneHeight,
                 width: LANE_WIDTH,
-                background: data.even ? "rgba(243,244,246,0.82)" : "rgba(255,255,255,0.88)",
-                border: data.even ? "1px dashed #d1d5db" : "1px dashed #cbd5e1",
+                background: isParkingLane
+                    ? "repeating-linear-gradient(-45deg, rgba(241, 245, 249, 0.9), rgba(241, 245, 249, 0.9) 10px, rgba(248, 250, 252, 0.9) 10px, rgba(248, 250, 252, 0.9) 20px)"
+                    : (data.even ? "rgba(243,244,246,0.82)" : "rgba(255,255,255,0.88)"),
+                border: isParkingLane
+                    ? "2px dashed #94a3b8"
+                    : (data.even ? "1px dashed #d1d5db" : "1px dashed #cbd5e1"),
                 borderRadius: 16,
                 pointerEvents: "none",
                 position: "relative",
@@ -58,9 +63,9 @@ export default function LaneColumn({ data }) {
                     left: 12,
                     fontSize: 18,
                     fontWeight: 700,
-                    color: "#374151",
-                    background: "rgba(255,255,255,0.78)",
-                    border: "1px solid #d1d5db",
+                    color: isParkingLane ? "#475569" : "#374151",
+                    background: isParkingLane ? "rgba(241, 245, 249, 0.95)" : "rgba(255,255,255,0.78)",
+                    border: isParkingLane ? "1px solid #94a3b8" : "1px solid #d1d5db",
                     borderRadius: 8,
                     padding: "5px 10px",
                     lineHeight: 1.2,

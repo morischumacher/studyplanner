@@ -9,6 +9,7 @@ export default class GraphFilterEngine {
         courseTypes: [],
         examSubjects: [],
         progressStates: ["todo", "in_plan", "done"],
+        termAvailabilities: ["summer", "winter", "both"],
     };
 
     static isBachelorProgram(programCode) {
@@ -61,12 +62,17 @@ export default class GraphFilterEngine {
                 ectsRange = { min: ectsRange.max, max: ectsRange.min };
             }
         }
+        const termAvailabilitySet = new Set(["summer", "winter", "both"]);
+        const normalizedTermAvailabilities = Array.isArray(source.termAvailabilities)
+            ? source.termAvailabilities.filter((x) => termAvailabilitySet.has(x))
+            : ["summer", "winter", "both"];
         return {
             obligationTypes: normalizedObligationTypes.length ? normalizedObligationTypes : defaultObligationTypes,
             ectsRange,
             courseTypes: Array.isArray(source.courseTypes) ? source.courseTypes : this.DEFAULT_FILTERS.courseTypes,
             examSubjects: Array.isArray(source.examSubjects) ? source.examSubjects : this.DEFAULT_FILTERS.examSubjects,
             progressStates: Array.isArray(source.progressStates) ? source.progressStates : this.DEFAULT_FILTERS.progressStates,
+            termAvailabilities: normalizedTermAvailabilities,
         };
     }
 
@@ -86,14 +92,16 @@ export default class GraphFilterEngine {
         const category = String(data?.category || "").trim().toLowerCase();
         const isBachelor = this.isBachelorProgram(programCode);
         if (isBachelor) {
-            if (category === "mandatory") return "mandatory";
+            if (category === "mandatory" || category === "pflicht" || category === "required") return "mandatory";
             if (!category && data?.isMandatory) return "mandatory";
+            if (category === "core" || category === "narrow_elective" || category === "narrow" || category === "enge wahl") return "elective_narrow";
+            if (category === "elective" || category === "broad_elective" || category === "broad" || category === "breite wahl") return "elective_broad";
             if (this.isBroadElective(data?.examSubject)) return "elective_broad";
             return "elective_narrow";
         }
-        if (category === "mandatory") return "mandatory";
-        if (category === "core") return "core";
-        if (category === "elective") return "elective";
+        if (category === "mandatory" || category === "pflicht" || category === "required") return "mandatory";
+        if (category === "core" || category === "narrow_elective" || category === "narrow" || category === "enge wahl") return "core";
+        if (category === "elective" || category === "broad_elective" || category === "broad" || category === "breite wahl") return "elective";
         if (!category && data?.isMandatory) return "mandatory";
         return null;
     }
@@ -158,6 +166,22 @@ export default class GraphFilterEngine {
                 // Keep nodes with unknown/unclear type visible to avoid hiding synthetic or
                 // catalog-incomplete entries (e.g. FWTS standalone items).
                 if (courseType && !filters.courseTypes.includes(courseType)) return false;
+            }
+        }
+
+        if (Array.isArray(filters.termAvailabilities)) {
+            const selectedTerms = filters.termAvailabilities;
+            if (selectedTerms.length === 0) return false;
+            const allowed = new Set(selectedTerms);
+            if (level === "module") {
+                const moduleTerms = Array.isArray(data?.moduleCourseTermAvailabilities) ? data.moduleCourseTermAvailabilities : [];
+                if (moduleTerms.length > 0 && !moduleTerms.some((t) => {
+                    const normalizedTerm = String(t || "both").trim().toLowerCase();
+                    return allowed.has(normalizedTerm);
+                })) return false;
+            } else if (level === "course" || level === "courseDirect") {
+                const term = String(data?.termAvailability || "both").trim().toLowerCase();
+                if (!allowed.has(term)) return false;
             }
         }
 

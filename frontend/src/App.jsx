@@ -30,7 +30,7 @@ import {
     sendRuleCheckUpdate,
     fetchRecommendations,
 } from "./lib/api";
-import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar } from "./components";
+import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar, OnboardingTour } from "./components";
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
 import PlannerNotifications from "./components/app/PlannerNotifications.jsx";
@@ -144,6 +144,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         importPlannerStateSnapshot,
     } = currentProgram();
     const [viewMode, setViewMode] = useState("table");
+    const [tableVerticalSemantics, setTableVerticalSemantics] = useState("no_meaning");
+    const [tableVerticalCustomText, setTableVerticalCustomText] = useState("");
+    const [isTableSemanticsPopupOpen, setIsTableSemanticsPopupOpen] = useState(false);
+    const [activeTourStep, setActiveTourStep] = useState(null);
 
     // Catalog state
     const [catalog, setCatalog] = useState([]);
@@ -231,6 +235,27 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [profileDraftCareer, setProfileDraftCareer] = useState("");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRecPanelOpen, setIsRecPanelOpen] = useState(false);
+    const [profileDisableGraphView, setProfileDisableGraphView] = useState(() => {
+        return localStorage.getItem("disable-graph-view-" + currentUser?.username) === "true";
+    });
+
+    useEffect(() => {
+        if (currentUser?.username) {
+            setProfileDisableGraphView(localStorage.getItem("disable-graph-view-" + currentUser?.username) === "true");
+        }
+    }, [currentUser]);
+
+    const [tourCompleted, setTourCompleted] = useState(true);
+
+    useEffect(() => {
+        if (currentUser?.username) {
+            const completedKey = "study-planner-tour-completed-" + currentUser.username;
+            setTourCompleted(localStorage.getItem(completedKey) === "true");
+        } else {
+            setTourCompleted(true);
+        }
+    }, [currentUser, activeTourStep]);
+
     const [isParkingCollapsed, setIsParkingCollapsed] = useState(false);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
     const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
@@ -239,6 +264,34 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
     const successFeedbackSignatureRef = useRef("");
     const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
+
+    useEffect(() => {
+        if (activeTourStep === null) return;
+        if (activeTourStep === 0) {
+            setIsSidebarOpen(true);
+            setIsRecPanelOpen(false);
+            setIsRuleDashboardOpen(false);
+            setIsProfileOpen(false);
+        } else if (activeTourStep === 5) {
+            setIsRecPanelOpen(false);
+        } else if (activeTourStep === 6) {
+            setIsRecPanelOpen(true);
+            setIsRuleDashboardOpen(false);
+        } else if (activeTourStep === 7) {
+            setIsRecPanelOpen(false);
+            setIsRuleDashboardOpen(false);
+        } else if (activeTourStep === 8) {
+            setIsRuleDashboardOpen(true);
+            setIsProfileOpen(false);
+        } else if (activeTourStep === 9) {
+            setIsRuleDashboardOpen(false);
+            setIsProfileOpen(false);
+        } else if (activeTourStep === 10) {
+            setIsProfileOpen(true);
+        } else if (activeTourStep === 11) {
+            setIsProfileOpen(false);
+        }
+    }, [activeTourStep]);
 
     useEffect(() => {
         if (!openSignupSetupOnEntry) return;
@@ -404,7 +457,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         startTermLocked: Boolean(payload?.start_term_locked ?? startTerm),
                         courseTermOverrides: normalizedOverrides,
                         interests: payload?.interests || [],
-                        careerDirection: payload?.careerDirection || "",
+                        careerDirection: payload?.career_direction || "",
                         recommendation_toggles: payload?.recommendation_toggles || {},
                     },
                 }));
@@ -1154,7 +1207,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const flowLayoutOptions = useMemo(() => ({
         maxSemesterCount,
         minModuleGroupTopY: MIN_MODULE_GROUP_TOP_Y,
-    }), [maxSemesterCount, MIN_MODULE_GROUP_TOP_Y]);
+        verticalSemantics: tableVerticalSemantics,
+    }), [maxSemesterCount, MIN_MODULE_GROUP_TOP_Y, tableVerticalSemantics]);
 
     const compactPrefillLayout = useCallback(
         (allNodes) => compactPrefillLayoutBase(allNodes, flowLayoutOptions),
@@ -1165,6 +1219,12 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         (allNodes) => resolveLaneCollisionsBase(allNodes, flowLayoutOptions),
         [flowLayoutOptions]
     );
+
+    useEffect(() => {
+        if (viewMode === "table") {
+            setNodes((prev) => resolveLaneCollisions(prev));
+        }
+    }, [tableVerticalSemantics, resolveLaneCollisions, viewMode, setNodes]);
 
     /***********************
      * Node remove helpers *
@@ -1439,6 +1499,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         programCode,
                         subjectColor,
                         status: "parked",
+                        termAvailability: termAvailabilityForCode(code),
                     },
                     position: {
                         x,
@@ -1679,6 +1740,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     programCode,
                     subjectColor: resolvedSubjectColor,
                     status: "in_plan",
+                    termAvailability: termAvailabilityForCode(courseCode),
                 },
                 position: { x, y },
                 sourcePosition: "right",
@@ -1852,6 +1914,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         programCode,
                         subjectColor: resolvedCourseSubjectColor,
                         status: "in_plan",
+                        termAvailability: termAvailabilityForCode(code),
                     },
                     position: { x: centerX(targetLane), y: baseY },
                     sourcePosition: "right",
@@ -1969,6 +2032,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     programCode,
                     subjectColor: resolvedCourseSubjectColor,
                     status: "in_plan",
+                    termAvailability: termAvailabilityForCode(course?.code),
                 },
                 position: { x, y: baseY },
                 sourcePosition: "right",
@@ -2084,6 +2148,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 const nextSemesterSig = nextSemesters
                     .map((semester) => `${Number(semester?.id) || 0}:${semester?.title || ""}:${semester?.isParking ? 1 : 0}:${semester?.isPlus ? 1 : 0}`)
                     .join("|");
+                const nextTermAvailability = termAvailabilityForCode(code);
                 if (
                     node?.data?.notes === nextNotes &&
                     String(node?.data?.estimatedHours ?? "") === nextEstimatedHours &&
@@ -2091,7 +2156,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     node?.data?.onUpdateCourseMeta === updateCourseMeta &&
                     !needsAddToPlanHandler &&
                     !needsAddModuleToPlanHandler &&
-                    currentSemesterSig === nextSemesterSig
+                    currentSemesterSig === nextSemesterSig &&
+                    node?.data?.termAvailability === nextTermAvailability
                 ) {
                     return node;
                 }
@@ -2108,12 +2174,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         onAddModuleToPlan: needsAddModuleToPlanHandler ? addGraphModuleToPlan : node?.data?.onAddModuleToPlan,
                         semesters: nextSemesters,
                         recommendation: recommendedCourseMap.get(code) || null,
+                        termAvailability: nextTermAvailability,
                     },
                 };
             });
             return changed ? next : prev;
         });
-    }, [addGraphCourseToPlan, addGraphModuleToPlan, courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta, validSemestersForCourse, recommendedCourseMap]);
+    }, [addGraphCourseToPlan, addGraphModuleToPlan, courseMetaByCode, getCourseMeta, nodes, setNodes, updateCourseMeta, validSemestersForCourse, recommendedCourseMap, termAvailabilityForCode]);
 
     const removeGraphCoursesFromPlan = useCallback((courseCodes) => {
         const codes = Array.isArray(courseCodes) ? courseCodes.filter(Boolean) : [];
@@ -2279,6 +2346,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         programCode,
                         subjectColor,
                         status: doneSet.has(course?.code) ? "done" : "in_plan",
+                        termAvailability: termAvailabilityForCode(course?.code),
                     },
                     position: {
                         x: centerX(laneIndex),
@@ -2431,6 +2499,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         programCode,
                         subjectColor,
                         status: doneSet.has(course?.code) ? "done" : "in_plan",
+                        termAvailability: termAvailabilityForCode(course?.code),
                     },
                     position: {
                         x: centerX(laneIndex),
@@ -4125,6 +4194,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             programCode={programCode}
             bachelorProgramCode={BACHELOR_PROGRAM_CODE}
             selectedFocus={selectedFocus}
+            tourCompleted={tourCompleted}
             onApplyInitialPrefill={(focus) => {
                 const applied = programCode === BACHELOR_PROGRAM_CODE
                     ? applyBachelorPrefilledPlan(focus)
@@ -4146,7 +4216,86 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 gap: 8,
             }}
         >
+            <style>{`
+                @keyframes helpPulse {
+                    0% {
+                        box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.6);
+                    }
+                    70% {
+                        box-shadow: 0 0 0 8px rgba(79, 70, 229, 0);
+                    }
+                    100% {
+                        box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+                    }
+                }
+            `}</style>
+            <div style={{ position: "relative", display: "inline-block" }}>
+                <button
+                    id="open-tour-btn"
+                    onClick={() => setActiveTourStep(viewMode === "graph" ? 13 : 0)}
+                    style={{
+                        border: "1px solid rgba(79, 70, 229, 0.3)",
+                        background: "rgba(79, 70, 229, 0.08)",
+                        color: "#4f46e5",
+                        borderRadius: 8,
+                        padding: "8px 12px",
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        animation: (!tourCompleted && !(shouldOfferInitialBachelorPrefill || shouldOfferInitialMasterPrefill)) ? "helpPulse 2s infinite" : "none",
+                    }}
+                    title="Start interactive planner tour"
+                >
+                    ❓ Help
+                </button>
+                {!tourCompleted && !(shouldOfferInitialBachelorPrefill || shouldOfferInitialMasterPrefill) && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            top: "calc(100% + 8px)",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            background: "#4f46e5",
+                            color: "#ffffff",
+                            padding: "5px 9px",
+                            borderRadius: 6,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            whiteSpace: "nowrap",
+                            boxShadow: "0 4px 12px rgba(79, 70, 229, 0.35)",
+                            pointerEvents: "none",
+                            zIndex: 35,
+                        }}
+                    >
+                        <div style={{
+                            position: "absolute",
+                            top: -4,
+                            left: "50%",
+                            transform: "translateX(-50%) rotate(45deg)",
+                            width: 8,
+                            height: 8,
+                            background: "#4f46e5",
+                        }} />
+                        Start Tour! ⚡️
+                    </div>
+                )}
+            </div>
             <button
+                id="open-dashboard-btn"
+                onClick={() => setIsRuleDashboardOpen((v) => !v)}
+                style={{
+                    border: "1px solid #d1d5db",
+                    background: "#ffffff",
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                }}
+                title={isRuleDashboardOpen ? "Close dashboard" : "Open dashboard"}
+            >
+                {isRuleDashboardOpen ? "▦ Close Dashboard" : "▦ Open Dashboard"}
+            </button>
+            <button
+                id="open-profile-btn"
                 onClick={() => setIsProfileOpen(true)}
                 style={{
                     border: "1px solid #d1d5db",
@@ -4280,8 +4429,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             type="number"
                             min={1900}
                             max={2600}
-                            value={signupSetupStartYear}
-                            onChange={(e) => setSignupSetupStartYear(Number(e.target.value))}
+                            value={signupSetupStartYear ?? ""}
+                            onChange={(e) => setSignupSetupStartYear(e.target.value)}
                             disabled={isSavingSignupSetup}
                             style={{
                                 border: "1px solid #d1d5db",
@@ -4351,6 +4500,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             }}
         >
             <div
+                id="profile-modal-container"
                 style={{
                     width: 420,
                     maxWidth: "100%",
@@ -4405,6 +4555,25 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     <div style={{ fontSize: 13, color: "#111827" }}>
                         Name: <strong>{currentUser?.username || "user"}</strong>
                     </div>
+                )}
+                {!isCurriculumSettingsOpen && (
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", userSelect: "none", marginTop: 4 }}>
+                        <input
+                            type="checkbox"
+                            checked={profileDisableGraphView}
+                            onChange={(e) => {
+                                const val = e.target.checked;
+                                setProfileDisableGraphView(val);
+                                if (val) {
+                                    localStorage.setItem("disable-graph-view-" + currentUser?.username, "true");
+                                } else {
+                                    localStorage.removeItem("disable-graph-view-" + currentUser?.username);
+                                }
+                            }}
+                            style={{ cursor: "pointer", width: 16, height: 16 }}
+                        />
+                        Disable Graph View (User Study Persona 1)
+                    </label>
                 )}
                 {!isCurriculumSettingsOpen && (
                     <div style={{ display: "grid", gap: 4 }}>
@@ -4490,8 +4659,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             type="number"
                             min={1900}
                             max={2600}
-                            value={profileDraftStartYear}
-                            onChange={(e) => setProfileDraftStartYear(Number(e.target.value))}
+                            value={profileDraftStartYear ?? ""}
+                            onChange={(e) => setProfileDraftStartYear(e.target.value)}
                             disabled={isSavingProfileSettings || isStartTermLocked}
                             style={{
                                 border: "1px solid #d1d5db",
@@ -4634,12 +4803,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                                 type="number"
                                 min={1}
                                 step={0.5}
-                                value={Number(profileDraftMaxEcts ?? 42)}
-                                onChange={(e) => {
-                                    const nextMax = Number(e.target.value);
-                                    if (!Number.isFinite(nextMax) || nextMax <= 0) return;
-                                    setProfileDraftMaxEcts(nextMax);
-                                }}
+                                value={profileDraftMaxEcts ?? ""}
+                                onChange={(e) => setProfileDraftMaxEcts(e.target.value)}
                                 style={{
                                     border: "1px solid #d1d5db",
                                     background: "#ffffff",
@@ -4657,12 +4822,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                                 type="number"
                                 min={1}
                                 step={0.5}
-                                value={Number(profileDraftMaxWeekHours ?? 50)}
-                                onChange={(e) => {
-                                    const nextMax = Number(e.target.value);
-                                    if (!Number.isFinite(nextMax) || nextMax <= 0) return;
-                                    setProfileDraftMaxWeekHours(nextMax);
-                                }}
+                                value={profileDraftMaxWeekHours ?? ""}
+                                onChange={(e) => setProfileDraftMaxWeekHours(e.target.value)}
                                 style={{
                                     border: "1px solid #d1d5db",
                                     background: "#ffffff",
@@ -4680,12 +4841,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                                 type="number"
                                 min={1}
                                 step={0.5}
-                                value={Number(profileDraftRecommendedEcts ?? 30)}
-                                onChange={(e) => {
-                                    const nextRecommended = Number(e.target.value);
-                                    if (!Number.isFinite(nextRecommended) || nextRecommended <= 0) return;
-                                    setProfileDraftRecommendedEcts(nextRecommended);
-                                }}
+                                value={profileDraftRecommendedEcts ?? ""}
+                                onChange={(e) => setProfileDraftRecommendedEcts(e.target.value)}
                                 style={{
                                     border: "1px solid #d1d5db",
                                     background: "#ffffff",
@@ -4703,12 +4860,8 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                                 type="number"
                                 min={1}
                                 step={0.5}
-                                value={Number(profileDraftRecommendedWeekHours ?? 40)}
-                                onChange={(e) => {
-                                    const nextRecommended = Number(e.target.value);
-                                    if (!Number.isFinite(nextRecommended) || nextRecommended <= 0) return;
-                                    setProfileDraftRecommendedWeekHours(nextRecommended);
-                                }}
+                                value={profileDraftRecommendedWeekHours ?? ""}
+                                onChange={(e) => setProfileDraftRecommendedWeekHours(e.target.value)}
                                 style={{
                                     border: "1px solid #d1d5db",
                                     background: "#ffffff",
@@ -4747,6 +4900,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
     const ruleDashboardAside = isRuleDashboardOpen && (
         <aside
+            id="planner-dashboard-container"
             style={{
                 width: 420,
                 borderLeft: "1px solid #e5e7eb",
@@ -4818,12 +4972,14 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
             <div style={{ display: "inline-flex", gap: 6, marginBottom: 12 }}>
                 <button
+                    id="dashboard-planned-tab"
                     onClick={() => setDashboardViewMode("planning")}
                     style={getDashboardModeButtonStyle("planning")}
                 >
                     Planned
                 </button>
                 <button
+                    id="dashboard-done-tab"
                     onClick={() => setDashboardViewMode("progress")}
                     style={getDashboardModeButtonStyle("progress")}
                 >
@@ -6016,6 +6172,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         semesterOptions={sidebarSemesters}
                         getValidSemestersForCourse={validSemestersForCourse}
                         getValidSemestersForModule={validSemestersForModule}
+                        termAvailabilityForCode={termAvailabilityForCode}
                         graphViewState={graphViewState}
                         setGraphViewState={setGraphViewState}
                         graphStateReady={plannerHydrated && plannerLoadOk}
@@ -6024,6 +6181,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                         }}
                         isRuleDashboardOpen={isRuleDashboardOpen}
                         onToggleRuleDashboard={() => setIsRuleDashboardOpen((v) => !v)}
+                        isRecPanelOpen={isRecPanelOpen}
+                        onToggleRecPanel={() => setIsRecPanelOpen((v) => !v)}
+                        recommendations={recommendations}
+                        setRecommendations={setRecommendations}
+                        recommendationToggles={profileSettingsByProgram?.[programCode]?.recommendation_toggles || {}}
+                        onRecommendationToggleChange={handleRecommendationToggle}
+                        onDragStart={handleDragStart}
                         recommendedCourseMap={recommendedCourseMap}
                         isLegendOpen={isLegendOpen}
                         onToggleLegend={() => setIsLegendOpen((v) => !v)}
@@ -6036,6 +6200,18 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     />
                 </div>
                 {ruleDashboardAside}
+
+                {activeTourStep !== null && (
+                    <OnboardingTour
+                        activeStep={activeTourStep}
+                        setActiveStep={setActiveTourStep}
+                        viewMode={viewMode}
+                        setViewMode={setViewMode}
+                        disableGraphView={profileDisableGraphView}
+                        username={currentUser?.username}
+                        onClose={() => setActiveTourStep(null)}
+                    />
+                )}
             </div>
         );
     }
@@ -6059,39 +6235,27 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     boxSizing: "border-box",
                 }}
             >
+                {!profileDisableGraphView && (
+                    <button
+                        id="toggle-view-mode-btn"
+                        onClick={() => setViewMode("graph")}
+                        style={{
+                            border: "1px solid #d1d5db",
+                            background: "#ffffff",
+                            borderRadius: 8,
+                            padding: "6px 8px",
+                            textAlign: "center",
+                            whiteSpace: "nowrap",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            gridColumn: "1 / -1",
+                        }}
+                    >
+                        ⇆ Graph View
+                    </button>
+                )}
                 <button
-                    onClick={() => setViewMode("graph")}
-                    style={{
-                        flex: 1,
-                        border: "1px solid #d1d5db",
-                        background: "#ffffff",
-                        borderRadius: 8,
-                        padding: "6px 8px",
-                        textAlign: "center",
-                        whiteSpace: "nowrap",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                    }}
-                >
-                    ⇆ Graph View
-                </button>
-                <button
-                    onClick={() => setIsRuleDashboardOpen((v) => !v)}
-                    style={{
-                        flex: 1,
-                        border: "1px solid #d1d5db",
-                        background: "#ffffff",
-                        borderRadius: 8,
-                        padding: "6px 8px",
-                        textAlign: "center",
-                        whiteSpace: "nowrap",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                    }}
-                >
-                    {isRuleDashboardOpen ? "▦ Close Dashboard" : "▦ Open Dashboard"}
-                </button>
-                <button
+                    id="show-all-catalog-btn"
                     onClick={() => setIsSidebarOpen((v) => !v)}
                     style={{
                         border: "1px solid #d1d5db",
@@ -6107,6 +6271,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     {isSidebarOpen ? "☰ Hide Sidebar" : "☰ Show Sidebar"}
                 </button>
                 <button
+                    id="open-recommendations-btn"
                     onClick={() => setIsRecPanelOpen((v) => !v)}
                     style={{
                         border: "1px solid #d1d5db",
@@ -6239,6 +6404,172 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                             </Controls>
                             <Background gap={GRID_SIZE} />
                         </ReactFlow>
+
+                        {/* Layout Semantics Pill */}
+                        <div
+                            style={{
+                                position: "absolute",
+                                bottom: 16,
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                zIndex: 10,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                background: "rgba(255, 255, 255, 0.9)",
+                                backdropFilter: "blur(8px)",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 9999,
+                                padding: "6px 14px",
+                                boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: "#374151",
+                            }}
+                        >
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <span style={{ color: "#4f46e5", fontWeight: 700 }}>↔ Horizontal:</span> Semesters (Chronological)
+                            </span>
+                            <span style={{ color: "#d1d5db" }}>|</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                <span style={{ color: "#4f46e5", fontWeight: 700 }}>↕ Vertical:</span> 
+                                {tableVerticalSemantics === "no_meaning" && (
+                                    <span style={{ color: "#9ca3af", fontStyle: "italic" }}>
+                                        no meaning
+                                    </span>
+                                )}
+                                {tableVerticalSemantics === "alphabetical" && <span>Alphabetical (A-Z)</span>}
+                                {tableVerticalSemantics === "ects" && <span>ECTS (descending)</span>}
+                                {tableVerticalSemantics === "custom" && (
+                                    <span style={{ fontWeight: 600, color: "#1f2937" }}>{tableVerticalCustomText || "Custom meaning"}</span>
+                                )}
+                            </span>
+                            <button
+                                id="table-semantics-edit-btn"
+                                onClick={() => setIsTableSemanticsPopupOpen(true)}
+                                style={{
+                                    background: "none",
+                                    border: "none",
+                                    padding: 0,
+                                    cursor: "pointer",
+                                    color: "#4f46e5",
+                                    fontWeight: 700,
+                                    fontSize: 11,
+                                    marginLeft: 6,
+                                    textDecoration: "underline",
+                                }}
+                            >
+                                Edit
+                            </button>
+                        </div>
+
+                        {isTableSemanticsPopupOpen && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    bottom: 50,
+                                    left: "50%",
+                                    transform: "translateX(-50%)",
+                                    zIndex: 11,
+                                    width: 320,
+                                    background: "#ffffff",
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 12,
+                                    padding: 14,
+                                    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                                    display: "grid",
+                                    gap: 10,
+                                }}
+                            >
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937" }}>Configure Layout Axis Semantics</div>
+                                
+                                {/* Horizontal Axis */}
+                                <div style={{ display: "grid", gap: 4 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: "#4b5563" }}>Horizontal Axis Semantics</div>
+                                    <div style={{ fontSize: 11, color: "#6b7280", fontStyle: "italic" }}>
+                                        Semesters (fixed by layout)
+                                    </div>
+                                </div>
+
+                                <hr style={{ border: "0", borderTop: "1px solid #e5e7eb", margin: "4px 0" }} />
+
+                                {/* Vertical Axis */}
+                                <div style={{ display: "grid", gap: 6 }}>
+                                    <div style={{ fontSize: 11, fontWeight: 700, color: "#4b5563" }}>Vertical Axis Semantics</div>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                                        <input
+                                            type="radio"
+                                            name="tableVerticalSemantics"
+                                            checked={tableVerticalSemantics === "no_meaning"}
+                                            onChange={() => setTableVerticalSemantics("no_meaning")}
+                                        />
+                                        No meaning
+                                    </label>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                                        <input
+                                            type="radio"
+                                            name="tableVerticalSemantics"
+                                            checked={tableVerticalSemantics === "alphabetical"}
+                                            onChange={() => setTableVerticalSemantics("alphabetical")}
+                                        />
+                                        Alphabetical (A-Z)
+                                    </label>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                                        <input
+                                            type="radio"
+                                            name="tableVerticalSemantics"
+                                            checked={tableVerticalSemantics === "ects"}
+                                            onChange={() => setTableVerticalSemantics("ects")}
+                                        />
+                                        ECTS (descending)
+                                    </label>
+                                    <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                                        <input
+                                            type="radio"
+                                            name="tableVerticalSemantics"
+                                            checked={tableVerticalSemantics === "custom"}
+                                            onChange={() => setTableVerticalSemantics("custom")}
+                                        />
+                                        Custom meaning...
+                                    </label>
+                                </div>
+
+                                {tableVerticalSemantics === "custom" && (
+                                    <input
+                                        type="text"
+                                        placeholder="Enter custom vertical ordering meaning"
+                                        value={tableVerticalCustomText}
+                                        onChange={(e) => setTableVerticalCustomText(e.target.value)}
+                                        style={{
+                                            border: "1px solid #d1d5db",
+                                            borderRadius: 6,
+                                            padding: "4px 8px",
+                                            fontSize: 11,
+                                            width: "100%",
+                                            boxSizing: "border-box",
+                                        }}
+                                    />
+                                )}
+
+                                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 4 }}>
+                                    <button
+                                        onClick={() => setIsTableSemanticsPopupOpen(false)}
+                                        style={{
+                                            background: "#4f46e5",
+                                            color: "#ffffff",
+                                            border: "none",
+                                            borderRadius: 6,
+                                            padding: "4px 10px",
+                                            fontSize: 11,
+                                            fontWeight: 600,
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                     {isLegendOpen && (
                         <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 6 }}>
@@ -6249,6 +6580,18 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
                 {ruleDashboardAside}
             </div>
+
+            {activeTourStep !== null && (
+                <OnboardingTour
+                    activeStep={activeTourStep}
+                    setActiveStep={setActiveTourStep}
+                    viewMode={viewMode}
+                    setViewMode={setViewMode}
+                    disableGraphView={profileDisableGraphView}
+                    username={currentUser?.username}
+                    onClose={() => setActiveTourStep(null)}
+                />
+            )}
         </div>
     );
 }

@@ -156,7 +156,7 @@ export default function CourseCard({ data }) {
 
     return (
         <div
-            className="card"
+            className="card study-planner-course-card"
             ref={rootRef}
             onMouseEnter={() => {
                 if (data?.groupId) {
@@ -216,8 +216,26 @@ export default function CourseCard({ data }) {
             )}
 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                    {headerCode}
+                <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span>{headerCode}</span>
+                    {data?.termAvailability && (
+                        <>
+                            <span>|</span>
+                            <span 
+                                style={{ 
+                                    display: "inline-flex", 
+                                    alignItems: "center", 
+                                    filter: "grayscale(100%) brightness(0.4) opacity(0.7)", 
+                                    fontSize: 10,
+                                    lineHeight: 1,
+                                    transform: "translateY(-0.5px)"
+                                }} 
+                                title={`Available in ${data.termAvailability}`}
+                            >
+                                {data.termAvailability === "summer" ? "☀️" : data.termAvailability === "winter" ? "❄️" : "☀️❄️"}
+                            </span>
+                        </>
+                    )}
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                     <div style={{ position: "relative" }}>
@@ -229,6 +247,8 @@ export default function CourseCard({ data }) {
                                     setIsMenuOpen((v) => (menuView === nextView ? !v : true));
                                     setMenuView(nextView);
                                 }}
+                                translate="no"
+                                className="notranslate"
                                 aria-label="Details"
                                 title="Details"
                                 style={{

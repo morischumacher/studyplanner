@@ -230,7 +230,7 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
     return enforceStackingOrder(resolved);
 }
 
-export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
+export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGroupTopY, verticalSemantics }) {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
 
     const lanes = new Map();
@@ -247,24 +247,48 @@ export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGro
         const laneNodes = ids
             .map((id) => nodes.find((n) => n.id === id))
             .filter(Boolean)
-            .sort((a, b) => a.position.y - b.position.y);
+            .sort((a, b) => {
+                if (verticalSemantics === "alphabetical") {
+                    const nameA = (a.data?.name || "").toLowerCase();
+                    const nameB = (b.data?.name || "").toLowerCase();
+                    return nameA.localeCompare(nameB);
+                }
+                if (verticalSemantics === "ects") {
+                    const ectsA = Number(a.data?.ects || 0);
+                    const ectsB = Number(b.data?.ects || 0);
+                    return ectsB - ectsA;
+                }
+                return a.position.y - b.position.y;
+            });
 
         let prev = null;
+        let currentY = 96;
         for (const curr of laneNodes) {
-            if (!prev) {
-                prev = curr;
-                continue;
+            if (verticalSemantics === "alphabetical" || verticalSemantics === "ects") {
+                const dy = currentY - curr.position.y;
+                if (dy !== 0) {
+                    nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: currentY } } : n));
+                    const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
+                    if (idx !== -1) laneNodes[idx] = { ...curr, position: { ...curr.position, y: currentY } };
+                }
+                const curB = nodeBBox(laneNodes.find((ln) => ln.id === curr.id) || curr);
+                currentY = curB.y2 + COLLISION_GAP;
+            } else {
+                if (!prev) {
+                    prev = curr;
+                    continue;
+                }
+                const prevB = nodeBBox(prev);
+                const curB = nodeBBox(curr);
+                const minY = prevB.y2 + COLLISION_GAP;
+                if (curB.y1 < minY) {
+                    const dy = minY - curB.y1;
+                    nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: n.position.y + dy } } : n));
+                    const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
+                    if (idx !== -1) laneNodes[idx] = { ...curr, position: { x: curr.position.x, y: curr.position.y + dy } };
+                }
+                prev = laneNodes.find((ln) => ln.id === curr.id) || curr;
             }
-            const prevB = nodeBBox(prev);
-            const curB = nodeBBox(curr);
-            const minY = prevB.y2 + COLLISION_GAP;
-            if (curB.y1 < minY) {
-                const dy = minY - curB.y1;
-                nodes = nodes.map((n) => (n.id === curr.id ? { ...n, position: { x: n.position.x, y: n.position.y + dy } } : n));
-                const idx = laneNodes.findIndex((ln) => ln.id === curr.id);
-                if (idx !== -1) laneNodes[idx] = { ...curr, position: { x: curr.position.x, y: curr.position.y + dy } };
-            }
-            prev = laneNodes.find((ln) => ln.id === curr.id) || curr;
         }
     }
 

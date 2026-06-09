@@ -10,6 +10,7 @@ export default function PlannerNotifications({
     onApplyInitialPrefill,
     onDismissInitialPrefill,
     progressMilestoneText,
+    tourCompleted = true,
 }) {
     const prefillPromptNode = focusPrefillPrompt ? (
         <div
@@ -121,6 +122,39 @@ export default function PlannerNotifications({
         </div>
     ) : null);
 
+    const prefillIndicatorNode = (!tourCompleted && (shouldOfferInitialBachelorPrefill || shouldOfferInitialMasterPrefill)) ? (
+        <div
+            style={{
+                position: "fixed",
+                top: 76,
+                right: 384,
+                background: "#4f46e5",
+                color: "#ffffff",
+                padding: "8px 12px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+                boxShadow: "0 4px 12px rgba(79, 70, 229, 0.35)",
+                pointerEvents: "none",
+                zIndex: 99999,
+                width: 220,
+                boxSizing: "border-box",
+                lineHeight: "1.4",
+            }}
+        >
+            <div style={{
+                position: "absolute",
+                top: "50%",
+                right: -4,
+                transform: "translateY(-50%) rotate(45deg)",
+                width: 8,
+                height: 8,
+                background: "#4f46e5",
+            }} />
+            Please choose whether to fill the planner with a prebuilt plan first!
+        </div>
+    ) : null;
+
     const progressMilestoneNode = progressMilestoneText ? (
         <div
             style={{
@@ -146,6 +180,7 @@ export default function PlannerNotifications({
     return (
         <>
             {prefillPromptNode}
+            {prefillIndicatorNode}
             {progressMilestoneNode}
         </>
     );

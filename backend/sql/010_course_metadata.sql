@@ -421,9 +421,6 @@ SET attributes = COALESCE(attributes, '{}'::jsonb) || jsonb_build_object(
 )
 WHERE title ILIKE 'Zuverlässige Echtzeitsysteme%';
 
--- Auto-generated migration: master course content metadata (Inhalt only)
--- Extracted from syllabus_master.pdf
-
 UPDATE course
 SET attributes = COALESCE(attributes, '{}'::jsonb) || jsonb_build_object(
   'content', '["Provable security, the random-oracle model", "elliptic-curve-based cryptography", "zero-knowledge and succinct proof systems", "secure multi-party computation", "post-quantum (lattice-based) cryptography"]'::jsonb

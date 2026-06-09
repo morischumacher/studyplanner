@@ -121,6 +121,7 @@ export default function RecommendationPanel({
     // ── Main Card List & Empty State Unified ─────────────────────────────
     return (
         <aside
+            id="recommendation-panel-container"
             onScroll={() => closeMenu()}
             style={{
                 width,

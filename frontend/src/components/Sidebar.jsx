@@ -239,6 +239,7 @@ export default function Sidebar({
     };
     return (
         <aside
+            id="course-catalog-sidebar"
             style={{
                 width,
                 marginTop: topOffset,

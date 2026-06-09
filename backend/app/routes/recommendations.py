@@ -64,7 +64,16 @@ async def get_recommendations(payload: RecommendationsPayload, user=Depends(requ
     if profile_row:
         interests = profile_row["interests"] or []
         career_direction = profile_row["career_direction"] or ""
-        toggles = profile_row["recommendation_toggles"] if profile_row["recommendation_toggles"] is not None else toggles
+        raw_toggles = profile_row["recommendation_toggles"]
+        if raw_toggles is not None:
+            if isinstance(raw_toggles, str):
+                import json
+                try:
+                    toggles = json.loads(raw_toggles)
+                except Exception:
+                    pass
+            elif isinstance(raw_toggles, dict):
+                toggles = raw_toggles
 
     # 3. Instantiate Checker & Recommender
     def select_checker(p_code: str):

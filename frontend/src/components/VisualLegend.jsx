@@ -120,6 +120,24 @@ export default function VisualLegend({ programCode }) {
                         {typeCard(elective.label, 1, subjectColor)}
                     </div>
                 </div>
+
+                <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 8, display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Semester Offerings</div>
+                    <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#4b5563" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ filter: "grayscale(100%) brightness(0.4) opacity(0.7)", display: "inline-flex", alignItems: "center", lineHeight: 1 }}>☀️</span>
+                            <span>Summer</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ filter: "grayscale(100%) brightness(0.4) opacity(0.7)", display: "inline-flex", alignItems: "center", lineHeight: 1 }}>❄️</span>
+                            <span>Winter</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <span style={{ filter: "grayscale(100%) brightness(0.4) opacity(0.7)", display: "inline-flex", alignItems: "center", lineHeight: 1 }}>☀️❄️</span>
+                            <span>Both</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );

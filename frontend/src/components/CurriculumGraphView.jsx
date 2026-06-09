@@ -9,6 +9,7 @@ import {
     GraphSubjectNode,
 } from "./graphNodes/index.js";
 import VisualLegend from "./VisualLegend.jsx";
+import RecommendationPanel from "./RecommendationPanel.jsx";
 import GraphFilterEngine from "../utils/GraphFilterEngine.js";
 
 const X_BY_LEVEL = {
@@ -39,7 +40,7 @@ function nodeTypeForLevel(level) {
     return "graphCourse";
 }
 
-function buildTree(catalog, subjectColors) {
+function buildTree(catalog, subjectColors, termAvailabilityForCode) {
     const subjects = (catalog || []).map((pf, pfIdx) => {
         const subjectName = pf?.pruefungsfach ?? `Pruefungsfach ${pfIdx + 1}`;
         const subjectColor = subjectColors?.[subjectName] ?? "#4b5563";
@@ -54,12 +55,13 @@ function buildTree(catalog, subjectColors) {
             // direct course node like table/sidebar.
             if (hasNoCourses || courses.length === 1) {
                 const course = courses[0];
+                const resolvedCode = hasNoCourses ? (mod?.code ?? "") : (course?.code ?? mod?.code ?? "");
                 return [{
                     id: `course-${pfIdx}-${modIdx}-single-${course?.code || mod?.code || "course"}`,
                     label: `${hasNoCourses ? (mod?.name || "Course") : (course?.name || mod?.name || "Course")}`,
                     level: "courseDirect",
                     color: subjectColor,
-                    courseCode: hasNoCourses ? (mod?.code ?? "") : (course?.code ?? mod?.code ?? ""),
+                    courseCode: resolvedCode,
                     courseName: hasNoCourses ? (mod?.name ?? "Course") : (course?.name ?? mod?.name ?? "Course"),
                     ects: hasNoCourses ? (mod?.ects ?? null) : (course?.ects ?? mod?.ects ?? null),
                     courseType: hasNoCourses
@@ -68,6 +70,7 @@ function buildTree(catalog, subjectColors) {
                     category: mod?.category ?? null,
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     isMandatory: Boolean(mod?.is_mandatory),
+                    termAvailability: typeof termAvailabilityForCode === "function" ? termAvailabilityForCode(resolvedCode) : null,
                     children: [],
                 }];
             }
@@ -106,6 +109,9 @@ function buildTree(catalog, subjectColors) {
                 moduleCourseEcts: courses
                     .map((course) => Number(course?.ects))
                     .filter((ects) => Number.isFinite(ects)),
+                moduleCourseTermAvailabilities: courses
+                    .map((course) => typeof termAvailabilityForCode === "function" ? termAvailabilityForCode(course?.code) : null)
+                    .filter(Boolean),
                 children: courses.map((course, courseIdx) => ({
                     id: `course-${pfIdx}-${modIdx}-${courseIdx}-${course?.code || "course"}`,
                     label: `${course?.name || "Course"}`,
@@ -119,6 +125,7 @@ function buildTree(catalog, subjectColors) {
                     examSubject: mod?.module_exam_subject ?? subjectName ?? null,
                     isMandatory: Boolean(mod?.is_mandatory),
                     parentModulePayload: modulePayload,
+                    termAvailability: typeof termAvailabilityForCode === "function" ? termAvailabilityForCode(course?.code) : null,
                     children: [],
                 })),
             }];
@@ -205,6 +212,8 @@ function toFilterCandidateNode(treeNode, getCourseStatus) {
             examSubject: treeNode?.examSubject ?? (treeNode?.level === "subject" ? treeNode?.label : null),
             isMandatory: Boolean(treeNode?.isMandatory),
             status: computeTreeNodeStatus(treeNode, getCourseStatus),
+            termAvailability: treeNode?.termAvailability ?? null,
+            moduleCourseTermAvailabilities: treeNode?.moduleCourseTermAvailabilities ?? [],
         },
     };
 }
@@ -268,6 +277,18 @@ function relaxFiltersForExpandedSubtree({
                 }
             }
 
+            if (Array.isArray(next?.termAvailabilities) && next.termAvailabilities.length > 0) {
+                if (data?.level === "module") {
+                    const terms = Array.isArray(data?.moduleCourseTermAvailabilities) ? data.moduleCourseTermAvailabilities : [];
+                    for (const term of terms) {
+                        changed = addUnique("termAvailabilities", String(term || "both").trim().toLowerCase()) || changed;
+                    }
+                } else if (data?.level === "course" || data?.level === "courseDirect") {
+                    const term = String(data?.termAvailability || "both").trim().toLowerCase();
+                    changed = addUnique("termAvailabilities", term) || changed;
+                }
+            }
+
             const range = next?.ectsRange;
             if (range && Number.isFinite(Number(range.min)) && Number.isFinite(Number(range.max))) {
                 const currentMin = Number(range.min);
@@ -297,7 +318,7 @@ function relaxFiltersForExpandedSubtree({
         if (!changed) break;
     }
 
-    // Force-unblock progress/obligation for manually expanded subtree.
+    // Force-unblock progress/obligation/terms for manually expanded subtree.
     // This avoids a dead-end where strict empty selections hide all children.
     const stillHidden = descendantNodes
         .filter((node) => !GraphFilterEngine.nodeMatchesFilters(node, next, programCode));
@@ -308,7 +329,7 @@ function relaxFiltersForExpandedSubtree({
                     .map((node) => String(node?.data?.status || ""))
                     .filter(Boolean)
             );
-            const safeStatuses = statuses.size > 0 ? Array.from(statuses) : ["todo", "in_plan", "done"];
+            const safeStatuses = statuses.size > 0 ? Array.from(statuses) : ["todo", "in_plan", "done", "parked"];
             next = { ...next, progressStates: safeStatuses };
         }
 
@@ -322,6 +343,23 @@ function relaxFiltersForExpandedSubtree({
                 ? Array.from(obligations)
                 : GraphFilterEngine.obligationOptionsForProgram(programCode).map((x) => x.value).filter(Boolean);
             next = { ...next, obligationTypes: safeObligations };
+        }
+
+        if (Array.isArray(next?.termAvailabilities) && next.termAvailabilities.length === 0) {
+            const terms = new Set();
+            for (const node of stillHidden) {
+                if (node?.data?.level === "module") {
+                    const moduleTerms = Array.isArray(node?.data?.moduleCourseTermAvailabilities) ? node?.data?.moduleCourseTermAvailabilities : [];
+                    for (const t of moduleTerms) {
+                        if (t) terms.add(String(t).trim().toLowerCase());
+                    }
+                } else {
+                    const term = String(node?.data?.termAvailability || "both").trim().toLowerCase();
+                    if (term) terms.add(term);
+                }
+            }
+            const safeTerms = terms.size > 0 ? Array.from(terms) : ["summer", "winter", "both"];
+            next = { ...next, termAvailabilities: safeTerms };
         }
     }
 
@@ -434,6 +472,8 @@ function layoutTree(root, collapsedIds, options = {}) {
                 semestersForModule: node.level === "module" ? semestersForModule : null,
                 isRecommended: (node.level === "course" || node.level === "courseDirect") && node?.courseCode ? recommendedCourseMap.has(String(node.courseCode)) : false,
                 recommendationType: (node.level === "course" || node.level === "courseDirect") && node?.courseCode ? (recommendedCourseMap.get(String(node.courseCode)) ?? null) : null,
+                termAvailability: node?.termAvailability ?? null,
+                moduleCourseTermAvailabilities: node?.moduleCourseTermAvailabilities ?? [],
             },
             sourcePosition: "right",
             targetPosition: "left",
@@ -616,12 +656,20 @@ export default function CurriculumGraphView({
     ruleFeedback,
     isRuleDashboardOpen,
     onToggleRuleDashboard,
+    isRecPanelOpen,
+    onToggleRecPanel,
+    recommendations = [],
+    setRecommendations,
+    recommendationToggles = {},
+    onRecommendationToggleChange,
+    onDragStart,
     isLegendOpen,
     onToggleLegend,
     recommendedCourseMap = new Map(),
+    termAvailabilityForCode,
 }) {
     const rfRef = useRef(null);
-    const root = useMemo(() => buildTree(catalog, subjectColors), [catalog, subjectColors]);
+    const root = useMemo(() => buildTree(catalog, subjectColors, termAvailabilityForCode), [catalog, subjectColors, termAvailabilityForCode]);
     const isDraggingRef = useRef(false);
     const suppressCollapsedPersistRef = useRef(false);
     const filtersDirtyRef = useRef(false);
@@ -629,6 +677,12 @@ export default function CurriculumGraphView({
     const [isProgramSwitching, setIsProgramSwitching] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(true);
     const [interactionMode, setInteractionMode] = useState("pan");
+    const [graphHorizontalSemantics, setGraphHorizontalSemantics] = useState("hierarchy");
+    const [graphHorizontalCustomText, setGraphHorizontalCustomText] = useState("");
+    const [graphVerticalSemantics, setGraphVerticalSemantics] = useState("no_meaning");
+    const [graphVerticalCustomText, setGraphVerticalCustomText] = useState("");
+    const [isGraphSemanticsPopupOpen, setIsGraphSemanticsPopupOpen] = useState(false);
+
     const [feedbackToast, setFeedbackToast] = useState({
         visible: false,
         text: "",
@@ -651,7 +705,8 @@ export default function CurriculumGraphView({
             obligationTypes: allObligationTypes,
             courseTypes: allCourseTypes,
             examSubjects: allExamSubjects,
-            progressStates: ["todo", "in_plan", "done"],
+            progressStates: ["todo", "in_plan", "done", "parked"],
+            termAvailabilities: ["summer", "winter", "both"],
         };
     }, [obligationOptions, filterOptions?.courseTypes, filterOptions?.examSubjects]);
     const withFilterDefaults = useCallback((filters) => {
@@ -1145,7 +1200,7 @@ export default function CurriculumGraphView({
     };
 
     return (
-        <div style={{ height: "100%", width: "100%", position: "relative", background: "#f9fafb" }}>
+        <div id="graph-flow-container" style={{ height: "100%", width: "100%", position: "relative", background: "#f9fafb" }}>
             <div
                 style={{
                     position: "absolute",
@@ -1165,30 +1220,31 @@ export default function CurriculumGraphView({
                     }}
                     style={{
                         ...topButtonStyle,
+                        gridColumn: "1 / -1",
                     }}
                 >
                     ⇆ Table View
                 </button>
                 <button
-                    onClick={() => onToggleRuleDashboard?.()}
-                    style={{
-                        ...topButtonStyle,
-                    }}
-                >
-                    {isRuleDashboardOpen ? "▦ Close Dashboard" : "▦ Open Dashboard"}
-                </button>
-                <button
                     onClick={() => setIsFiltersOpen((v) => !v)}
                     style={{
                         ...topButtonStyle,
-                        gridColumn: "1 / -1",
                     }}
                 >
                     {isFiltersOpen ? "☰ Hide Filters" : "☰ Show Filters"}
                 </button>
+                <button
+                    onClick={() => onToggleRecPanel?.()}
+                    style={{
+                        ...topButtonStyle,
+                    }}
+                >
+                    {isRecPanelOpen ? "★ Hide Recs" : "★ Show Recs"}
+                </button>
             </div>
             {isFiltersOpen && (
                 <div
+                    id="graph-filters-panel"
                     style={{
                         position: "absolute",
                         top: filterPanelTop,
@@ -1208,7 +1264,7 @@ export default function CurriculumGraphView({
                 >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700 }}>Filters</div>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div id="graph-interaction-instructions" style={{ display: "flex", gap: 6 }}>
                         <button
                             onClick={() => {
                                 isDraggingRef.current = false;
@@ -1281,6 +1337,7 @@ export default function CurriculumGraphView({
                                             ? normalized.examSubjects
                                             : [],
                                         progressStates: [],
+                                        termAvailabilities: [],
                                     };
                                 });
                                 setHierarchyMode("force_collapsed");
@@ -1453,6 +1510,7 @@ export default function CurriculumGraphView({
                             ["todo", "Not Planned"],
                             ["in_plan", "Planned"],
                             ["done", "Done"],
+                            ["parked", "Parked"],
                         ].map(([state, label]) => {
                             const active = graphFilters.progressStates.includes(state);
                             return (
@@ -1470,6 +1528,49 @@ export default function CurriculumGraphView({
                                     }}
                                 >
                                     {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Semester</div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {[
+                            ["summer", "☀️ Summer"],
+                            ["winter", "❄️ Winter"],
+                            ["both", "☀️❄️ Both"],
+                        ].map(([term, label]) => {
+                            const active = (graphFilters.termAvailabilities || []).includes(term);
+                            return (
+                                <button
+                                    key={term}
+                                    onClick={() => toggleFilterValue("termAvailabilities", term)}
+                                    style={{
+                                        border: "1px solid #d1d5db",
+                                        background: active ? "#dbeafe" : "#ffffff",
+                                        borderRadius: 6,
+                                        padding: "4px 8px",
+                                        fontSize: 11,
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                    }}
+                                >
+                                    <span 
+                                        style={{ 
+                                            display: "inline-flex", 
+                                            alignItems: "center", 
+                                            filter: "grayscale(100%) brightness(0.4) opacity(0.7)", 
+                                            fontSize: 10,
+                                            lineHeight: 1
+                                        }}
+                                    >
+                                        {term === "summer" ? "☀️" : term === "winter" ? "❄️" : "☀️❄️"}
+                                    </span>
+                                    <span>{term === "summer" ? "Summer" : term === "winter" ? "Winter" : "Both"}</span>
                                 </button>
                             );
                         })}
@@ -1518,6 +1619,31 @@ export default function CurriculumGraphView({
                     </button>
                 </div>
             )}
+            {isRecPanelOpen && (
+                <RecommendationPanel
+                    recommendations={recommendations}
+                    onDismiss={(id) => setRecommendations?.((prev) => prev.filter((r) => r.id !== id))}
+                    onAddToPlan={(payload, laneIndex) => {
+                        onAddToPlan?.(payload, laneIndex, { allowDirectLaneSelection: true });
+                    }}
+                    semesterOptions={semesterOptions}
+                    getValidSemestersForCourse={getValidSemestersForCourse}
+                    toggles={recommendationToggles}
+                    onToggleChange={onRecommendationToggleChange}
+                    width={280}
+                    leftOffset={isFiltersOpen ? (filterPanelWidth + 24) : 12}
+                    topOffset={80}
+                    bottomOffset={12}
+                    programCode={programCode}
+                    getCourseStatus={getCourseStatus}
+                    onDragStart={onDragStart}
+                    subjectColors={subjectColors}
+                    onToggleCourseDone={onToggleDone}
+                    onRemoveCourseFromPlan={onRemoveFromPlan}
+                    getCourseMeta={getCourseMeta}
+                    onUpdateCourseMeta={onUpdateCourseMeta}
+                />
+            )}
             {isLegendOpen && (
                 <div style={{ position: "absolute", right: 12, bottom: 12, zIndex: 5 }}>
                     <VisualLegend programCode={programCode} />
@@ -1558,7 +1684,7 @@ export default function CurriculumGraphView({
                     elementsSelectable
                     selectNodesOnDrag={interactionMode === "select"}
                     selectionOnDrag={interactionMode === "select"}
-                    selectionKeyCode={null}
+                    selectionKeyCode="Shift"
                     selectionMode={SelectionMode.Partial}
                     multiSelectionKeyCode={["Meta", "Shift", "Control"]}
                     panOnDrag={interactionMode === "pan"}
@@ -1583,6 +1709,160 @@ export default function CurriculumGraphView({
                     </Controls>
                     <Background gap={18} />
                 </ReactFlow>
+            )}
+
+            {/* Graph Layout Semantics Pill */}
+            <div
+                style={{
+                    position: "absolute",
+                    bottom: 16,
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    zIndex: 10,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: "rgba(255, 255, 255, 0.9)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 9999,
+                    padding: "6px 14px",
+                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: "#374151",
+                }}
+            >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "#4f46e5", fontWeight: 700 }}>↔ Horizontal:</span> 
+                    {graphHorizontalSemantics === "hierarchy" && <span>Curriculum Hierarchy Level</span>}
+                    {graphHorizontalSemantics === "no_meaning" && (
+                        <span style={{ color: "#9ca3af", fontStyle: "italic" }}>
+                            no meaning
+                        </span>
+                    )}
+                    {graphHorizontalSemantics === "custom" && (
+                        <span style={{ fontWeight: 600, color: "#1f2937" }}>{graphHorizontalCustomText || "Custom meaning"}</span>
+                    )}
+                </span>
+                <span style={{ color: "#d1d5db" }}>|</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "#4f46e5", fontWeight: 700 }}>↕ Vertical:</span> Exam Subject
+                </span>
+                <button
+                    onClick={() => setIsGraphSemanticsPopupOpen(true)}
+                    style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        color: "#4f46e5",
+                        fontWeight: 700,
+                        fontSize: 11,
+                        marginLeft: 6,
+                        textDecoration: "underline",
+                    }}
+                >
+                    Edit
+                </button>
+            </div>
+
+            {isGraphSemanticsPopupOpen && (
+                <div
+                    style={{
+                        position: "absolute",
+                        bottom: 50,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        zIndex: 11,
+                        width: 320,
+                        background: "#ffffff",
+                        border: "1px solid #d1d5db",
+                        borderRadius: 12,
+                        padding: 14,
+                        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                        display: "grid",
+                        gap: 12,
+                    }}
+                >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1f2937" }}>Configure Graph Axis Semantics</div>
+                    
+                    {/* Horizontal Axis */}
+                    <div style={{ display: "grid", gap: 6 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#4b5563" }}>Horizontal Axis Semantics</div>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                            <input
+                                type="radio"
+                                name="graphHorizontalSemantics"
+                                checked={graphHorizontalSemantics === "hierarchy"}
+                                onChange={() => setGraphHorizontalSemantics("hierarchy")}
+                            />
+                            Curriculum Hierarchy Level
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                            <input
+                                type="radio"
+                                name="graphHorizontalSemantics"
+                                checked={graphHorizontalSemantics === "no_meaning"}
+                                onChange={() => setGraphHorizontalSemantics("no_meaning")}
+                            />
+                            No meaning
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#374151", cursor: "pointer" }}>
+                            <input
+                                type="radio"
+                                name="graphHorizontalSemantics"
+                                checked={graphHorizontalSemantics === "custom"}
+                                onChange={() => setGraphHorizontalSemantics("custom")}
+                            />
+                            Custom meaning...
+                        </label>
+                        {graphHorizontalSemantics === "custom" && (
+                            <input
+                                type="text"
+                                placeholder="Enter custom horizontal meaning"
+                                value={graphHorizontalCustomText}
+                                onChange={(e) => setGraphHorizontalCustomText(e.target.value)}
+                                style={{
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: 6,
+                                    padding: "4px 8px",
+                                    fontSize: 11,
+                                    width: "100%",
+                                    boxSizing: "border-box",
+                                }}
+                            />
+                        )}
+                    </div>
+
+                    <hr style={{ border: "0", borderTop: "1px solid #e5e7eb", margin: "4px 0" }} />
+
+                    {/* Vertical Axis */}
+                    <div style={{ display: "grid", gap: 4 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#4b5563" }}>Vertical Axis Semantics</div>
+                        <div style={{ fontSize: 11, color: "#6b7280", fontStyle: "italic" }}>
+                            Exam Subject (fixed by layout)
+                        </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 4 }}>
+                        <button
+                            onClick={() => setIsGraphSemanticsPopupOpen(false)}
+                            style={{
+                                background: "#4f46e5",
+                                color: "#ffffff",
+                                border: "none",
+                                borderRadius: 6,
+                                padding: "4px 10px",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                            }}
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

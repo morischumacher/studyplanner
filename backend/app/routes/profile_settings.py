@@ -80,6 +80,20 @@ async def get_profile_settings(
             code,
         )
 
+    toggles = {
+        "interest": True, "similarity": True, "sequence": True, "completed": True, "internship": True
+    }
+    if start_term_row and start_term_row["recommendation_toggles"] is not None:
+        raw_toggles = start_term_row["recommendation_toggles"]
+        if isinstance(raw_toggles, str):
+            import json
+            try:
+                toggles = json.loads(raw_toggles)
+            except Exception:
+                pass
+        elif isinstance(raw_toggles, dict):
+            toggles = raw_toggles
+
     return {
         "program_code": code,
         "start_term": (
@@ -92,9 +106,7 @@ async def get_profile_settings(
         ),
         "interests": start_term_row["interests"] if start_term_row and start_term_row["interests"] is not None else [],
         "career_direction": start_term_row["career_direction"] if start_term_row else None,
-        "recommendation_toggles": start_term_row["recommendation_toggles"] if start_term_row and start_term_row["recommendation_toggles"] is not None else {
-            "interest": True, "similarity": True, "sequence": True, "completed": True, "internship": True
-        },
+        "recommendation_toggles": toggles,
         "start_term_locked": bool(start_term_row),
         "locked_program_code": (
             str(locked_program_row["program_code"]).strip()
