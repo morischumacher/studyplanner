@@ -77,7 +77,10 @@ async def signup(payload: AuthPayload, response: Response):
         )
 
     _set_session_cookie(response, token)
-    return {"user": {"id": str(user["id"]), "username": user["username"]}}
+    return {
+        "user": {"id": str(user["id"]), "username": user["username"]},
+        "token": token
+    }
 
 
 @router.post("/signin")
@@ -109,7 +112,10 @@ async def signin(payload: AuthPayload, response: Response):
         )
 
     _set_session_cookie(response, token)
-    return {"user": {"id": str(user["id"]), "username": user["username"]}}
+    return {
+        "user": {"id": str(user["id"]), "username": user["username"]},
+        "token": token
+    }
 
 
 @router.post("/signout")

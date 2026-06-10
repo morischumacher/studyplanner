@@ -1,5 +1,14 @@
 const BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000';
 
+function getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    const token = localStorage.getItem("study_planner_auth_token");
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 /**
  * Fetch the catalog for a single program by its code (e.g. "066 937").
  * Returns the catalog array (subjects ...), exactly as the backend returns for a single program.
@@ -10,7 +19,7 @@ export async function fetchCatalog(programCode) {
 
     const res = await fetch(url.toString(), {
         credentials: "include",
-        headers: { Accept: "application/json" },
+        headers: getAuthHeaders({ Accept: "application/json" }),
     });
 
     if (!res.ok) {
@@ -25,10 +34,10 @@ export async function sendRuleCheckUpdate(payload) {
     const res = await fetch(url.toString(), {
         method: "POST",
         credentials: "include",
-        headers: {
+        headers: getAuthHeaders({
             "Content-Type": "application/json",
             Accept: "application/json",
-        },
+        }),
         body: JSON.stringify(payload ?? {}),
     });
 
@@ -59,7 +68,11 @@ export async function signUp(username, password) {
         },
         body: JSON.stringify({ username, password }),
     });
-    return parseJsonOrError(res, "Signup failed");
+    const data = await parseJsonOrError(res, "Signup failed");
+    if (data?.token) {
+        localStorage.setItem("study_planner_auth_token", data.token);
+    }
+    return data;
 }
 
 export async function signIn(username, password) {
@@ -73,7 +86,11 @@ export async function signIn(username, password) {
         },
         body: JSON.stringify({ username, password }),
     });
-    return parseJsonOrError(res, "Signin failed");
+    const data = await parseJsonOrError(res, "Signin failed");
+    if (data?.token) {
+        localStorage.setItem("study_planner_auth_token", data.token);
+    }
+    return data;
 }
 
 export async function signOut() {
@@ -81,8 +98,9 @@ export async function signOut() {
     const res = await fetch(url.toString(), {
         method: "POST",
         credentials: "include",
-        headers: { Accept: "application/json" },
+        headers: getAuthHeaders({ Accept: "application/json" }),
     });
+    localStorage.removeItem("study_planner_auth_token");
     return parseJsonOrError(res, "Signout failed");
 }
 
@@ -90,7 +108,7 @@ export async function fetchCurrentUser() {
     const url = new URL("/auth/me", BASE);
     const res = await fetch(url.toString(), {
         credentials: "include",
-        headers: { Accept: "application/json" },
+        headers: getAuthHeaders({ Accept: "application/json" }),
     });
     if (res.status === 401) return null;
     return parseJsonOrError(res, "Fetch current user failed");
@@ -100,7 +118,7 @@ export async function fetchPlannerState() {
     const url = new URL("/planner-state", BASE);
     const res = await fetch(url.toString(), {
         credentials: "include",
-        headers: { Accept: "application/json" },
+        headers: getAuthHeaders({ Accept: "application/json" }),
     });
     return parseJsonOrError(res, "Fetch planner state failed");
 }
@@ -110,10 +128,10 @@ export async function savePlannerState(state) {
     const res = await fetch(url.toString(), {
         method: "PUT",
         credentials: "include",
-        headers: {
+        headers: getAuthHeaders({
             "Content-Type": "application/json",
             Accept: "application/json",
-        },
+        }),
         body: JSON.stringify({ state: state ?? {} }),
     });
     return parseJsonOrError(res, "Save planner state failed");
@@ -124,7 +142,7 @@ export async function fetchProfileSettings(programCode) {
     if (programCode) url.searchParams.set("program_code", programCode);
     const res = await fetch(url.toString(), {
         credentials: "include",
-        headers: { Accept: "application/json" },
+        headers: getAuthHeaders({ Accept: "application/json" }),
     });
     return parseJsonOrError(res, "Fetch profile settings failed");
 }
@@ -134,10 +152,10 @@ export async function saveStartTerm({ programCode, season, year }) {
     const res = await fetch(url.toString(), {
         method: "PUT",
         credentials: "include",
-        headers: {
+        headers: getAuthHeaders({
             "Content-Type": "application/json",
             Accept: "application/json",
-        },
+        }),
         body: JSON.stringify({
             program_code: programCode,
             season,
@@ -152,10 +170,10 @@ export async function saveCourseTerms({ programCode, updates }) {
     const res = await fetch(url.toString(), {
         method: "PUT",
         credentials: "include",
-        headers: {
+        headers: getAuthHeaders({
             "Content-Type": "application/json",
             Accept: "application/json",
-        },
+        }),
         body: JSON.stringify({
             program_code: programCode,
             updates: Array.isArray(updates) ? updates.map((item) => ({
@@ -172,10 +190,10 @@ export async function saveRecommendationProfile({ programCode, interests, career
     const res = await fetch(url.toString(), {
         method: "PUT",
         credentials: "include",
-        headers: {
+        headers: getAuthHeaders({
             "Content-Type": "application/json",
             Accept: "application/json",
-        },
+        }),
         body: JSON.stringify({
             program_code: programCode,
             interests: interests || [],
@@ -191,10 +209,10 @@ export async function fetchRecommendations(payload) {
     const res = await fetch(url.toString(), {
         method: "POST",
         credentials: "include",
-        headers: {
+        headers: getAuthHeaders({
             "Content-Type": "application/json",
             Accept: "application/json",
-        },
+        }),
         body: JSON.stringify(payload ?? {}),
     });
     return parseJsonOrError(res, "Fetch recommendations failed");
