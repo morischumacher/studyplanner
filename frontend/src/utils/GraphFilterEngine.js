@@ -121,6 +121,31 @@ export default class GraphFilterEngine {
             if (!data?.examSubject || !selectedExamSubjects.includes(data.examSubject)) return false;
         }
 
+        // For subject or module nodes with descendant courses metadata (e.g. when collapsed),
+        // we check if at least one of their descendant courses matches the filters.
+        if (level === "subject" || level === "module") {
+            const descendantCourses = Array.isArray(data?.descendantCourses) ? data.descendantCourses : [];
+            if (descendantCourses.length > 0) {
+                return descendantCourses.some((c) => {
+                    const syntheticNode = {
+                        data: {
+                            level: "course",
+                            courseCode: c.courseCode,
+                            courseName: c.courseName,
+                            ects: c.ects,
+                            courseType: c.courseType,
+                            category: c.category,
+                            examSubject: c.examSubject,
+                            isMandatory: c.isMandatory,
+                            status: c.status,
+                            termAvailability: c.termAvailability,
+                        }
+                    };
+                    return this.nodeMatchesFilters(syntheticNode, filters, programCode);
+                });
+            }
+        }
+
         const selectedObligationTypes = Array.isArray(filters.obligationTypes) ? filters.obligationTypes : [];
         if (selectedObligationTypes.length > 0) {
             const obligation = this.obligationForNodeData(data, programCode);

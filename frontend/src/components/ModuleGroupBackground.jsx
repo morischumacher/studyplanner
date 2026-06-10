@@ -408,8 +408,7 @@ export default function ModuleGroupBackground({ data }) {
                         textOverflow: "ellipsis",
                     }}
                 >
-                    {Number(moduleCourseCount ?? 0)} courses • {moduleEcts ? `${moduleEcts} ECTS` : "-"} • {typeMeta.label} •{" "}
-                    <span style={{ color: statusTextColor, fontWeight: 700 }}>{statusLabel}</span>
+                    {Number(moduleCourseCount ?? 0)} courses • {moduleEcts ? `${moduleEcts} ECTS` : "-"} • {typeMeta.label} • <span style={{ color: statusTextColor, fontWeight: 700 }}>{statusLabel}</span>
                 </div>
             </div>
         </div>

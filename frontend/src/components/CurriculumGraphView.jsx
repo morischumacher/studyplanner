@@ -366,6 +366,20 @@ function relaxFiltersForExpandedSubtree({
     return next;
 }
 
+function collectDescendantCourses(treeNode) {
+    const list = [];
+    const visitNode = (n) => {
+        if (n.level === "course" || n.level === "courseDirect") {
+            list.push(n);
+        }
+        if (Array.isArray(n.children)) {
+            n.children.forEach(visitNode);
+        }
+    };
+    visitNode(treeNode);
+    return list;
+}
+
 function layoutTree(root, collapsedIds, options = {}) {
     const getCourseStatus = options?.getCourseStatus;
     const getCourseMeta = options?.getCourseMeta;
@@ -387,6 +401,7 @@ function layoutTree(root, collapsedIds, options = {}) {
 
     const visit = (node, parentId = null, depth = 0, currentSubjectId = null) => {
         const canExpand = Array.isArray(node.children) && node.children.length > 0;
+        const descendants = collectDescendantCourses(node);
         const isCollapsed = collapsedIds.has(node.id);
         const visibleChildren = canExpand && !isCollapsed ? node.children : [];
         const subjectId = node.level === "subject" ? node.id : currentSubjectId;
@@ -474,6 +489,17 @@ function layoutTree(root, collapsedIds, options = {}) {
                 recommendationType: (node.level === "course" || node.level === "courseDirect") && node?.courseCode ? (recommendedCourseMap.get(String(node.courseCode)) ?? null) : null,
                 termAvailability: node?.termAvailability ?? null,
                 moduleCourseTermAvailabilities: node?.moduleCourseTermAvailabilities ?? [],
+                descendantCourses: descendants.map((c) => ({
+                    courseCode: c.courseCode,
+                    courseName: c.courseName,
+                    ects: c.ects,
+                    courseType: c.courseType,
+                    category: c.category,
+                    examSubject: c.examSubject,
+                    isMandatory: c.isMandatory,
+                    status: typeof getCourseStatus === "function" ? getCourseStatus(c.courseCode) : "todo",
+                    termAvailability: c.termAvailability,
+                })),
             },
             sourcePosition: "right",
             targetPosition: "left",
@@ -850,13 +876,85 @@ export default function CurriculumGraphView({
     }, [ruleFeedback?.text, ruleFeedback?.bg, ruleFeedback?.border, ruleFeedback?.color]);
 
     const allCollapsibleIds = useMemo(() => collectCollapsibleIds(root), [root]);
+
+    const isFilteringActive = useMemo(() => {
+        const filters = graphFilters;
+        if (!filters) return false;
+
+        // Progress states
+        if (Array.isArray(filters.progressStates) && filters.progressStates.length > 0 && filters.progressStates.length < 4) return true;
+        // Term availabilities
+        if (Array.isArray(filters.termAvailabilities) && filters.termAvailabilities.length > 0 && filters.termAvailabilities.length < 3) return true;
+        // Obligation types
+        const allObligations = obligationOptions.map((x) => x.value).filter(Boolean);
+        if (Array.isArray(filters.obligationTypes) && filters.obligationTypes.length > 0 && filters.obligationTypes.length < allObligations.length) return true;
+        // Course types
+        const allCourseTypes = Array.isArray(filterOptions?.courseTypes) ? filterOptions.courseTypes : [];
+        if (Array.isArray(filters.courseTypes) && filters.courseTypes.length > 0 && filters.courseTypes.length < allCourseTypes.length) return true;
+        // Exam subjects
+        const allSubjects = Array.isArray(filterOptions?.examSubjects) ? filterOptions.examSubjects : [];
+        if (Array.isArray(filters.examSubjects) && filters.examSubjects.length > 0 && filters.examSubjects.length < allSubjects.length) return true;
+        // ECTS range
+        if (filters.ectsRange && filterOptions?.ectsBounds) {
+            if (Number(filters.ectsRange.min) > Number(filterOptions.ectsBounds.min) ||
+                Number(filters.ectsRange.max) < Number(filterOptions.ectsBounds.max)) {
+                return true;
+            }
+        }
+        return false;
+    }, [graphFilters, obligationOptions, filterOptions]);
+
     const effectiveCollapsedIds = useMemo(
         () => {
-            if (hierarchyMode === "force_expanded") return new Set();
-            if (hierarchyMode === "force_collapsed") return new Set(allCollapsibleIds);
-            return collapsedIds;
+            let base;
+            if (hierarchyMode === "force_expanded") base = new Set();
+            else if (hierarchyMode === "force_collapsed") base = new Set(allCollapsibleIds);
+            else base = new Set(collapsedIds);
+
+            if (isFilteringActive) {
+                const nextCollapsed = new Set(base);
+
+                // Auto-expand any subject/module node in the tree that contains at least one course node matching the active filters
+                const allTreeNodes = [];
+                const collectNodes = (n) => {
+                    if (n.level === "subject" || n.level === "module") {
+                        allTreeNodes.push(n);
+                    }
+                    if (Array.isArray(n.children)) {
+                        n.children.forEach(collectNodes);
+                    }
+                };
+                collectNodes(root);
+
+                for (const treeNode of allTreeNodes) {
+                    const descendants = collectDescendantCourses(treeNode);
+                    const hasMatch = descendants.some((c) => {
+                        const syntheticNode = {
+                            data: {
+                                level: "course",
+                                courseCode: c.courseCode,
+                                courseName: c.courseName,
+                                ects: c.ects,
+                                courseType: c.courseType,
+                                category: c.category,
+                                examSubject: c.examSubject,
+                                isMandatory: c.isMandatory,
+                                status: typeof getCourseStatus === "function" ? getCourseStatus(c.courseCode) : "todo",
+                                termAvailability: c.termAvailability,
+                            }
+                        };
+                        return GraphFilterEngine.nodeMatchesFilters(syntheticNode, graphFilters, programCode);
+                    });
+                    if (hasMatch) {
+                        nextCollapsed.delete(treeNode.id);
+                    }
+                }
+                return nextCollapsed;
+            }
+
+            return base;
         },
-        [hierarchyMode, collapsedIds, allCollapsibleIds]
+        [hierarchyMode, collapsedIds, allCollapsibleIds, isFilteringActive, root, graphFilters, programCode, getCourseStatus]
     );
 
     const { nodes, edges: autoEdges } = useMemo(() => {

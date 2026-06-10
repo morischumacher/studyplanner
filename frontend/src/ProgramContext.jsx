@@ -11,6 +11,7 @@ const DEFAULT_GRAPH_FILTERS = {
     courseTypes: [],
     examSubjects: [],
     progressStates: ["todo", "in_plan", "done"],
+    termAvailabilities: ["summer", "winter", "both"],
 };
 const EMPTY_GRAPH_VIEW_STATE = {
     collapsedIds: null,
@@ -132,6 +133,7 @@ function sanitizeGraphFilters(filters) {
         courseTypes: Array.isArray(source.courseTypes) ? source.courseTypes : DEFAULT_GRAPH_FILTERS.courseTypes,
         examSubjects: Array.isArray(source.examSubjects) ? source.examSubjects : DEFAULT_GRAPH_FILTERS.examSubjects,
         progressStates: Array.isArray(source.progressStates) ? source.progressStates : DEFAULT_GRAPH_FILTERS.progressStates,
+        termAvailabilities: Array.isArray(source.termAvailabilities) ? source.termAvailabilities : DEFAULT_GRAPH_FILTERS.termAvailabilities,
     };
 }
 
