@@ -60,9 +60,6 @@ export default function AuthGate({ onAuthenticated }) {
                 }}
             >
                 <div style={{ fontSize: 20, fontWeight: 700 }}>{title}</div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                    Test user: <strong>test</strong> / <strong>test</strong>
-                </div>
 
                 <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 600 }}>
                     Username
