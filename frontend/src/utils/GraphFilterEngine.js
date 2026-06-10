@@ -122,21 +122,16 @@ export default class GraphFilterEngine {
         }
 
         const selectedObligationTypes = Array.isArray(filters.obligationTypes) ? filters.obligationTypes : [];
-        if (Array.isArray(filters.obligationTypes)) {
-            // Obligation type selection is strict:
-            // all selected -> all visible, none selected -> none visible.
-            if (selectedObligationTypes.length === 0) return false;
+        if (selectedObligationTypes.length > 0) {
             const obligation = this.obligationForNodeData(data, programCode);
             // Keep nodes with unknown obligation metadata visible.
             if (obligation && !selectedObligationTypes.includes(obligation)) return false;
         }
 
-        if (Array.isArray(filters.progressStates)) {
-            // Progress state selection is strict:
-            // all selected -> all visible, none selected -> none visible.
-            if (filters.progressStates.length === 0) return false;
+        const selectedProgressStates = Array.isArray(filters.progressStates) ? filters.progressStates : [];
+        if (selectedProgressStates.length > 0) {
             const status = String(data?.status || "todo");
-            if (!filters.progressStates.includes(status)) return false;
+            if (!selectedProgressStates.includes(status)) return false;
         }
 
         const range = filters?.ectsRange;
@@ -154,24 +149,21 @@ export default class GraphFilterEngine {
             }
         }
 
-        if (Array.isArray(filters.courseTypes)) {
-            // Course type selection is strict:
-            // all selected -> all visible, none selected -> none visible.
-            if (filters.courseTypes.length === 0) return false;
+        const selectedCourseTypes = Array.isArray(filters.courseTypes) ? filters.courseTypes : [];
+        if (selectedCourseTypes.length > 0) {
             if (level === "module") {
                 const moduleTypes = Array.isArray(data?.moduleCourseTypes) ? data.moduleCourseTypes : [];
-                if (!moduleTypes.some((t) => filters.courseTypes.includes(t))) return false;
+                if (!moduleTypes.some((t) => selectedCourseTypes.includes(t))) return false;
             } else {
                 const courseType = this.normalizeCourseType(data?.courseType, data?.courseCode);
                 // Keep nodes with unknown/unclear type visible to avoid hiding synthetic or
                 // catalog-incomplete entries (e.g. FWTS standalone items).
-                if (courseType && !filters.courseTypes.includes(courseType)) return false;
+                if (courseType && !selectedCourseTypes.includes(courseType)) return false;
             }
         }
 
-        if (Array.isArray(filters.termAvailabilities)) {
-            const selectedTerms = filters.termAvailabilities;
-            if (selectedTerms.length === 0) return false;
+        const selectedTerms = Array.isArray(filters.termAvailabilities) ? filters.termAvailabilities : [];
+        if (selectedTerms.length > 0) {
             const allowed = new Set(selectedTerms);
             if (level === "module") {
                 const moduleTerms = Array.isArray(data?.moduleCourseTermAvailabilities) ? data.moduleCourseTermAvailabilities : [];
