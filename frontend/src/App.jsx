@@ -1809,7 +1809,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             setNeedsPersist(true);
         }
         return true;
-    }, [catalog, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, parkCourseCodes, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts]);
+    }, [catalog, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, parkCourseCodes, removeCourseNode, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, updateCourseEcts, termAvailabilityForCode]);
 
     const addGraphModuleToPlan = useCallback((modulePayload, requestedLaneIndex, options = null) => {
         const variantResolution = resolveModuleVariantCourses(modulePayload, options?.variantId ?? null);
@@ -1975,41 +1975,52 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             let persistedNodes = null;
             let added = false;
             setNodes((prev) => {
-                const hasSelectedAlready = codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code && n?.data?.status !== "parked"));
-                if (hasSelectedAlready) return prev;
+                const existingNodes = prev.filter((n) => n.type === "course" && codes.includes(n?.data?.code) && n?.data?.status !== "parked");
+                const existingCodes = new Set(existingNodes.map((n) => n.data.code));
+                if (existingCodes.size === codes.length) return prev;
+
+                const affectedGroupIds = new Set();
+                prev.forEach((n) => {
+                    if (n.type === "course" && existingCodes.has(n?.data?.code) && n?.data?.groupId) {
+                        affectedGroupIds.add(n.data.groupId);
+                    }
+                });
 
                 const removeSet = new Set(conflictingVariantCodes);
-                const affectedGroupIds = new Set(
-                    prev
-                        .filter((n) =>
-                            n.type === "course" &&
-                            n?.data?.groupId &&
-                            (
-                                removeSet.has(n?.data?.code) ||
-                                (codes.includes(n?.data?.code) && n?.data?.status === "parked")
-                            )
-                        )
-                        .map((n) => n.data.groupId)
-                );
+                prev.forEach((n) => {
+                    if (n.type === "course" && removeSet.has(n?.data?.code) && n?.data?.groupId) {
+                        affectedGroupIds.add(n.data.groupId);
+                    }
+                });
+
                 let next = prev.filter((n) => !(n.type === "course" && (removeSet.has(n?.data?.code) || (codes.includes(n?.data?.code) && n?.data?.status === "parked"))));
+                next = next.map((n) => {
+                    if (n.type === "course" && existingCodes.has(n?.data?.code)) {
+                        return {
+                            ...n,
+                            data: {
+                                ...n.data,
+                                groupId,
+                            }
+                        };
+                    }
+                    return n;
+                });
+
                 for (const oldGroupId of affectedGroupIds) {
                     next = recomputeGroupFromChildren(next, oldGroupId);
                 }
 
-                const withAll = next.concat(groupNode, ...childCourseNodes);
+                const newCourseNodes = childCourseNodes.filter((node) => !existingCodes.has(node?.data?.code));
+                const withAll = next.concat(groupNode, ...newCourseNodes);
                 const sized = recomputeGroupFromChildren(withAll, groupId);
-                const resolved = resolveLaneCollisions(sized);
-                persistedNodes = resolved.filter((n) => n.type !== "lane");
-                added = true;
-                return resolved;
+                return resolveLaneCollisions(sized);
             });
-            if (!added) return false;
-            if (Array.isArray(persistedNodes)) {
-                setCoursesFromNodes(persistedNodes);
-                setNeedsPersist(false);
-            } else {
-                setNeedsPersist(true);
-            }
+            
+            // Note: Since setNodes is async in React 18, we can't reliably read 'added' 
+            // or 'persistedNodes' immediately after. The sync to coursesByProgram 
+            // will happen via the useEffect listening to 'nodes'.
+            setNeedsPersist(true);
             return true;
         }
         const x = centerX(laneIndex);
@@ -2093,43 +2104,51 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         let persistedNodes = null;
         let added = false;
         setNodes((prev) => {
-            const hasSelectedAlready = codes.some((code) => prev.some((n) => n.type === "course" && n?.data?.code === code && n?.data?.status !== "parked"));
-            if (hasSelectedAlready) return prev;
+            const existingNodes = prev.filter((n) => n.type === "course" && codes.includes(n?.data?.code) && n?.data?.status !== "parked");
+            const existingCodes = new Set(existingNodes.map((n) => n.data.code));
+            if (existingCodes.size === codes.length) return prev;
+
+            const affectedGroupIds = new Set();
+            prev.forEach((n) => {
+                if (n.type === "course" && existingCodes.has(n?.data?.code) && n?.data?.groupId) {
+                    affectedGroupIds.add(n.data.groupId);
+                }
+            });
 
             const removeSet = new Set(conflictingVariantCodes);
-            const affectedGroupIds = new Set(
-                prev
-                    .filter((n) =>
-                        n.type === "course" &&
-                        n?.data?.groupId &&
-                        (
-                            removeSet.has(n?.data?.code) ||
-                            (codes.includes(n?.data?.code) && n?.data?.status === "parked")
-                        )
-                    )
-                    .map((n) => n.data.groupId)
-            );
+            prev.forEach((n) => {
+                if (n.type === "course" && removeSet.has(n?.data?.code) && n?.data?.groupId) {
+                    affectedGroupIds.add(n.data.groupId);
+                }
+            });
+
             let next = prev.filter((n) => !(n.type === "course" && (removeSet.has(n?.data?.code) || (codes.includes(n?.data?.code) && n?.data?.status === "parked"))));
+            next = next.map((n) => {
+                if (n.type === "course" && existingCodes.has(n?.data?.code)) {
+                    return {
+                        ...n,
+                        data: {
+                            ...n.data,
+                            groupId,
+                        }
+                    };
+                }
+                return n;
+            });
+
             for (const oldGroupId of affectedGroupIds) {
                 next = recomputeGroupFromChildren(next, oldGroupId);
             }
 
-            const withAll = next.concat(groupNode, ...childCourseNodes);
+            const newCourseNodes = childCourseNodes.filter((node) => !existingCodes.has(node?.data?.code));
+            const withAll = next.concat(groupNode, ...newCourseNodes);
             const sized = recomputeGroupFromChildren(withAll, groupId);
-            const resolved = resolveLaneCollisions(sized);
-            persistedNodes = resolved.filter((n) => n.type !== "lane");
-            added = true;
-            return resolved;
+            return resolveLaneCollisions(sized);
         });
-        if (!added) return false;
-        if (Array.isArray(persistedNodes)) {
-            setCoursesFromNodes(persistedNodes);
-            setNeedsPersist(false);
-        } else {
-            setNeedsPersist(true);
-        }
+
+        setNeedsPersist(true);
         return true;
-    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, catalogCourseByCode, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts]);
+    }, [MIN_GROUP_CHILD_Y, addGraphCourseToPlan, catalog, catalogCourseByCode, clampPlacementLane, firstAllowedLaneForCourse, getCourseStatus, isCourseAllowedInLane, maxSemesterCount, removeCourseNode, removeModuleGroup, setCoursesFromNodes, setNodes, subjectColors, toggleCourseDone, toggleModuleDoneCodes, updateCourseEcts, termAvailabilityForCode]);
 
     useEffect(() => {
         addGraphModuleToPlanRef.current = addGraphModuleToPlan;
@@ -2482,10 +2501,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setCoursesFromNodes,
         setNodes,
         startTermSeason,
-        subjectColors,
         toggleCourseDone,
         toggleModuleDoneCodes,
         updateCourseEcts,
+        termAvailabilityForCode,
     ]);
 
     const applyMasterPrefilledPlan = useCallback(() => {
@@ -2590,10 +2609,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         removeCourseNode,
         setCoursesFromNodes,
         setNodes,
-        startTermSeason,
-        subjectColors,
         toggleCourseDone,
         updateCourseEcts,
+        termAvailabilityForCode,
     ]);
 
     /************************
@@ -6356,6 +6374,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     semesterOptions={sidebarSemesters}
                     getValidSemestersForCourse={validSemestersForCourse}
                     getValidSemestersForModule={validSemestersForModule}
+                    termAvailabilityForCode={termAvailabilityForCode}
                     width={SIDEBAR_WIDTH}
                     leftOffset={SIDEBAR_LEFT_OFFSET}
                     topOffset={TABLE_SIDEBAR_TOP_OFFSET}
@@ -6373,6 +6392,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                     }}
                     semesterOptions={sidebarSemesters}
                     getValidSemestersForCourse={validSemestersForCourse}
+                    termAvailabilityForCode={termAvailabilityForCode}
                     toggles={profileSettingsByProgram?.[programCode]?.recommendation_toggles || {}}
                     onToggleChange={handleRecommendationToggle}
                     width={REC_PANEL_WIDTH}

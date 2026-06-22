@@ -1726,6 +1726,7 @@ export default function CurriculumGraphView({
                     }}
                     semesterOptions={semesterOptions}
                     getValidSemestersForCourse={getValidSemestersForCourse}
+                    termAvailabilityForCode={termAvailabilityForCode}
                     toggles={recommendationToggles}
                     onToggleChange={onRecommendationToggleChange}
                     width={280}

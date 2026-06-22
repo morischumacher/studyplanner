@@ -46,6 +46,7 @@ export default function RecommendationPanel({
     programCode,
     subjectColors = {},
     onDragStart,
+    termAvailabilityForCode,
 }) {
     // Track which card has its menu expanded
     const [menuState, setMenuState] = useState({ id: null, view: "root" }); // view: 'root', 'semesters', or 'details'
@@ -209,8 +210,26 @@ export default function RecommendationPanel({
 
                                 {/* Row 1: Code + Actions */}
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                        {displayCourseHeader(courseCode, courseName, rec.courseType)}
+                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                        <span>{displayCourseHeader(courseCode, courseName, rec.courseType)}</span>
+                                        {typeof termAvailabilityForCode === "function" && termAvailabilityForCode(courseCode) && (
+                                            <>
+                                                <span>|</span>
+                                                <span 
+                                                    style={{ 
+                                                        display: "inline-flex", 
+                                                        alignItems: "center", 
+                                                        filter: "grayscale(100%) brightness(0.4) opacity(0.7)", 
+                                                        fontSize: 10,
+                                                        lineHeight: 1,
+                                                        transform: "translateY(-0.5px)"
+                                                    }} 
+                                                    title={`Available in ${termAvailabilityForCode(courseCode)}`}
+                                                >
+                                                    {termAvailabilityForCode(courseCode) === "summer" ? "☀️" : termAvailabilityForCode(courseCode) === "winter" ? "❄️" : "☀️❄️"}
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
                                     <div style={{ display: "inline-flex", gap: 6 }}>
                                         <button

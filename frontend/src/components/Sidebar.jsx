@@ -32,9 +32,10 @@ export default function Sidebar({
     onRemoveModuleFromPlan,
     getCourseMeta,
     onUpdateCourseMeta,
-    semesterOptions,
+    semesterOptions = [],
     getValidSemestersForCourse,
     getValidSemestersForModule,
+    termAvailabilityForCode,
     width = 300,
     topOffset = 56,
     bottomOffset = 84,
@@ -565,8 +566,26 @@ export default function Sidebar({
                                                         return null;
                                                      })()}
                                                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                            {displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}
+                                                        <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                                            <span>{displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}</span>
+                                                            {typeof termAvailabilityForCode === "function" && termAvailabilityForCode(course?.code ?? mod?.code) && (
+                                                                <>
+                                                                    <span>|</span>
+                                                                    <span 
+                                                                        style={{ 
+                                                                            display: "inline-flex", 
+                                                                            alignItems: "center", 
+                                                                            filter: "grayscale(100%) brightness(0.4) opacity(0.7)", 
+                                                                            fontSize: 10,
+                                                                            lineHeight: 1,
+                                                                            transform: "translateY(-0.5px)"
+                                                                        }} 
+                                                                        title={`Available in ${termAvailabilityForCode(course?.code ?? mod?.code)}`}
+                                                                    >
+                                                                        {termAvailabilityForCode(course?.code ?? mod?.code) === "summer" ? "☀️" : termAvailabilityForCode(course?.code ?? mod?.code) === "winter" ? "❄️" : "☀️❄️"}
+                                                                    </span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                             <button
@@ -932,7 +951,27 @@ export default function Sidebar({
                                                                 }}
                                                             >
                                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                                                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}</div>
+                                                                    <div style={{ fontSize: 11, color: "#6b7280", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                                                        <span>{displayCourseHeader(course?.code ?? mod?.code, course?.name ?? mod?.name, course?.type)}</span>
+                                                                        {typeof termAvailabilityForCode === "function" && termAvailabilityForCode(course?.code ?? mod?.code) && (
+                                                                            <>
+                                                                                <span>|</span>
+                                                                                <span 
+                                                                                    style={{ 
+                                                                                        display: "inline-flex", 
+                                                                                        alignItems: "center", 
+                                                                                        filter: "grayscale(100%) brightness(0.4) opacity(0.7)", 
+                                                                                        fontSize: 10,
+                                                                                        lineHeight: 1,
+                                                                                        transform: "translateY(-0.5px)"
+                                                                                    }} 
+                                                                                    title={`Available in ${termAvailabilityForCode(course?.code ?? mod?.code)}`}
+                                                                                >
+                                                                                    {termAvailabilityForCode(course?.code ?? mod?.code) === "summer" ? "☀️" : termAvailabilityForCode(course?.code ?? mod?.code) === "winter" ? "❄️" : "☀️❄️"}
+                                                                                </span>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
                                                                     <div style={{ display: "inline-flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                                                                         <button
                                                                             onClick={(e) => {
