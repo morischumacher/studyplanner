@@ -132,7 +132,7 @@ export default function CourseCard({ data }) {
         labelKey.includes("extension");
     const isBachelorProgram = String(data?.programCode || "").trim() === BACHELOR_PROGRAM_CODE;
     const ectsOptions = isBachelorProgram
-        ? [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+        ? [6, 7, 8, 9]
         : [4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9];
     const extensionOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     const headerCode = displayCourseHeader(data?.code, data?.label, data?.courseType ?? data?.type);

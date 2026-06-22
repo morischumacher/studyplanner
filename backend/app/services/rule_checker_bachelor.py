@@ -29,6 +29,7 @@ class RuleChecker:
     TOTAL_ECTS = 180.0
     MIN_NARROW_ELECTIVE_MODULES = 7
     TRANSFERABLE_SKILLS_MIN_ECTS = 6.0
+    TRANSFERABLE_SKILLS_MAX_ECTS = 9.0
     BACHELORARBEIT_ECTS = 13.0
 
     MAX_ECTS_PER_SEMESTER = 42.0
@@ -915,7 +916,34 @@ class RuleChecker:
         # ----------------------------
         # Dashboard + missing requirements
         # ----------------------------
-        total_ects = sum(self._to_float(c.get("ects")) for c, _ in items)
+        ts_ects = cat_ects.get("transferable_skills", 0.0)
+        ts_done = sum(self._to_float(c.get("ects")) for c, status in items if status == "done" and per_course_canonical_cat.get(self._norm(self._course_code(c))) == "transferable_skills")
+        excess_ts = max(0.0, ts_ects - self.TRANSFERABLE_SKILLS_MAX_ECTS)
+
+        # Cap the category ects for transferable skills
+        if "transferable_skills" in cat_ects:
+            cat_ects["transferable_skills"] = min(self.TRANSFERABLE_SKILLS_MAX_ECTS, ts_ects)
+
+        # Adjust FWTS module ECTS
+        fwts_key = self._norm("Freie Wahlfächer und Transferable Skills")
+        if fwts_key in mod_all:
+            mod_all[fwts_key] = max(0.0, mod_all[fwts_key] - excess_ts)
+
+        done_excess = max(0.0, ts_done - self.TRANSFERABLE_SKILLS_MAX_ECTS)
+        planned_excess = excess_ts - done_excess
+
+        if fwts_key in mod_done:
+            mod_done[fwts_key] = max(0.0, mod_done[fwts_key] - done_excess)
+        if fwts_key in mod_planned:
+            mod_planned[fwts_key] = max(0.0, mod_planned[fwts_key] - planned_excess)
+
+        total_ects = sum(self._to_float(c.get("ects")) for c, _ in items) - excess_ts
+
+        if ts_ects > self.TRANSFERABLE_SKILLS_MAX_ECTS + 1e-6:
+            warnings.append(
+                f"Transferable Skills: maximal {self.TRANSFERABLE_SKILLS_MAX_ECTS:.1f} ECTS anrechenbar "
+                f"(aktuell {ts_ects:.1f} ECTS geplant/done, {excess_ts:.1f} ECTS werden nicht angerechnet)."
+            )
 
         def required_ects_for_module(module_key: str) -> Optional[float]:
             m = self.modules.get(module_key)
