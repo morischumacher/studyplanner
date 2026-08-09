@@ -93,6 +93,8 @@ import {
 import { useDashboardSectionOrdering } from "./hooks/useDashboardSectionOrdering.js";
 import { useDashboardMetrics } from "./hooks/useDashboardMetrics.jsx";
 import { useProfileDraftForm } from "./hooks/useProfileDraftForm.js";
+import { useSignupSetupForm } from "./hooks/useSignupSetupForm.js";
+import { useDisclosures } from "./hooks/useDisclosures.js";
 
 /*********************************
  * React Flow node type registry *
@@ -172,21 +174,23 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         return map;
     }, [recommendations]);
     const [dashboardViewMode, setDashboardViewMode] = useState("planning");
-    const [isLegendOpen, setIsLegendOpen] = useState(false);
-    const [isSteopInfoOpen, setIsSteopInfoOpen] = useState(false);
-    const [isSteopChecklistOpen, setIsSteopChecklistOpen] = useState(false);
-    const [isFocusInfoOpen, setIsFocusInfoOpen] = useState(false);
-    const [isFocusChecklistOpen, setIsFocusChecklistOpen] = useState(false);
-    const [isExamSubjectProgressOpen, setIsExamSubjectProgressOpen] = useState(false);
-    const [isPerSemesterEctsOpen, setIsPerSemesterEctsOpen] = useState(false);
-    const [isPlannedEstimatedHoursOpen, setIsPlannedEstimatedHoursOpen] = useState(false);
-    const [isDonePerSemesterEctsOpen, setIsDonePerSemesterEctsOpen] = useState(false);
-    const [isDoneGradePerSemesterOpen, setIsDoneGradePerSemesterOpen] = useState(false);
-    const [isPlannedExamSubjectOpen, setIsPlannedExamSubjectOpen] = useState(false);
-    const [isByCategoryOpen, setIsByCategoryOpen] = useState(false);
-    const [isDoneByCategoryOpen, setIsDoneByCategoryOpen] = useState(false);
-    const [isMissingRequirementsOpen, setIsMissingRequirementsOpen] = useState(false);
-    const [isWarningsOpen, setIsWarningsOpen] = useState(false);
+    const {
+        isLegendOpen, setIsLegendOpen,
+        isSteopInfoOpen, setIsSteopInfoOpen,
+        isSteopChecklistOpen, setIsSteopChecklistOpen,
+        isFocusInfoOpen, setIsFocusInfoOpen,
+        isFocusChecklistOpen, setIsFocusChecklistOpen,
+        isExamSubjectProgressOpen, setIsExamSubjectProgressOpen,
+        isPerSemesterEctsOpen, setIsPerSemesterEctsOpen,
+        isPlannedEstimatedHoursOpen, setIsPlannedEstimatedHoursOpen,
+        isDonePerSemesterEctsOpen, setIsDonePerSemesterEctsOpen,
+        isDoneGradePerSemesterOpen, setIsDoneGradePerSemesterOpen,
+        isPlannedExamSubjectOpen, setIsPlannedExamSubjectOpen,
+        isByCategoryOpen, setIsByCategoryOpen,
+        isDoneByCategoryOpen, setIsDoneByCategoryOpen,
+        isMissingRequirementsOpen, setIsMissingRequirementsOpen,
+        isWarningsOpen, setIsWarningsOpen,
+    } = useDisclosures();
     const [plannedDashboardSectionOrder, setPlannedDashboardSectionOrder] = useState(DEFAULT_PLANNED_SECTION_ORDER);
     const [doneDashboardSectionOrder, setDoneDashboardSectionOrder] = useState(DEFAULT_DONE_SECTION_ORDER);
     const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0, tone: "" });
@@ -219,11 +223,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [profileSearch, setProfileSearch] = useState("");
     const [profileSettingsByProgram, setProfileSettingsByProgram] = useState({});
     const [lockedProgramCode, setLockedProgramCode] = useState(null);
-    const [signupSetupProgramCode, setSignupSetupProgramCode] = useState(programCode);
-    const [signupSetupStartSeason, setSignupSetupStartSeason] = useState(TERM_WINTER);
-    const [signupSetupStartYear, setSignupSetupStartYear] = useState(new Date().getFullYear());
-    const [signupSetupFocus, setSignupSetupFocus] = useState(selectedFocus || "");
-    const [isSavingSignupSetup, setIsSavingSignupSetup] = useState(false);
+    const {
+        signupSetupProgramCode, setSignupSetupProgramCode,
+        signupSetupStartSeason, setSignupSetupStartSeason,
+        signupSetupStartYear, setSignupSetupStartYear,
+        signupSetupFocus, setSignupSetupFocus,
+        isSavingSignupSetup, setIsSavingSignupSetup,
+    } = useSignupSetupForm(programCode, selectedFocus);
     const [pendingCourseTermUpdateByCode, setPendingCourseTermUpdateByCode] = useState({});
     const [isSavingProfileSettings, setIsSavingProfileSettings] = useState(false);
     const [isCurriculumSettingsOpen, setIsCurriculumSettingsOpen] = useState(false);
