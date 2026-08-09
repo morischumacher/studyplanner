@@ -92,6 +92,7 @@ import {
 } from "./lib/flowLayout.js";
 import { useDashboardSectionOrdering } from "./hooks/useDashboardSectionOrdering.js";
 import { useDashboardMetrics } from "./hooks/useDashboardMetrics.jsx";
+import { useProfileDraftForm } from "./hooks/useProfileDraftForm.js";
 
 /*********************************
  * React Flow node type registry *
@@ -226,15 +227,17 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [pendingCourseTermUpdateByCode, setPendingCourseTermUpdateByCode] = useState({});
     const [isSavingProfileSettings, setIsSavingProfileSettings] = useState(false);
     const [isCurriculumSettingsOpen, setIsCurriculumSettingsOpen] = useState(false);
-    const [profileDraftFocus, setProfileDraftFocus] = useState("");
-    const [profileDraftStartSeason, setProfileDraftStartSeason] = useState(TERM_WINTER);
-    const [profileDraftStartYear, setProfileDraftStartYear] = useState(new Date().getFullYear());
-    const [profileDraftMaxEcts, setProfileDraftMaxEcts] = useState(42);
-    const [profileDraftRecommendedEcts, setProfileDraftRecommendedEcts] = useState(30);
-    const [profileDraftMaxWeekHours, setProfileDraftMaxWeekHours] = useState(50);
-    const [profileDraftRecommendedWeekHours, setProfileDraftRecommendedWeekHours] = useState(40);
-    const [profileDraftInterests, setProfileDraftInterests] = useState("");
-    const [profileDraftCareer, setProfileDraftCareer] = useState("");
+    const {
+        profileDraftFocus, setProfileDraftFocus,
+        profileDraftStartSeason, setProfileDraftStartSeason,
+        profileDraftStartYear, setProfileDraftStartYear,
+        profileDraftMaxEcts, setProfileDraftMaxEcts,
+        profileDraftRecommendedEcts, setProfileDraftRecommendedEcts,
+        profileDraftMaxWeekHours, setProfileDraftMaxWeekHours,
+        profileDraftRecommendedWeekHours, setProfileDraftRecommendedWeekHours,
+        profileDraftInterests, setProfileDraftInterests,
+        profileDraftCareer, setProfileDraftCareer,
+    } = useProfileDraftForm();
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRecPanelOpen, setIsRecPanelOpen] = useState(false);
     const [profileDisableGraphView, setProfileDisableGraphView] = useState(() => {
