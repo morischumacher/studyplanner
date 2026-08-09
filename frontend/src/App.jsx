@@ -95,6 +95,7 @@ import { useDashboardMetrics } from "./hooks/useDashboardMetrics.jsx";
 import { useProfileDraftForm } from "./hooks/useProfileDraftForm.js";
 import { useSignupSetupForm } from "./hooks/useSignupSetupForm.js";
 import { useDisclosures } from "./hooks/useDisclosures.js";
+import { useTransientFeedback } from "./hooks/useTransientFeedback.js";
 
 /*********************************
  * React Flow node type registry *
@@ -193,8 +194,12 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     } = useDisclosures();
     const [plannedDashboardSectionOrder, setPlannedDashboardSectionOrder] = useState(DEFAULT_PLANNED_SECTION_ORDER);
     const [doneDashboardSectionOrder, setDoneDashboardSectionOrder] = useState(DEFAULT_DONE_SECTION_ORDER);
-    const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0, tone: "" });
-    const [progressMilestone, setProgressMilestone] = useState({ text: "", until: 0 });
+    const {
+        stickyViolation, setStickyViolation,
+        progressMilestone, setProgressMilestone,
+        progressMilestoneRef,
+        successFeedbackSignatureRef,
+    } = useTransientFeedback();
     const subjectColors = useMemo(
         () => createExamSubjectColorMap((catalog || []).map((pf) => pf?.pruefungsfach).filter(Boolean)),
         [catalog]
@@ -214,7 +219,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const hydratedProgramRef = useRef(null);
     const latestGraphSnapshotRef = useRef(null);
     const loadedDashboardUiRef = useRef({ byProgram: {}, global: {} });
-    const progressMilestoneRef = useRef({ programCode: null, pct: 0 });
     const [plannerHydrated, setPlannerHydrated] = useState(false);
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
@@ -273,7 +277,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [focusPrefillPrompt, setFocusPrefillPrompt] = useState(null);
     const [dismissedInitialPrefillPrompt, setDismissedInitialPrefillPrompt] = useState(false);
     const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
-    const successFeedbackSignatureRef = useRef("");
     const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
 
     useEffect(() => {
