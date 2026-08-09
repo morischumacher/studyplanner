@@ -1,4 +1,6 @@
 from typing import List, Dict, Any, Set
+import hashlib
+import json
 import random
 import re
 
@@ -46,7 +48,6 @@ def get_mock_prior_users(program_code: str, all_candidate_codes: List[Dict[str, 
             
         # Seed the random generator deterministically using the program_code
         # This guarantees the same synthetic users are always generated across server restarts
-        import hashlib
         seed_int = int(hashlib.md5(program_code.encode('utf-8')).hexdigest(), 16) % 10000000
         prng = random.Random(seed_int)
         
@@ -82,9 +83,8 @@ class Recommender:
         # Ensure toggles is a dict (asyncpg sometimes returns it as a string if codecs aren't ready)
         if isinstance(toggles, str):
             try:
-                import json
                 self.toggles = json.loads(toggles)
-            except:
+            except Exception:
                 self.toggles = {}
         else:
             self.toggles = toggles or {}
@@ -105,8 +105,7 @@ class Recommender:
 
         if not candidates:
             return []
-            
-        import re
+
         def _get_metadata(c_dict: dict) -> dict:
             c_code = c_dict.get("code")
             c_name = c_dict.get("title") or c_dict.get("name") or c_code or ""
