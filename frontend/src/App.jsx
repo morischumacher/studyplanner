@@ -19,14 +19,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import {
-    fetchCatalog,
-    fetchPlannerState,
-    savePlannerState,
-    saveRecommendationProfile,
-    sendRuleCheckUpdate,
-    fetchRecommendations,
-} from "./lib/api";
+import { sendRuleCheckUpdate } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar, OnboardingTour } from "./components";
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
@@ -38,6 +31,16 @@ import {
     useProfileSettings,
 } from "./features/profile/index.ts";
 import RecommendationPanel from "./components/RecommendationPanel.jsx";
+import {
+    useCatalogue,
+    useEffectiveCourseTerms,
+} from "./features/catalogue/index.ts";
+import {
+    useRecommendationList,
+    useRecommendationRequests,
+} from "./features/recommendations/index.ts";
+import { useOnboardingTour } from "./features/tour/index.ts";
+import { usePlannerPersistence } from "./app/persistence/index.ts";
 import {
     CANVAS_HEIGHT,
     COLLISION_GAP,
@@ -54,14 +57,11 @@ import {
     laneX,
     projectToLaneAndSnap,
 } from "./domain/layout.ts";
-import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
 import {
     buildSemesterList,
     firstAllowedLaneAtOrAfter,
     isLaneAllowedForTerm,
-    normalizeTermAvailability,
     semesterBoundsForProgram,
-    TERM_BOTH,
 } from "./domain/terms.ts";
 import {
     buildBachelorPrefillPlan,
@@ -78,7 +78,6 @@ import {
 import {
     getCourseTypeForCode,
     getExamSubjectForCode,
-    normalizeCatalog,
     normalizeRulecheckCategoryForProgram,
 } from "./domain/catalogue.ts";
 import {
@@ -152,12 +151,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [tableVerticalSemantics, setTableVerticalSemantics] = useState("no_meaning");
     const [tableVerticalCustomText, setTableVerticalCustomText] = useState("");
     const [isTableSemanticsPopupOpen, setIsTableSemanticsPopupOpen] = useState(false);
-    const [activeTourStep, setActiveTourStep] = useState(null);
 
-    // Catalog state
-    const [catalog, setCatalog] = useState([]);
-    const [loadingCatalog, setLoadingCatalog] = useState(false);
-    const [catalogError, setCatalogError] = useState("");
     const [ruleCheckStateByProgram, setRuleCheckStateByProgram] = useState({});
     const dashboardPanels = useDashboardPanels({ programCode });
     const {
@@ -174,24 +168,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         dashboardUiGlobal,
         restoreDashboardUiFromPlannerState,
     } = dashboardPanels;
-    const [recommendations, setRecommendations] = useState([]);
-
-    // ── Recommendation state derived data ────────────────────────────────────
-    const recommendedCourseMap = useMemo(() => {
-        const map = new Map();
-        for (const rec of Array.isArray(recommendations) ? recommendations : []) {
-            if (rec?.courseCode) {
-                map.set(String(rec.courseCode), { type: rec.type || "interest", content: rec.content || [] });
-            }
-        }
-        return map;
-    }, [recommendations]);
+    const {
+        recommendations,
+        setRecommendations,
+        recommendedCourseMap,
+    } = useRecommendationList();
     const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0, tone: "" });
     const [progressMilestone, setProgressMilestone] = useState({ text: "", until: 0 });
-    const subjectColors = useMemo(
-        () => createExamSubjectColorMap((catalog || []).map((pf) => pf?.pruefungsfach).filter(Boolean)),
-        [catalog]
-    );
 
     // React Flow refs
     const wrapperRef = useRef(null);
@@ -203,12 +186,9 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const latestRuleCheckChangeIdRef = useRef({});
     const pendingInitialSyncProgramRef = useRef(programCode);
     const pendingDragPayloadRef = useRef(null);
-    const savePlannerTimerRef = useRef(null);
     const hydratedProgramRef = useRef(null);
     const latestGraphSnapshotRef = useRef(null);
     const progressMilestoneRef = useRef({ programCode: null, pct: 0 });
-    const [plannerHydrated, setPlannerHydrated] = useState(false);
-    const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRecPanelOpen, setIsRecPanelOpen] = useState(false);
@@ -221,17 +201,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             setProfileDisableGraphView(localStorage.getItem("disable-graph-view-" + currentUser?.username) === "true");
         }
     }, [currentUser]);
-
-    const [tourCompleted, setTourCompleted] = useState(true);
-
-    useEffect(() => {
-        if (currentUser?.username) {
-            const completedKey = "study-planner-tour-completed-" + currentUser.username;
-            setTourCompleted(localStorage.getItem(completedKey) === "true");
-        } else {
-            setTourCompleted(true);
-        }
-    }, [currentUser, activeTourStep]);
 
     const [isParkingCollapsed, setIsParkingCollapsed] = useState(false);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
@@ -254,34 +223,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         });
     }, []);
 
-    const buildPersistSnapshot = useCallback(() => {
-        const snapshot = exportPlannerStateSnapshot?.() || {};
-        const latestGraphSnapshot = latestGraphSnapshotRef.current;
-        if (latestGraphSnapshot && typeof latestGraphSnapshot === "object") {
-            snapshot.graphViewByProgram = {
-                ...(snapshot.graphViewByProgram || {}),
-                [programCode]: {
-                    ...((snapshot.graphViewByProgram || {})[programCode] || {}),
-                    ...latestGraphSnapshot,
-                },
-            };
-        }
-        snapshot.dashboardUiByProgram = {
-            ...(snapshot.dashboardUiByProgram || {}),
-            [programCode]: dashboardUiForProgram,
-        };
-        snapshot.dashboardUiGlobal = {
-            ...(snapshot.dashboardUiGlobal || {}),
-            ...dashboardUiGlobal,
-        };
-        return snapshot;
-    }, [
-        exportPlannerStateSnapshot,
-        programCode,
-        dashboardUiForProgram,
-        dashboardUiGlobal,
-    ]);
-
     useEffect(() => {
         latestGraphSnapshotRef.current = null;
     }, [programCode, setProgramCode]);
@@ -294,29 +235,13 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setDragPreviewSemesterCount(null);
     }, [programCode]);
 
-    // Fetch & normalize catalog whenever programCode changes
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            setLoadingCatalog(true);
-            setCatalogError("");
-            try {
-                const raw = await fetchCatalog(programCode);
-                if (cancelled) return;
-                setCatalog(normalizeCatalog(raw));
-            } catch (e) {
-                if (cancelled) return;
-                console.error(e);
-                setCatalog([]);
-                setCatalogError(String(e?.message || e));
-            } finally {
-                if (!cancelled) setLoadingCatalog(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [programCode]);
+    const {
+        catalog,
+        loadingCatalog,
+        catalogError,
+        subjectColors,
+        catalogCourseByCode,
+    } = useCatalogue({ programCode });
 
     const {
         isProfileOpen,
@@ -334,98 +259,40 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         courseTermOverrides,
     } = useProfileSettings({ programCode, setProgramCode });
 
-    useEffect(() => {
-        if (activeTourStep === null) return;
-        if (activeTourStep === 0) {
-            setIsSidebarOpen(true);
-            setIsRecPanelOpen(false);
-            setIsRuleDashboardOpen(false);
-            setIsProfileOpen(false);
-        } else if (activeTourStep === 5) {
-            setIsRecPanelOpen(false);
-        } else if (activeTourStep === 6) {
-            setIsRecPanelOpen(true);
-            setIsRuleDashboardOpen(false);
-        } else if (activeTourStep === 7) {
-            setIsRecPanelOpen(false);
-            setIsRuleDashboardOpen(false);
-        } else if (activeTourStep === 8) {
-            setIsRuleDashboardOpen(true);
-            setIsProfileOpen(false);
-        } else if (activeTourStep === 9) {
-            setIsRuleDashboardOpen(false);
-            setIsProfileOpen(false);
-        } else if (activeTourStep === 10) {
-            setIsProfileOpen(true);
-        } else if (activeTourStep === 11) {
-            setIsProfileOpen(false);
-        }
-    }, [activeTourStep]);
+    const { activeTourStep, setActiveTourStep, tourCompleted } = useOnboardingTour({
+        currentUser,
+        setIsSidebarOpen,
+        setIsRecPanelOpen,
+        setIsRuleDashboardOpen,
+        setIsProfileOpen,
+    });
 
-    useEffect(() => {
-        let cancelled = false;
-        setPlannerHydrated(false);
-        setPlannerLoadOk(false);
-        hydratedProgramRef.current = null;
-        (async () => {
-            try {
-                const payload = await fetchPlannerState();
-                if (cancelled) return;
-                const state = payload?.state ?? {};
-                importPlannerStateSnapshot(state);
-                restoreDashboardUiFromPlannerState(state);
-                setPlannerLoadOk(true);
-            } catch (e) {
-                if (cancelled) return;
-                console.error("Failed to load planner state", e);
-                setPlannerLoadOk(false);
-            } finally {
-                if (!cancelled) setPlannerHydrated(true);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [importPlannerStateSnapshot]);
-
-    useEffect(() => {
-        if (!plannerHydrated || !plannerLoadOk) return;
-        if (savePlannerTimerRef.current) {
-            window.clearTimeout(savePlannerTimerRef.current);
-        }
-        savePlannerTimerRef.current = window.setTimeout(async () => {
-            try {
-                await savePlannerState(buildPersistSnapshot());
-            } catch (e) {
-                console.error("Failed to save planner state", e);
-            }
-        }, 500);
-        return () => {
-            if (savePlannerTimerRef.current) {
-                window.clearTimeout(savePlannerTimerRef.current);
-                savePlannerTimerRef.current = null;
-            }
-        };
-    }, [plannerHydrated, plannerLoadOk, buildPersistSnapshot]);
+    const {
+        plannerHydrated,
+        plannerLoadOk,
+        buildPersistSnapshot,
+        flushPlannerStateSave,
+    } = usePlannerPersistence({
+        programCode,
+        exportPlannerStateSnapshot,
+        importPlannerStateSnapshot,
+        restoreDashboardUiFromPlannerState,
+        dashboardUiForProgram,
+        dashboardUiGlobal,
+        latestGraphSnapshotRef,
+        hydratedProgramRef,
+    });
 
     const handleSignOut = useCallback(async () => {
         if (isSigningOut) return;
         setIsSigningOut(true);
         try {
-            if (savePlannerTimerRef.current) {
-                window.clearTimeout(savePlannerTimerRef.current);
-                savePlannerTimerRef.current = null;
-            }
-            try {
-                await savePlannerState(buildPersistSnapshot());
-            } catch (e) {
-                console.error("Failed to save planner state before sign out", e);
-            }
+            await flushPlannerStateSave();
             await onSignOut?.();
         } finally {
             setIsSigningOut(false);
         }
-    }, [isSigningOut, buildPersistSnapshot, onSignOut]);
+    }, [isSigningOut, flushPlannerStateSave, onSignOut]);
 
     const semesterBounds = useMemo(() => semesterBoundsForProgram(programCode), [programCode]);
     const minSemesterCount = semesterBounds.min;
@@ -475,30 +342,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         })),
         [activeSemesterCount, maxSemesterCount]
     );
-    const effectiveCourseTermByCode = useMemo(() => {
-        const map = {};
-        for (const subject of Array.isArray(catalog) ? catalog : []) {
-            for (const module of Array.isArray(subject?.modules) ? subject.modules : []) {
-                for (const course of Array.isArray(module?.courses) ? module.courses : []) {
-                    const code = String(course?.code || "").trim();
-                    if (!code) continue;
-                    map[code] = normalizeTermAvailability(course?.termAvailability ?? TERM_BOTH);
-                }
-            }
-        }
-        for (const [code, term] of Object.entries(courseTermOverrides || {})) {
-            const normalizedCode = String(code || "").trim();
-            if (!normalizedCode) continue;
-            map[normalizedCode] = normalizeTermAvailability(term);
-        }
-        return map;
-    }, [catalog, courseTermOverrides]);
-
-    const termAvailabilityForCode = useCallback((courseCode) => {
-        const code = String(courseCode || "").trim();
-        if (!code) return TERM_BOTH;
-        return normalizeTermAvailability(effectiveCourseTermByCode?.[code] ?? TERM_BOTH);
-    }, [effectiveCourseTermByCode]);
+    const { effectiveCourseTermByCode, termAvailabilityForCode } = useEffectiveCourseTerms({
+        catalog,
+        courseTermOverrides,
+    });
 
     const {
         signupSetupProgramCode,
@@ -634,56 +481,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         });
         return [{ id: 0, title: "Parking Stage", isParking: true }, ...fallbackAllowed];
     }, [isCourseAllowedInLane, sidebarSemesters]);
-    const catalogCourseByCode = useMemo(() => {
-        const byCode = new Map();
-        const subjects = Array.isArray(catalog) ? catalog : [];
-        subjects.forEach((subject, subjectIdx) => {
-            const modules = Array.isArray(subject?.modules) ? subject.modules : [];
-            modules.forEach((module, moduleIdx) => {
-                const standaloneCode = String(module?.code || `MOD-${subjectIdx + 1}-${moduleIdx + 1}`).trim();
-                const moduleCourses = Array.isArray(module?.courses) ? module.courses : [];
-                const moduleCourseCodes = moduleCourses
-                    .map((course) => String(course?.code || "").trim())
-                    .filter(Boolean);
-                const moduleId = `mod-cat-${subjectIdx + 1}-${moduleIdx + 1}-${standaloneCode || "module"}`;
-                const moduleMeta = moduleCourseCodes.length >= 2
-                    ? {
-                        id: moduleId,
-                        title: module?.name || "Module",
-                        code: module?.code ?? null,
-                        ects: module?.ects ?? null,
-                        examSubject: subject?.pruefungsfach ?? null,
-                        category: module?.category ?? "unknown",
-                        courseCodes: moduleCourseCodes,
-                    }
-                    : null;
-                if (moduleCourses.length === 0 && standaloneCode && !byCode.has(standaloneCode)) {
-                    byCode.set(standaloneCode, {
-                        code: standaloneCode,
-                        name: module?.name || standaloneCode,
-                        type: module?.category || null,
-                        ects: module?.ects ?? null,
-                        category: module?.category ?? "unknown",
-                        examSubject: subject?.pruefungsfach ?? null,
-                    });
-                }
-                for (const course of moduleCourses) {
-                    const code = String(course?.code || "").trim();
-                    if (!code || byCode.has(code)) continue;
-                    byCode.set(code, {
-                        code,
-                        name: course?.name || code,
-                        type: course?.type || null,
-                        ects: course?.ects ?? null,
-                        category: module?.category ?? "unknown",
-                        examSubject: subject?.pruefungsfach ?? null,
-                        moduleMeta,
-                    });
-                }
-            });
-        });
-        return byCode;
-    }, [catalog]);
 
     const plannedEctsBySemester = useMemo(() => {
         const out = {};
@@ -2719,125 +2516,17 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             });
     }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, semesterLoadLimits?.maxWeekHoursPerSemester, semesterLoadLimits?.recommendedWeekHoursPerSemester, setProgramRuleCheckState]);
 
-    // Notify backend recommendations endpoint on each plan/status change
-    const latestRecChangeIdRef = useRef({});
-    useEffect(() => {
-        if (!lastPlanChange) return;
-        const requestProgramCode = programCode;
-        latestRecChangeIdRef.current = {
-            ...(latestRecChangeIdRef.current || {}),
-            [requestProgramCode]: lastPlanChange.id ?? null,
-        };
-        const doneSet = new Set(doneCourseCodes || []);
-        const allCourses = Object.values(coursesBySemester || {})
-            .flat()
-            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
-        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
-        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
-        const changeIdSnapshot = lastPlanChange.id ?? null;
-
-        fetchRecommendations({
-            programCode: requestProgramCode,
-            plannedCourses,
-            doneCourses,
-            parkedCourses: parkedCourseCodes,
-        })
-            .then((response) => {
-                if ((latestRecChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
-                if (response?.ok && response?.recommendations) {
-                    setRecommendations(response.recommendations);
-                } else {
-                    setRecommendations([]);
-                }
-            })
-            .catch((err) => {
-                console.error("Failed to fetch recommendations", err);
-                if ((latestRecChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
-                setRecommendations([]);
-            });
-    }, [lastPlanChange, programCode, coursesBySemester, doneCourseCodes, parkedCourseCodes]);
-
-    // Initial recommendations fetch
-    useEffect(() => {
-        if (!plannerHydrated || !programCode || lastPlanChange) return;
-        const requestProgramCode = programCode;
-        if (latestRecChangeIdRef.current?.[requestProgramCode] === "initial") return;
-        latestRecChangeIdRef.current = {
-            ...(latestRecChangeIdRef.current || {}),
-            [requestProgramCode]: "initial",
-        };
-        const doneSet = new Set(doneCourseCodes || []);
-        const allCourses = Object.values(coursesBySemester || {})
-            .flat()
-            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
-        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
-        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
-
-        fetchRecommendations({
-            programCode: requestProgramCode,
-            plannedCourses,
-            doneCourses,
-            parkedCourses: parkedCourseCodes,
-        })
-            .then((response) => {
-                if (latestRecChangeIdRef.current?.[requestProgramCode] !== "initial") return;
-                if (response?.ok && response?.recommendations) {
-                    setRecommendations(response.recommendations);
-                } else {
-                    setRecommendations([]);
-                }
-            })
-            .catch((err) => {
-                console.error("Failed to fetch initial recommendations", err);
-                if (latestRecChangeIdRef.current?.[requestProgramCode] !== "initial") return;
-                setRecommendations([]);
-            });
-    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, lastPlanChange, parkedCourseCodes]);
-
-    const handleRecommendationToggle = useCallback(async (key, newValue) => {
-        const nextToggles = {
-            ...(profileSettingsForProgram?.recommendation_toggles || {
-                interest: true, similarity: true, sequence: true, completed: true, internship: true, peer: true
-            }),
-            [key]: newValue
-        };
-        
-        // Optimistic UI update
-        setProfileSettingsByProgram(prev => ({
-            ...(prev || {}),
-            [programCode]: {
-                ...(prev?.[programCode] || {}),
-                recommendation_toggles: nextToggles
-            }
-        }));
-
-        try {
-            await saveRecommendationProfile({
-                programCode,
-                interests: profileSettingsForProgram?.interests || [],
-                careerDirection: profileSettingsForProgram?.careerDirection || "",
-                recommendationToggles: nextToggles,
-            });
-            // trigger refetch of recommendations
-            const doneSet = new Set(doneCourseCodes || []);
-            const allCourses = Object.values(coursesBySemester || {})
-                .flat()
-                .map((course) => normalizeRulecheckCategoryForProgram(course, programCode));
-            const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
-            const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
-            const response = await fetchRecommendations({ 
-                programCode, 
-                plannedCourses, 
-                doneCourses,
-                parkedCourses: parkedCourseCodes
-            });
-            if (response?.ok && response?.recommendations) {
-                setRecommendations(response.recommendations);
-            }
-        } catch (e) {
-            console.error("Failed to save toggle", e);
-        }
-    }, [programCode, profileSettingsForProgram, doneCourseCodes, coursesBySemester, parkedCourseCodes]);
+    const { handleRecommendationToggle } = useRecommendationRequests({
+        programCode,
+        plannerHydrated,
+        lastPlanChange,
+        coursesBySemester,
+        doneCourseCodes,
+        parkedCourseCodes,
+        profileSettingsForProgram,
+        setProfileSettingsByProgram,
+        setRecommendations,
+    });
 
     useEffect(() => {
         if (!stickyViolation?.message) return;
