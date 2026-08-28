@@ -66,7 +66,7 @@ frontend/
   tests/e2e/          the flows the evaluation study observed
 ```
 
-Three documents explain the parts that are not obvious from the tree:
+Four documents explain the parts that are not obvious from the tree:
 
 - [`docs/architecture.md`](docs/architecture.md): how a request travels, where
   the plan actually lives, and the three pieces of the frontend that are
@@ -75,6 +75,9 @@ Three documents explain the parts that are not obvious from the tree:
   derived in the thesis, and the code that implements it.
 - [`docs/adr/`](docs/adr/), six records of what was decided and what it was
   decided over.
+- [`docs/known-defects.md`](docs/known-defects.md), what the evaluation study
+  found and what reading the code found afterwards. Neither list was fixed
+  while restructuring.
 
 ## Tests
 
