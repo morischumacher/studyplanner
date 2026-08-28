@@ -87,7 +87,7 @@ Three layers, because they catch different things.
 
 ```bash
 cd backend  && pytest                 # 183
-cd frontend && npm test               # 105
+cd frontend && npm test               # 107
 cd frontend && npm run test:e2e       #  17
 cd frontend && npm run typecheck
 ```
