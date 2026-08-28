@@ -3,7 +3,7 @@
 ## What has to stay green
 
 ```bash
-cd backend  && pytest                 # 169
+cd backend  && pytest                 # 183
 cd frontend && npm test               #  97
 cd frontend && npm run typecheck
 cd frontend && npm run test:e2e       #  16
