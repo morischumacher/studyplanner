@@ -122,8 +122,11 @@ checker is configured. Both failures are logged, and the catch is `Exception`, s
 `KeyboardInterrupt` and `SystemExit` travel on.
 
 **The synthetic peer cohort is unbounded module-level mutable state**, keyed by
-programme code, never evicted, shared across requests.
-`backend/app/recommendations/peer.py`.
+programme code, never evicted, shared across requests. Fixed by bounding rather
+than by scoping: the memo is what makes the channel affordable, and there are two
+programmes, so it holds four entries and drops the least recently asked-for one
+past that. An evicted programme is recomputed and answers exactly as it did,
+since the cohort is seeded from the programme code.
 
 ### Found while fixing the above
 
