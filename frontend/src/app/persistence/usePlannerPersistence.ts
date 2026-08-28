@@ -12,7 +12,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
-import type { DashboardUiGlobalSnapshot, DashboardUiSnapshot } from "../../features/dashboard/index.ts";
+import type {
+    DashboardUiGlobalSnapshot,
+    DashboardUiSnapshot,
+    StoredDashboardUi,
+} from "../../features/dashboard/index.ts";
 import { fetchPlannerState, savePlannerState } from "../../lib/api.js";
 
 /** How long the planner waits for the student to stop before it saves. */
@@ -37,6 +41,12 @@ export interface UsePlannerPersistenceInput {
     restoreDashboardUiFromPlannerState: (state: unknown) => void;
     dashboardUiForProgram: DashboardUiSnapshot;
     dashboardUiGlobal: DashboardUiGlobalSnapshot;
+    /**
+     * The panel state of every programme. The plan snapshot carries none of it,
+     * so a save that did not read this would store the programme on screen and
+     * nothing else.
+     */
+    storedDashboardUiRef: MutableRefObject<StoredDashboardUi>;
     /** The unsaved graph view of the programme on screen, or null. */
     latestGraphSnapshotRef: MutableRefObject<Record<string, unknown> | null>;
     /** Cleared by the load, so that the canvas is rebuilt from what arrived. */
@@ -60,6 +70,7 @@ export function usePlannerPersistence({
     restoreDashboardUiFromPlannerState,
     dashboardUiForProgram,
     dashboardUiGlobal,
+    storedDashboardUiRef,
     latestGraphSnapshotRef,
     hydratedProgramRef,
 }: UsePlannerPersistenceInput): UsePlannerPersistenceResult {
@@ -79,12 +90,13 @@ export function usePlannerPersistence({
                 },
             };
         }
+        const storedDashboardUi = storedDashboardUiRef.current;
         snapshot.dashboardUiByProgram = {
-            ...(snapshot.dashboardUiByProgram || {}),
+            ...storedDashboardUi.byProgram,
             [programCode]: dashboardUiForProgram,
         };
         snapshot.dashboardUiGlobal = {
-            ...(snapshot.dashboardUiGlobal || {}),
+            ...storedDashboardUi.global,
             ...dashboardUiGlobal,
         };
         return snapshot;

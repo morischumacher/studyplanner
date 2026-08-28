@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 
 import { asRecord } from "../../domain/plan/sanitizers.ts";
 import {
@@ -53,6 +53,16 @@ export interface DashboardUiSnapshot {
 export interface DashboardUiGlobalSnapshot {
     isRuleDashboardOpen: boolean;
     isLegendOpen: boolean;
+}
+
+/**
+ * The panel state of every programme, in the two maps the stored document keeps
+ * it in. This is the only copy there is of a programme that is not on screen,
+ * so a save has to be given it or it writes that programme away.
+ */
+export interface StoredDashboardUi {
+    byProgram: Record<string, unknown>;
+    global: Record<string, unknown>;
 }
 
 export interface UseDashboardPanelsInput {
@@ -104,6 +114,8 @@ export interface DashboardPanels {
     /** What the persist snapshot files under the current programme. */
     dashboardUiForProgram: DashboardUiSnapshot;
     dashboardUiGlobal: DashboardUiGlobalSnapshot;
+    /** What it files under all the others. Read when a save is built. */
+    storedDashboardUiRef: MutableRefObject<StoredDashboardUi>;
     /** Takes the whole planner state document, not just its dashboard part. */
     restoreDashboardUiFromPlannerState: (state: unknown) => void;
 }
@@ -134,12 +146,10 @@ export function useDashboardPanels({ programCode }: UseDashboardPanelsInput): Da
         DEFAULT_DONE_SECTION_ORDER
     );
 
-    // The stored panel state of every programme, kept so that a switch can
-    // replay it without going back to the server.
-    const loadedDashboardUiRef = useRef<{
-        byProgram: Record<string, unknown>;
-        global: Record<string, unknown>;
-    }>({ byProgram: {}, global: {} });
+    // The panel state of every programme, kept so that a switch can replay it
+    // without going back to the server, and so that a save has something to
+    // write for the programmes that are not on screen.
+    const storedDashboardUiRef = useRef<StoredDashboardUi>({ byProgram: {}, global: {} });
 
     const applyStoredDashboardUi = useCallback((stored: unknown) => {
         const ui = asRecord(stored);
@@ -168,18 +178,18 @@ export function useDashboardPanels({ programCode }: UseDashboardPanelsInput): Da
 
     const restoreDashboardUiFromPlannerState = useCallback((state: unknown) => {
         const document = asRecord(state);
-        loadedDashboardUiRef.current = {
+        storedDashboardUiRef.current = {
             byProgram: asRecord(document.dashboardUiByProgram),
             global: asRecord(document.dashboardUiGlobal),
         };
-        applyStoredDashboardUi(loadedDashboardUiRef.current.byProgram[programCode]);
-        const global = loadedDashboardUiRef.current.global;
+        applyStoredDashboardUi(storedDashboardUiRef.current.byProgram[programCode]);
+        const global = storedDashboardUiRef.current.global;
         if (typeof global.isRuleDashboardOpen === "boolean") setIsRuleDashboardOpen(global.isRuleDashboardOpen);
         if (typeof global.isLegendOpen === "boolean") setIsLegendOpen(global.isLegendOpen);
     }, [applyStoredDashboardUi, programCode]);
 
     useEffect(() => {
-        const stored = loadedDashboardUiRef.current?.byProgram?.[programCode] || null;
+        const stored = storedDashboardUiRef.current?.byProgram?.[programCode] || null;
         if (!stored || typeof stored !== "object") return;
         applyStoredDashboardUi(stored);
     }, [programCode]);
@@ -227,6 +237,21 @@ export function useDashboardPanels({ programCode }: UseDashboardPanelsInput): Da
         isLegendOpen,
     }), [isRuleDashboardOpen, isLegendOpen]);
 
+    // The programme on screen writes back what it is showing, so that a save
+    // made after the student has moved on still carries what they left behind.
+    // It runs after the restore above, and on a switch the two settle in that
+    // order: the entry is written once with what is still on screen and again
+    // with what the switch put there.
+    useEffect(() => {
+        storedDashboardUiRef.current = {
+            byProgram: {
+                ...storedDashboardUiRef.current.byProgram,
+                [programCode]: dashboardUiForProgram,
+            },
+            global: { ...storedDashboardUiRef.current.global, ...dashboardUiGlobal },
+        };
+    }, [programCode, dashboardUiForProgram, dashboardUiGlobal]);
+
     return {
         isRuleDashboardOpen,
         setIsRuleDashboardOpen,
@@ -270,6 +295,7 @@ export function useDashboardPanels({ programCode }: UseDashboardPanelsInput): Da
         setDoneDashboardSectionOrder,
         dashboardUiForProgram,
         dashboardUiGlobal,
+        storedDashboardUiRef,
         restoreDashboardUiFromPlannerState,
     };
 }

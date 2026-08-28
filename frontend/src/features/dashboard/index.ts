@@ -25,6 +25,7 @@ export type {
     DashboardUiGlobalSnapshot,
     DashboardUiSnapshot,
     DashboardViewMode,
+    StoredDashboardUi,
     UseDashboardPanelsInput,
 } from "./useDashboardPanels.ts";
 export type {

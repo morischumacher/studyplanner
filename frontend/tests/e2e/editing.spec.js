@@ -17,6 +17,8 @@
 import { expect, test } from "@playwright/test";
 
 import {
+    BACHELOR,
+    MASTER,
     cardAction,
     catalogCourse,
     dragCardToLane,
@@ -27,7 +29,9 @@ import {
     openDashboard,
     panIntoView,
     plannedCard,
+    readPlannerDocument,
     startPlanning,
+    writePlannerDocument,
 } from "./support/planner.js";
 
 /** Read a catalogue entry's code and credit weight from what it renders. */
@@ -163,6 +167,13 @@ test.describe("a course card", () => {
 });
 
 test.describe("the dashboard's own state", () => {
+    /** The panel a plain toggle can be read off, by the heading it prints. */
+    const section = (page) =>
+        page
+            .locator("#planner-dashboard-container")
+            .getByText("Per Semester (ECTS)", { exact: true })
+            .locator("..");
+
     test("which sections are open survives a reload", async ({ page }) => {
         // The panel booleans are persisted in the same document as the plan, so
         // splitting them apart during the refactor risks losing one or the other.
@@ -173,12 +184,6 @@ test.describe("the dashboard's own state", () => {
         await startPlanning(page);
         await openDashboard(page);
 
-        const section = (root) =>
-            root
-                .locator("#planner-dashboard-container")
-                .getByText("Per Semester (ECTS)", { exact: true })
-                .locator("..");
-
         await section(page).getByRole("button", { name: "Expand" }).click();
         await expect(section(page).getByRole("button", { name: "Collapse" })).toBeVisible();
 
@@ -187,5 +192,37 @@ test.describe("the dashboard's own state", () => {
 
         await expect(page.locator("#planner-dashboard-container")).toBeVisible();
         await expect(section(page).getByRole("button", { name: "Collapse" })).toBeVisible();
+    });
+
+    test("a save carries the programmes the student is not looking at", async ({ page }) => {
+        // The planner locks a student to the programme they chose at signup, so
+        // the second programme's panel state is written into the stored document
+        // rather than through the interface. It is read back the same way: no
+        // screen shows a programme that is not on screen, and the point of the
+        // flow is that a save must not drop it.
+        await startPlanning(page, { program: MASTER });
+        await page.waitForTimeout(2000);
+
+        const seeded = await readPlannerDocument(page);
+        await writePlannerDocument(page, {
+            ...seeded,
+            dashboardUiByProgram: {
+                ...(seeded.dashboardUiByProgram ?? {}),
+                [BACHELOR]: { isPerSemesterEctsOpen: true, isByCategoryOpen: true },
+            },
+        });
+
+        await page.reload();
+        await openDashboard(page);
+        await section(page).getByRole("button", { name: "Expand" }).click();
+        await expect(section(page).getByRole("button", { name: "Collapse" })).toBeVisible();
+        await page.waitForTimeout(2000);
+
+        const stored = await readPlannerDocument(page);
+        expect(stored.dashboardUiByProgram?.[MASTER]?.isPerSemesterEctsOpen).toBe(true);
+        expect(stored.dashboardUiByProgram?.[BACHELOR]).toEqual({
+            isPerSemesterEctsOpen: true,
+            isByCategoryOpen: true,
+        });
     });
 });

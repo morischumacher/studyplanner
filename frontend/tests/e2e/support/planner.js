@@ -16,6 +16,41 @@ import { expect } from "@playwright/test";
 export const MASTER = "066 937";
 export const BACHELOR = "033 521";
 
+/**
+ * Where the API answers. The config picks the port and hands it to the bundle
+ * at build time, so a test that wants to talk to the API directly has to work
+ * it out the same way rather than read it back out of the page.
+ */
+const API_BASE = `http://127.0.0.1:${process.env.E2E_API_PORT ?? "8100"}`;
+
+async function authHeaders(page) {
+    const token = await page.evaluate(() => localStorage.getItem("study_planner_auth_token"));
+    return { Authorization: `Bearer ${token}`, Accept: "application/json" };
+}
+
+/**
+ * The planner document as the server holds it.
+ *
+ * Some of what the planner stores belongs to a programme the student is not
+ * looking at, and there is no screen that shows it. The stored document is
+ * where it can be seen, so it is what those tests assert on.
+ */
+export async function readPlannerDocument(page) {
+    const response = await page.request.get(`${API_BASE}/planner-state`, {
+        headers: await authHeaders(page),
+    });
+    expect(response.ok()).toBeTruthy();
+    return (await response.json())?.state ?? {};
+}
+
+export async function writePlannerDocument(page, state) {
+    const response = await page.request.put(`${API_BASE}/planner-state`, {
+        headers: { ...(await authHeaders(page)), "Content-Type": "application/json" },
+        data: { state },
+    });
+    expect(response.ok()).toBeTruthy();
+}
+
 /** Create a fresh account and land in the signup setup modal. */
 export async function signUp(page) {
     const username = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;

@@ -148,6 +148,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setDoneDashboardSectionOrder,
         dashboardUiForProgram,
         dashboardUiGlobal,
+        storedDashboardUiRef,
         restoreDashboardUiFromPlannerState,
     } = dashboardPanels;
     const {
@@ -237,6 +238,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         restoreDashboardUiFromPlannerState,
         dashboardUiForProgram,
         dashboardUiGlobal,
+        storedDashboardUiRef,
         latestGraphSnapshotRef,
         hydratedProgramRef,
     });
