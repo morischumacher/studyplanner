@@ -83,9 +83,17 @@ async def apply_pending(connection: asyncpg.Connection, directory: str) -> None:
     }
     await _verify(connection, applied, files)
 
-    for path in paths:
-        if path.name in applied:
-            continue
+    pending = [path for path in paths if path.name not in applied]
+
+    # Said even when there is nothing to do. Someone watching a deployment needs
+    # to know the difference between a database that was already current and one
+    # whose migrations did not run at all, and silence does not distinguish them.
+    print(
+        f"migrations: {len(applied & files.keys())} already applied, "
+        f"{len(pending)} to apply"
+    )
+
+    for path in pending:
         try:
             # Files carry their own COMMIT statements, so each is executed whole
             # rather than split into statements.

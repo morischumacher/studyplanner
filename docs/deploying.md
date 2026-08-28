@@ -23,6 +23,68 @@ shape but the assumption, so it is checked by a test
 (`frontend/tests/unit/legacy-document.test.ts`) that reads a document in exactly
 the form already stored for every participant.
 
+## Running it locally first
+
+Two different things get called running it locally, and only the second is a
+rehearsal for a deployment.
+
+### Against an empty database, to see that it runs
+
+```bash
+git checkout fix/evaluation-defects
+
+./scripts/dev-db.sh up                       # starts Postgres, applies migrations
+export DATABASE_URL="$(./scripts/dev-db.sh url)"
+
+cd backend && pip install -r requirements-dev.txt
+uvicorn app.main:app --reload                # :8000
+```
+
+and in a second terminal:
+
+```bash
+cd frontend && npm install && npm run dev    # :5173
+```
+
+Node 22 or newer is required; `node --version` before you start, because the
+failure if it is older happens inside a dependency and does not say so.
+
+`scripts/dev-db.sh` starts a container if Docker is running and a native cluster
+otherwise, applies whatever is outstanding, and does nothing else. It is safe to
+re-run. `./scripts/dev-db.sh reset` throws the database away and starts again,
+which is the quickest way back to a known state.
+
+Then sign up, complete the setup, and plan something. This tells you the stack
+starts and the loop works. It cannot tell you anything about your own data,
+because there is none.
+
+### Against a copy of your real data, which is the rehearsal
+
+Branch the production database in Neon, then point the same local stack at the
+branch instead:
+
+```bash
+export DATABASE_URL="<the Neon branch connection string>"
+cd backend && uvicorn app.main:app --reload
+```
+
+and the client, told where the API is:
+
+```bash
+cd frontend && VITE_API_BASE=http://127.0.0.1:8000 npm run dev
+```
+
+Sign in as yourself and open a plan you already have. This is the only step that
+answers the question the 364 tests cannot: whether your saved plan, with its
+parked courses, its notes and its marks, comes back the way you left it. The
+tests run against a database built fresh from the migrations; yours has a year of
+real accounts in it.
+
+If you prefer Docker for the API as well, `backend/docker-compose.yml` brings up
+the database and the API together. It expects `backend/.env` to exist, so copy
+`backend/.env.example` to `backend/.env` first; without it, Docker creates a
+directory of that name and the API starts without its configuration.
+
 ## The order that keeps both safe
 
 ### 1. Take a backup you have restored from
@@ -33,33 +95,19 @@ that branch for step 2. If step 2 goes well, the branch has cost nothing; if it
 does not, the branch is the evidence of what went wrong and production was never
 touched.
 
-### 2. Run the new API locally against a branch of the real database
+### 2. Run the new API locally against that branch
 
-This is the step that matters, and it is worth doing even though the test suite
-is green. The tests run against a database built from the migrations. Your
-production database has been through a year of development and holds real plans,
-real accounts, and the study's records. Only it can tell you whether the ledger
-rename lands cleanly on your data.
+Set it up as described above, then watch the start-up output. It prints one line before it does anything:
 
-```bash
-export DATABASE_URL="<the Neon branch connection string>"
-cd backend && uvicorn app.main:app
+```
+migrations: 11 already applied, 0 to apply
 ```
 
-Watch the start-up output. What you want to see is the eleven migrations
-reported as already applied and nothing re-run. What would tell you to stop is a
-migration being applied, which would mean the rename did not match, or a report
-that a migration has been edited since it ran.
-
-Then point a local client at it and open a plan that already exists:
-
-```bash
-cd frontend && VITE_API_BASE=http://127.0.0.1:8000 npm run dev
-```
-
-The question this answers is the only one the automated tests cannot: does *your*
-saved plan, with its parked courses, its notes and its marks, come back the way
-you left it.
+That line is what you are checking. `0 to apply` means the ledger rename matched
+and nothing re-ran, which is the whole question. A number other than zero on a
+database that should already be current means the rename did not match, and you
+should stop and find out why before touching production. A report that a
+migration has been edited since it ran means the same.
 
 ### 3. Deploy the API before the client
 
