@@ -1,51 +1,109 @@
-# Study Planner - React Flow (WebStorm-ready)
+# Study Planner
 
-This project uses Vite + React + React Flow to build a semester-based study planner.
+A degree planning tool for TU Wien Informatics students. A student drags courses
+from the catalogue into semester lanes, and the planner tells them, as they go,
+whether the plan they are building satisfies the curriculum: what is missing,
+what is overloaded, what cannot be taken yet.
 
-## Run in WebStorm (frontend)
+It supports two programmes, the bachelor in Informatics (033 521) and the master
+in Software Engineering (066 937), and it exists because planning a degree at TU
+Wien currently means assembling the answer from a PDF curriculum, a course
+catalogue, a spreadsheet and a calendar.
 
-1. Open this project folder in WebStorm.
-2. Open the built-in terminal and run these commands in `frontend`:
+This is the software artefact of a diploma thesis. It was evaluated with eleven
+students in a within-subjects study; the version they used is tagged
+`v1.0-evaluated`.
 
-```bash
-npm install
-npm run dev
-```
+## Running it
 
-3. Open the URL printed in the terminal (usually `http://localhost:5173`).
-
-## Run backend (Docker)
-
-Run these commands in the `backend` folder:
-
-```bash
-docker compose up -d --build
-```
-
-## Reset backend containers and data, then restart
-
-Run in the `backend` folder:
+You need Node 20 or newer, Python 3.11 or newer, and PostgreSQL 16. Docker is
+optional.
 
 ```bash
-docker compose down -v --remove-orphans
-docker compose up -d --build
+# a database, migrated and seeded with both curricula
+./scripts/dev-db.sh up
+export DATABASE_URL="$(./scripts/dev-db.sh url)"
+
+# the API, on :8000
+cd backend && pip install -r requirements-dev.txt && uvicorn app.main:app --reload
+
+# the interface, on :5173
+cd frontend && npm install && npm run dev
 ```
 
-This removes backend containers, networks, and volumes (database data), then starts fresh containers again.
+`scripts/dev-db.sh` is idempotent: it starts a cluster if one is not already
+running, applies whatever migrations are outstanding, and does nothing else. It
+uses Docker when the daemon is available and a native PostgreSQL install
+otherwise. It also takes `down`, `reset`, `psql` and `url`.
 
-Or run this from the project root as a single command:
+`backend/docker-compose.yml` brings up the database and the API together if you
+prefer that.
+
+## The shape of it
+
+```
+backend/
+  app/
+    api/              HTTP: one service call per handler, one error-to-status table
+    services/         the use cases
+    repositories/     every SQL statement, behind a unit of work
+    domain/           the model, and the failures named for what they are
+    rules/            compliance checking, one rule set per programme
+    curriculum/       the regulations, as data
+    recommendations/  six channels behind a strategy protocol
+    infrastructure/   the connection pool and the migration ledger
+  sql/                migrations, YYYYMMDDHHMM_slug.sql
+  tests/              golden masters, contract tests, curriculum and migration tests
+
+frontend/
+  src/
+    domain/           the plan reducer, term rules, layout, filters. No React.
+    features/         profile, dashboard, catalogue, recommendations,
+                      tour, rule-check, prefill, planner-board
+    components/       the shared presentational pieces
+    app/persistence/  loading and saving the plan
+  tests/unit/         the domain layer
+  tests/e2e/          the flows the evaluation study observed
+```
+
+Three documents explain the parts that are not obvious from the tree:
+
+- [`docs/architecture.md`](docs/architecture.md): how a request travels, where
+  the plan actually lives, and the three pieces of the frontend that are
+  stranger than they look.
+- [`docs/thesis-map.md`](docs/thesis-map.md), each of the thirteen features
+  derived in the thesis, and the code that implements it.
+- [`docs/adr/`](docs/adr/), six records of what was decided and what it was
+  decided over.
+
+## Tests
+
+Three layers, because they catch different things.
 
 ```bash
-npm run backend:reset
+cd backend  && pytest                 # 169
+cd frontend && npm test               #  97
+cd frontend && npm run test:e2e       #  16
+cd frontend && npm run typecheck
 ```
 
-## What it does
+The backend suite includes a **golden master** for the rule engine: 36 recorded
+scenarios whose verdicts are compared field by field, and 85 more for the
+recommender. They exist because the compliance rules were restructured after the
+evaluation study, and the results of that study only mean anything if the
+answers did not change. The **contract tests** pin every endpoint's status code
+and response shape for the same reason.
 
-- Semester lanes are React Flow nodes, so they pan and zoom with the viewport.
-- Drag a course from the sidebar into any lane; it snaps into the nearest lane.
-- Supports pan/zoom, minimap, grid, and free-form course edges.
+The end-to-end suite drives a real browser against a real API and database, and
+covers the loop the study actually watched students perform: read the catalogue,
+drop a course into a semester, get told whether it is allowed, park what does not
+fit yet.
 
-## Customize
+The Playwright suite starts both servers itself. If you have a Chromium already
+installed rather than Playwright's own, point `E2E_CHROMIUM_PATH` at it.
 
-- Edit `SEMESTERS` in `src/App.jsx` to add or remove semesters.
-- Replace `COURSE_CATALOG` with your real course list.
+## Contributing
+
+[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the conventions: how to add a
+migration, how to add a compliance rule, how to add a recommendation channel,
+and what has to stay green.

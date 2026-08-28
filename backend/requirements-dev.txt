@@ -1,0 +1,10 @@
+# Everything the test suite needs on top of requirements.txt.
+#
+# httpx is here rather than in the runtime requirements because it is only used
+# to drive the ASGI app from the contract tests; the application itself makes no
+# outbound HTTP calls.
+-r requirements.txt
+
+pytest>=8
+pytest-asyncio>=0.24
+httpx>=0.27
