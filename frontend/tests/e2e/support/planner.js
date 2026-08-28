@@ -135,6 +135,48 @@ export async function expectLaneEcts(page, laneSelector, expected) {
         .toBe(expected);
 }
 
+/**
+ * Bring the lanes into view.
+ *
+ * The canvas opens scrolled so that the first row of cards sits above the
+ * viewport, and a card that is not on screen cannot be dragged. Panning is
+ * itself a drag on the canvas background.
+ */
+export async function panIntoView(page) {
+    const pane = await page.locator(".react-flow__pane").boundingBox();
+    await page.mouse.move(pane.x + pane.width - 40, pane.y + 60);
+    await page.mouse.down();
+    await page.mouse.move(pane.x + pane.width - 40, pane.y + 360, { steps: 12 });
+    await page.mouse.up();
+}
+
+/**
+ * Move a course already on the canvas into another lane.
+ *
+ * This is React Flow's own pointer drag rather than HTML5 drag-and-drop, and it
+ * is the gesture that matters most: a course's horizontal position *is* its
+ * semester, so this is where the plan is really edited.
+ */
+export async function dragCardToLane(page, code, laneSelector) {
+    const node = page.locator(".react-flow__node").filter({
+        has: page.locator(`[data-course-code="${code}"]`),
+    });
+    const card = await node.boundingBox();
+    const lane = await page.locator(laneSelector).boundingBox();
+
+    await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(lane.x + lane.width / 2, card.y + card.height / 2, { steps: 15 });
+    await page.mouse.up();
+}
+
+/** A button on a course card, addressed by its accessible name. */
+export function cardAction(page, code, name) {
+    return page
+        .locator(`[data-testid="course-card"][data-course-code="${code}"]`)
+        .getByRole("button", { name });
+}
+
 export async function openDashboard(page) {
     await page.locator("#open-dashboard-btn").click();
     await expect(page.locator("#planner-dashboard-container")).toBeVisible();
