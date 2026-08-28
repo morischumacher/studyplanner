@@ -109,8 +109,10 @@ function findBestCourse(
             if (entry._normCode === aliasNorm) score += 120;
             if (entry._normName === aliasNorm) score += 100;
             if (entry._normModule === aliasNorm) score += 80;
-            // A score of zero still beats the starting score, so the first
-            // unused entry in the catalogue is returned when nothing matches.
+            // An alias that matched nothing is a course the student is told is
+            // missing. Placing the first unused entry instead would fill their
+            // plan with a course the curriculum never named.
+            if (score <= 0) continue;
             if (score > bestScore) {
                 best = entry;
                 bestScore = score;

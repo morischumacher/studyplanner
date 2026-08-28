@@ -442,6 +442,7 @@ export function usePrefilledPlans({
         removeCourseNode,
         setCoursesFromNodes,
         setNodes,
+        startTermSeason,
         toggleCourseDone,
         updateCourseEcts,
         termAvailabilityForCode,
