@@ -61,20 +61,19 @@ wait_ready() {
 
 # Migrations are recorded in the same migration_history table the application
 # uses on boot, so the script and the app agree on what has been applied and
-# `up` is safe to re-run. Each file is applied inside a single transaction: 007
-# and 008 require it, because they build ON COMMIT DROP temp tables that psql's
-# default autocommit would destroy before the file's closing UPDATE reads them.
+# `up` is safe to re-run. Each file is applied inside a single transaction: the
+# two term-flag migrations require it, because they build ON COMMIT DROP temp
+# tables that psql's default autocommit would destroy before the file's closing
+# UPDATE reads them.
 # A few files carry their own BEGIN/COMMIT, which is harmless but makes psql
 # warn; those warnings are filtered while ON_ERROR_STOP still aborts on error.
 apply_migrations() {
   local psql_bin="${1:-psql}"
   local run=("$psql_bin" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE")
 
-  "${run[@]}" --quiet --set ON_ERROR_STOP=1 -c "
-    CREATE TABLE IF NOT EXISTS migration_history (
-      filename    text PRIMARY KEY,
-      executed_at timestamptz NOT NULL DEFAULT now()
-    );" >/dev/null
+  # The ledger and the one-time rename of the old sequential filenames. The
+  # application runs the same file at startup, so both agree on what has run.
+  "${run[@]}" --quiet --set ON_ERROR_STOP=1 -f "$SQL_DIR/_ledger.psql" >/dev/null
 
   local applied=0 skipped=0 f name
   for f in "$SQL_DIR"/*.sql; do
@@ -87,7 +86,8 @@ apply_migrations() {
       grep -vE 'WARNING:  there is (already a|no) transaction in progress' >&2
     )
     "${run[@]}" --quiet --set ON_ERROR_STOP=1 \
-      -c "INSERT INTO migration_history (filename) VALUES ('$name') ON CONFLICT DO NOTHING" >/dev/null
+      -c "INSERT INTO migration_history (filename, checksum)
+          VALUES ('$name', '$(sha256sum "$f" | cut -d" " -f1)') ON CONFLICT DO NOTHING" >/dev/null
     applied=$((applied + 1))
   done
   echo "migrations: $applied applied, $skipped already present"

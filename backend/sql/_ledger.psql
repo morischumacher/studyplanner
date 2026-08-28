@@ -1,0 +1,34 @@
+-- The migration ledger, and the one-time remap onto timestamped identifiers.
+--
+-- This file is not a migration. It is executed before the ledger is read, by
+-- both the application at startup and scripts/dev-db.sh, which is why it is
+-- named .psql: the migration scan globs *.sql and must not pick it up.
+--
+-- Every statement is idempotent, so it is safe on a fresh database and safe to
+-- re-run on one that has already been remapped.
+
+CREATE TABLE IF NOT EXISTS migration_history (
+    filename    text PRIMARY KEY,
+    executed_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Recorded from now on, so that an applied migration whose content later
+-- changes can be told apart from one that has not run.
+ALTER TABLE migration_history ADD COLUMN IF NOT EXISTS checksum text;
+
+-- Migrations used to be numbered 001 to 011. Sequential numbers collide when
+-- two branches both add the next one, so they became timestamps. Databases that
+-- already carry data, including the one holding the evaluation study's records,
+-- must not re-run these, so their ledger rows are renamed rather than the
+-- migrations being applied again.
+UPDATE migration_history SET filename = '202602091008_schema.sql'                    WHERE filename = '001_schema.sql';
+UPDATE migration_history SET filename = '202602091009_master_catalog.sql'            WHERE filename = '002_mastercatalog.sql';
+UPDATE migration_history SET filename = '202602091010_bachelor_catalog.sql'          WHERE filename = '003_bachelorcatalog.sql';
+UPDATE migration_history SET filename = '202602091011_catalog_materialised_view.sql' WHERE filename = '004_matview.sql';
+UPDATE migration_history SET filename = '202602121643_auth_and_planner_state.sql'    WHERE filename = '005_auth_planner.sql';
+UPDATE migration_history SET filename = '202602251601_term_availability_profile.sql' WHERE filename = '006_term_availability_profile.sql';
+UPDATE migration_history SET filename = '202602251602_master_term_flags.sql'         WHERE filename = '007_master_term_flags.sql';
+UPDATE migration_history SET filename = '202602251603_bachelor_term_flags.sql'       WHERE filename = '008_bachelor_term_flags.sql';
+UPDATE migration_history SET filename = '202605181426_recommendation_profile.sql'    WHERE filename = '009_recommendation_profile.sql';
+UPDATE migration_history SET filename = '202605181427_course_metadata.sql'           WHERE filename = '010_course_metadata.sql';
+UPDATE migration_history SET filename = '202605181428_course_similarities.sql'       WHERE filename = '011_course_similarities.sql';
