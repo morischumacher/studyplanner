@@ -203,6 +203,7 @@ is fetched again. `frontend/src/features/recommendations/`.
 - Two profile save functions are called from nowhere.
 - `rightPanelTab` is declared, never read, never persisted. Removed.
 - The onboarding tour writes an unsuffixed `localStorage` key that nothing reads.
+  Removed; the tour now writes the per-student key or nothing at all.
 - Per-module done and planned totals are computed, adjusted for the transferable
   skills cap, and then discarded; `per_course_module_title` is written and never
   read. `backend/app/rules/bachelor.py`.
