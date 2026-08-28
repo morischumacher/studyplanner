@@ -60,34 +60,27 @@ Ordered by what they cost, not by where they live.
 
 ### Data loss and wrong answers
 
-**Every planner save drops every other programme's dashboard state.**
-`buildPersistSnapshot` spreads `snapshot.dashboardUiByProgram`, but the plan
-snapshot has no such field, so the spread is always over nothing. Invisible
-within a session, because the other programmes are still held in memory; visible
-after a reload. `frontend/src/App.jsx`.
+**Every planner save drops every other programme's dashboard state.** Fixed.
+The state of the programmes not on screen already existed in the dashboard hook;
+it was simply never handed to the save. The stored document's shape is unchanged,
+so a plan saved before the fix still loads.
 
 **A course object with no code is parked under the literal string "undefined".**
-`String(isObject ? item?.code : item || "").trim()` parses as
-`isObject ? item?.code : (item || "")`, so the empty-string default never applies
-to the object branch, and the `if (!code) continue` guard passes.
-`frontend/src/features/planner-board/useCoursePlacement.ts`.
+Fixed. The ternary now sits inside the parentheses, so the empty-string default
+applies to both branches and the guard catches it.
 
-**A refused move can reposition the wrong copy of a course.**
-`rollbackMovedCourses` falls back from node id to course code, which undoes the
-diff's deliberate matching by id, and a plan holding the same course twice has
-the wrong instance moved back.
-`frontend/src/features/rule-check/useRuleCheckRollbacks.ts`.
+**A refused move can reposition the wrong copy of a course.** Fixed. The
+fallback from node id to course code is gone: every entry the diff emits carries
+the id the canvas gave it, ids survive every placement and rebuild the board
+does, and the rollback searches the array those ids came from.
 
-**The master prefill can place an unrelated course.** `findBestCourse` starts its
-best score at `-1` and has no "score must be positive" guard, unlike the bachelor
-version, so a score of zero wins and an unmatched alias silently takes the first
-unused catalogue entry. `missingAliases` therefore never fills for the master
-programme. `frontend/src/domain/prefill/master-plan.ts`.
+**The master prefill can place an unrelated course.** Fixed. A score of zero is
+now skipped, as the bachelor matcher already did, so an unmatched alias is
+reported rather than filled.
 
 **Accepting the master prefill after changing the start season can lay it out for
-the previous season.** The applier passes `startTermSeason` to the builder but
-omits it from its dependency array; the bachelor applier lists it.
-`frontend/src/features/prefill/usePrefilledPlans.ts`.
+the previous season.** Fixed. The start season is in the applier's dependencies,
+as it already was in the bachelor one.
 
 **A missing or unparseable credit value raises out of the bachelor rule engine
 rather than being reported.** The introductory-phase checks run over the raw
@@ -97,20 +90,25 @@ becomes a 500 instead of `rejected: invalid ects`.
 
 ### Recommendations
 
-**Two of the six channels can never fire against real data.** None of the course
-codes in the knowledge graph exists in either catalogue, so `sequence` and
-`completed` have no input. Four channels were live during the evaluation, not
-six. `backend/app/recommendations/knowledge.py`.
+**Two of the six channels can never fire against real data.** Fixed, and worth
+reading twice, because it changes how the evaluation should be read: **four
+channels were live during the study, not six.** The hand-written knowledge graph
+named courses that exist in neither catalogue. The sequence channel now reads the
+curriculum's own ordering, which is also what the compliance engine checks, and
+the completed channel derives its co-occurrence from the same deterministic
+synthetic cohort the peer channel builds, so both match on real codes. The
+knowledge graph is gone.
 
 **The candidate query has no `ORDER BY`.** The recommender's output depends on
 candidate order, so results can shift with whatever row order PostgreSQL happens
 to return. Distinct from the hash-ordering non-determinism, which is fixed.
 `backend/app/repositories/catalog.py`.
 
-**Set iteration still reaches two evidence strings.** Where several planned or
-finished courses would each justify the same candidate, which one the evidence
-names is not fixed. Latent: the current corpus never has a candidate claimed
-twice. `backend/app/recommendations/sequence.py`, `completed.py`.
+**Set iteration still reaches an evidence string.** Where several finished
+courses would each justify the same candidate, which share the evidence quotes
+was not fixed. Resolved for `sequence.py`, which now iterates the curriculum's
+ordering rather than the plan's sets, and settled in `completed.py` by ranking on
+the share. Latent elsewhere in the same class.
 
 **A rule-check failure is read as "this recommendation is fine".** Bare
 `except BaseException` around the filter, which also swallows `KeyboardInterrupt`
@@ -118,7 +116,17 @@ and `SystemExit`. `backend/app/recommendations/rules.py`.
 
 **The synthetic peer cohort is unbounded module-level mutable state**, keyed by
 programme code, never evicted, shared across requests.
-`backend/app/recommendations/knowledge.py`.
+`backend/app/recommendations/peer.py`.
+
+### Found while fixing the above
+
+**A candidate is offered to the rule checker in a semester past every one the
+student uses.** A course recommended *because a planned course needs it first* is
+therefore judged as arriving after the course that needs it. The master's
+prerequisites are hard, so the filter refuses it and the student sees nothing;
+the bachelor's ordering is advisory and survives only because the check returns
+early when the plan is acceptable and never compares warnings in that case. Both
+outcomes are now recorded in the corpus. `backend/app/recommendations/rules.py`.
 
 ### Curriculum data
 

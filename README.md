@@ -76,17 +76,17 @@ Four documents explain the parts that are not obvious from the tree:
 - [`docs/adr/`](docs/adr/), six records of what was decided and what it was
   decided over.
 - [`docs/known-defects.md`](docs/known-defects.md), what the evaluation study
-  found and what reading the code found afterwards. Neither list was fixed
-  while restructuring.
+  found and what reading the code found afterwards, and which of them have since
+  been fixed.
 
 ## Tests
 
 Three layers, because they catch different things.
 
 ```bash
-cd backend  && pytest                 # 169
-cd frontend && npm test               #  97
-cd frontend && npm run test:e2e       #  16
+cd backend  && pytest                 # 183
+cd frontend && npm test               # 105
+cd frontend && npm run test:e2e       #  17
 cd frontend && npm run typecheck
 ```
 
