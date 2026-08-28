@@ -66,7 +66,7 @@ frontend/
   tests/e2e/          the flows the evaluation study observed
 ```
 
-Four documents explain the parts that are not obvious from the tree:
+Five documents explain the parts that are not obvious from the tree:
 
 - [`docs/architecture.md`](docs/architecture.md): how a request travels, where
   the plan actually lives, and the three pieces of the frontend that are
@@ -78,6 +78,8 @@ Four documents explain the parts that are not obvious from the tree:
 - [`docs/known-defects.md`](docs/known-defects.md), what the evaluation study
   found and what reading the code found afterwards, and which of them have since
   been fixed.
+- [`docs/deploying.md`](docs/deploying.md), the order to deploy the three pieces
+  in, and the one of them that cannot be rolled back by redeploying.
 
 ## Tests
 
