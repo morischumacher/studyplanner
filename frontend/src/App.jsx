@@ -6414,6 +6414,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
                 <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
                     {(!isRuleSuccessFeedback || showTransientSuccessFeedback) && (
                         <div
+                            data-testid="planner-feedback"
                             style={{
                                 position: "absolute",
                                 top: 12,

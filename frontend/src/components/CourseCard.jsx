@@ -157,6 +157,11 @@ export default function CourseCard({ data }) {
     return (
         <div
             className="card study-planner-course-card"
+            // Test hooks. The end-to-end suite has to identify a card and read its
+            // state without depending on colours or on where the code is printed.
+            data-testid="course-card"
+            data-course-code={data?.code ?? ""}
+            data-course-status={data?.status ?? ""}
             ref={rootRef}
             onMouseEnter={() => {
                 if (data?.groupId) {
