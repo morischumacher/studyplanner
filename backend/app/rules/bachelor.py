@@ -27,15 +27,12 @@ class _PlanTotals:
     validated: List[Tuple[dict[str, Any], str]] = field(default_factory=list)
     seen: Dict[str, str] = field(default_factory=dict)
     lane_ects: Dict[int, float] = field(default_factory=dict)
-    mod_done: Dict[str, float] = field(default_factory=dict)
-    mod_planned: Dict[str, float] = field(default_factory=dict)
     mod_all: Dict[str, float] = field(default_factory=dict)
     cat_ects: Dict[str, float] = field(default_factory=dict)
     subj_ects: Dict[str, float] = field(default_factory=dict)
     earliest_lane_for_course: Dict[str, int] = field(default_factory=dict)
     earliest_lane_for_module: Dict[str, int] = field(default_factory=dict)
     per_course_canonical_cat: Dict[str, str] = field(default_factory=dict)
-    per_course_module_title: Dict[str, str] = field(default_factory=dict)
     split_module_parts: Dict[str, Set[str]] = field(default_factory=dict)
 
 
@@ -370,7 +367,6 @@ class RuleChecker:
 
             module_title = self._infer_module_title(course)
             module_key = self._norm(module_title)
-            totals.per_course_module_title[code_key] = module_title
             if module_key in self.split_variant_module_keys:
                 part = self._variant_part_for_course(course)
                 if part:
@@ -387,10 +383,6 @@ class RuleChecker:
             subj_key = self._norm(subj) or "(none)"
             totals.subj_ects[subj_key] = totals.subj_ects.get(subj_key, 0.0) + ects
 
-            if status == "done":
-                totals.mod_done[module_key] = totals.mod_done.get(module_key, 0.0) + ects
-            else:
-                totals.mod_planned[module_key] = totals.mod_planned.get(module_key, 0.0) + ects
             totals.mod_all[module_key] = totals.mod_all.get(module_key, 0.0) + ects
 
             if code_key not in totals.earliest_lane_for_course or li < totals.earliest_lane_for_course[code_key]:
@@ -592,7 +584,6 @@ class RuleChecker:
         from the category, from the FWTS module and from the overall total.
         """
         ts_ects = totals.cat_ects.get("transferable_skills", 0.0)
-        ts_done = sum(self._to_float(c.get("ects")) for c, status in items if status == "done" and totals.per_course_canonical_cat.get(self._norm(self._course_code(c))) == "transferable_skills")
         excess_ts = max(0.0, ts_ects - self.TRANSFERABLE_SKILLS_MAX_ECTS)
 
         if "transferable_skills" in totals.cat_ects:
@@ -601,15 +592,6 @@ class RuleChecker:
         fwts_key = self._norm("Freie Wahlfächer und Transferable Skills")
         if fwts_key in totals.mod_all:
             totals.mod_all[fwts_key] = max(0.0, totals.mod_all[fwts_key] - excess_ts)
-
-        # Completed courses fill the cap first, so only what is left over is taken off the planned side.
-        done_excess = max(0.0, ts_done - self.TRANSFERABLE_SKILLS_MAX_ECTS)
-        planned_excess = excess_ts - done_excess
-
-        if fwts_key in totals.mod_done:
-            totals.mod_done[fwts_key] = max(0.0, totals.mod_done[fwts_key] - done_excess)
-        if fwts_key in totals.mod_planned:
-            totals.mod_planned[fwts_key] = max(0.0, totals.mod_planned[fwts_key] - planned_excess)
 
         total_ects = sum(self._to_float(c.get("ects")) for c, _ in items) - excess_ts
 

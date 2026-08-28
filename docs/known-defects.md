@@ -206,7 +206,7 @@ is fetched again. `frontend/src/features/recommendations/`.
   Removed; the tour now writes the per-student key or nothing at all.
 - Per-module done and planned totals are computed, adjusted for the transferable
   skills cap, and then discarded; `per_course_module_title` is written and never
-  read. `backend/app/rules/bachelor.py`.
+  read. Removed; the golden master does not move, which is what discarded means.
 - `compactPrefillLayout` takes a maximum semester count and has never used it.
   Removed from its parameter type, which is now the one field it reads.
 - Several dependency arrays are incomplete: the placement and module-placement
