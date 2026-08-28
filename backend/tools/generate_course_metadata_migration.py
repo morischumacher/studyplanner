@@ -1,3 +1,15 @@
+"""
+Generate the course metadata migration from the published syllabi.
+
+A one-off tool rather than part of the application. It reads the two syllabus
+text files, extracts a skills list and a description for each course, and writes
+the UPDATE statements that became the course-metadata migration. It is kept so
+that the metadata in the database can be traced back to where it came from, and
+regenerated when the university publishes a new syllabus.
+
+The input paths are set below and have to be pointed at whatever the current
+syllabus files are called.
+"""
 import json
 import re
 

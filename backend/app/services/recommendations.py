@@ -14,7 +14,7 @@ from typing import Any
 from ..repositories import UnitOfWorkFactory
 from ..rules import checker_for
 from .profile import ProfileService
-from .recommender import Recommender
+from ..recommendations import Recommender
 
 
 class RecommendationService:
