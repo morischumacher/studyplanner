@@ -41,7 +41,12 @@ export default defineConfig({
     // A failing flow is usually a genuine break rather than flake, but the first
     // run pays for a cold backend start, so one retry keeps CI honest.
     retries: process.env.CI ? 1 : 0,
-    reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
+    // The github reporter turns a failed assertion into a GitHub annotation,
+    // which is the only part of a CI run that can be read without downloading
+    // the log. The html report is kept as well, and uploaded on failure.
+    reporter: process.env.CI
+        ? [["github"], ["list"], ["html", { open: "never" }]]
+        : [["list"], ["html", { open: "never" }]],
     use: {
         baseURL: `http://127.0.0.1:${WEB_PORT}`,
         trace: "retain-on-failure",
@@ -54,7 +59,7 @@ export default defineConfig({
             cwd: "../backend",
             port: Number(API_PORT),
             reuseExistingServer: !process.env.CI,
-            timeout: 120_000,
+            timeout: 240_000,
             // The API allows a fixed list of development origins by default, and
             // the port used here is not among them.
             env: {

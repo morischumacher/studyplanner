@@ -34,6 +34,29 @@ jobs:
       - run: pip install -r requirements-dev.txt
         working-directory: backend
 
+      - name: Apply migrations and confirm the catalogue seeded
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://studyplanner:studyplanner@localhost:5432/studyplanner
+        # The boot migrator reports a failed migration and carries on, so an
+        # unseeded catalogue would otherwise surface as a dozen puzzling test
+        # failures rather than as one clear one.
+        run: |
+          python - <<'PY'
+          import asyncio, os, asyncpg
+          from app.infrastructure.migrations import apply_pending, migrations_directory
+
+          async def main():
+              connection = await asyncpg.connect(os.environ["DATABASE_URL"])
+              await apply_pending(connection, migrations_directory("sql"))
+              courses = await connection.fetchval("SELECT count(*) FROM course")
+              print(f"catalogue holds {courses} courses")
+              assert courses > 0, "the catalogue did not seed"
+              await connection.close()
+
+          asyncio.run(main())
+          PY
+
       - run: pytest
         working-directory: backend
         env:
@@ -92,6 +115,29 @@ jobs:
         working-directory: frontend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
+
+      - name: Apply migrations and confirm the catalogue seeded
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://studyplanner:studyplanner@localhost:5432/studyplanner
+        # The boot migrator reports a failed migration and carries on, so an
+        # unseeded catalogue would otherwise surface as a dozen puzzling test
+        # failures rather than as one clear one.
+        run: |
+          python - <<'PY'
+          import asyncio, os, asyncpg
+          from app.infrastructure.migrations import apply_pending, migrations_directory
+
+          async def main():
+              connection = await asyncpg.connect(os.environ["DATABASE_URL"])
+              await apply_pending(connection, migrations_directory("sql"))
+              courses = await connection.fetchval("SELECT count(*) FROM course")
+              print(f"catalogue holds {courses} courses")
+              assert courses > 0, "the catalogue did not seed"
+              await connection.close()
+
+          asyncio.run(main())
+          PY
 
       - run: npm run test:e2e
         working-directory: frontend
