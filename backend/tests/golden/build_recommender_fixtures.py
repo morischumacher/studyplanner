@@ -293,11 +293,10 @@ def build(pools: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
             **here,
             toggles={**ALL_OFF, "sequence": True},
             plannedCourses=[course(pool, c, index) for index, c in enumerate(later)],
-            # The rule filter offers a candidate a semester past every one the
-            # student uses, so a course put forward because a planned course
-            # needs it first is judged as arriving after it. The scenario below
-            # records what the filter then does with that; with the checker off,
-            # this one records what the channel itself answered.
+            # With the checker off this records what the channel itself
+            # answered, and the scenario below records what the filter then does
+            # with it. The pair is what shows whether the semester the filter
+            # invents for a candidate costs the student a recommendation.
             ruleChecker=False,
         )
         cases[f"{tag}-sequence-prerequisite-through-the-rule-filter"] = scenario(

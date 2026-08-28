@@ -10753,7 +10753,22 @@
    "type": "sequence"
   }
  ],
- "master-sequence-prerequisite-through-the-rule-filter": [],
+ "master-sequence-prerequisite-through-the-rule-filter": [
+  {
+   "category": "elective",
+   "courseCode": "MTH",
+   "courseName": "Diplomarbeit",
+   "courseType": "PR",
+   "ects": {
+    "__decimal__": "27.0"
+   },
+   "evidence": "the curriculum expects this before planned course FOE",
+   "examSubject": "Diplomarbeit",
+   "id": "rec_MTH_sequence",
+   "score": 0.9,
+   "type": "sequence"
+  }
+ ],
  "master-sequence-successor-of-done": [
   {
    "category": "elective",
