@@ -46,8 +46,11 @@ import {
     COURSE_LAYOUT_HEIGHT,
     MODULE_BOTTOM_PADDING,
     MODULE_HEADER_HEIGHT,
-} from "./utils/constants.js";
-import { centerX, laneIndexFromX, laneX, projectToLaneAndSnap } from "./utils/geometry.js";
+    centerX,
+    laneIndexFromX,
+    laneX,
+    projectToLaneAndSnap,
+} from "./domain/layout.ts";
 import { createExamSubjectColorMap } from "./utils/examSubjectColors.js";
 import {
     buildSemesterList,
@@ -60,10 +63,12 @@ import {
     TERM_BOTH,
     TERM_SUMMER,
     TERM_WINTER,
-} from "./utils/semesters.js";
-import { buildBachelorPrefillPlan } from "./utils/bachelorPrefillPlan.js";
-import { buildMasterPrefillPlan } from "./utils/masterPrefillPlan.js";
-import { resolveModuleVariantCourses } from "./utils/bachelorCourseVariants.js";
+} from "./domain/terms.ts";
+import {
+    buildBachelorPrefillPlan,
+    buildMasterPrefillPlan,
+    resolveModuleVariantCourses,
+} from "./domain/prefill/index.ts";
 import {
     BACHELOR_FOCUS_OPTIONS,
     BACHELOR_PROGRAM_CODE,
@@ -75,21 +80,21 @@ import {
     PROGRAM_OPTIONS,
     STEOP_RULES_TEXT,
     sanitizeSectionOrder,
-} from "./app/constants.js";
+} from "./domain/programmes.ts";
 import {
     getCourseTypeForCode,
     getExamSubjectForCode,
     normalizeCatalog,
     normalizeRulecheckCategoryForProgram,
     resolveDashboardCategoryForProgram,
-} from "./app/catalogUtils.js";
+} from "./domain/catalogue.ts";
 import {
     compactPrefillLayout as compactPrefillLayoutBase,
     laneIdx,
     recomputeGroupFromChildren,
     resolveGroupCourseOverlaps,
     resolveLaneCollisions as resolveLaneCollisionsBase,
-} from "./lib/flowLayout.js";
+} from "./domain/nodes.ts";
 import { useDashboardSectionOrdering } from "./hooks/useDashboardSectionOrdering.js";
 import { useDashboardMetrics } from "./hooks/useDashboardMetrics.jsx";
 

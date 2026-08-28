@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { applyNodeChanges, Background, ControlButton, Controls, MarkerType, MiniMap, SelectionMode, useNodesState } from "reactflow";
 import "reactflow/dist/style.css";
-import { CARD_WIDTH, NODE_HEIGHT } from "../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../domain/layout.ts";
 import {
     GraphCourseNode,
     GraphModuleNode,
@@ -10,7 +10,7 @@ import {
 } from "./graphNodes/index.js";
 import VisualLegend from "./VisualLegend.jsx";
 import RecommendationPanel from "./RecommendationPanel.jsx";
-import GraphFilterEngine from "../utils/GraphFilterEngine.js";
+import GraphFilterEngine from "../domain/filters.ts";
 
 const X_BY_LEVEL = {
     root: 40,

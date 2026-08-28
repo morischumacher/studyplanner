@@ -1,4 +1,24 @@
-function normalizeText(value) {
+/**
+ * The prebuilt master plan.
+ *
+ * The master curriculum leaves almost everything to the student, so the
+ * template holds only the two courses the programme itself sequences. A summer
+ * start moves both into the second semester rather than mirroring the plan the
+ * way the bachelor does, because there is no second half to mirror against.
+ */
+
+import type { Catalogue, FlattenedCourse, PlannedCourse, PrefillTemplateItem } from "../types.ts";
+
+export interface MasterPrefillOptions {
+    startSeason?: string | null | undefined;
+}
+
+export interface MasterPrefillPlan {
+    plannedCourses: PlannedCourse[];
+    missingAliases: string[];
+}
+
+function normalizeText(value: unknown): string {
     return String(value || "")
         .normalize("NFKD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -8,7 +28,7 @@ function normalizeText(value) {
         .trim();
 }
 
-const MASTER_TEMPLATE = [
+const MASTER_TEMPLATE: PrefillTemplateItem[] = [
     {
         semester: 1,
         aliases: ["Advanced Software Engineering"],
@@ -19,7 +39,7 @@ const MASTER_TEMPLATE = [
     },
 ];
 
-function templateForStartSeason(startSeason) {
+function templateForStartSeason(startSeason: string | null | undefined): PrefillTemplateItem[] {
     const normalized = normalizeText(startSeason);
     if (normalized !== "summer") return MASTER_TEMPLATE;
     return MASTER_TEMPLATE.map((item) => ({
@@ -28,8 +48,13 @@ function templateForStartSeason(startSeason) {
     }));
 }
 
-function flattenCatalogCourses(catalog) {
-    const out = [];
+/**
+ * Every course the catalogue offers, one entry each. A module with no courses
+ * of its own still yields an entry, because some requirements are stated at
+ * module level and the plan has to be able to name them.
+ */
+function flattenCatalogCourses(catalog: Catalogue | null | undefined): FlattenedCourse[] {
+    const out: FlattenedCourse[] = [];
     for (const subject of Array.isArray(catalog) ? catalog : []) {
         const examSubject = subject?.pruefungsfach ?? null;
         for (const moduleEntry of Array.isArray(subject?.modules) ? subject.modules : []) {
@@ -68,8 +93,12 @@ function flattenCatalogCourses(catalog) {
     return out;
 }
 
-function findBestCourse(catalogEntries, aliases, usedCodes) {
-    let best = null;
+function findBestCourse(
+    catalogEntries: FlattenedCourse[],
+    aliases: string[],
+    usedCodes: Set<string>
+): FlattenedCourse | null {
+    let best: FlattenedCourse | null = null;
     let bestScore = -1;
     for (const alias of aliases) {
         const aliasNorm = normalizeText(alias);
@@ -80,6 +109,8 @@ function findBestCourse(catalogEntries, aliases, usedCodes) {
             if (entry._normCode === aliasNorm) score += 120;
             if (entry._normName === aliasNorm) score += 100;
             if (entry._normModule === aliasNorm) score += 80;
+            // A score of zero still beats the starting score, so the first
+            // unused entry in the catalogue is returned when nothing matches.
             if (score > bestScore) {
                 best = entry;
                 bestScore = score;
@@ -89,13 +120,16 @@ function findBestCourse(catalogEntries, aliases, usedCodes) {
     return best;
 }
 
-export function buildMasterPrefillPlan(catalog, options = {}) {
+export function buildMasterPrefillPlan(
+    catalog: Catalogue | null | undefined,
+    options: MasterPrefillOptions = {}
+): MasterPrefillPlan {
     const startSeason = options?.startSeason;
     const template = templateForStartSeason(startSeason);
     const catalogEntries = flattenCatalogCourses(catalog);
-    const usedCodes = new Set();
-    const plannedCourses = [];
-    const missingAliases = [];
+    const usedCodes = new Set<string>();
+    const plannedCourses: PlannedCourse[] = [];
+    const missingAliases: string[] = [];
 
     for (const item of template) {
         const aliases = Array.isArray(item?.aliases) ? item.aliases : [];

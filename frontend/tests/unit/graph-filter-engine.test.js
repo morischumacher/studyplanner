@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import GraphFilterEngine from "../../src/utils/GraphFilterEngine.js";
+import GraphFilterEngine from "../../src/domain/filters.ts";
 
 const BACHELOR = "033 521";
 const MASTER = "066 937";

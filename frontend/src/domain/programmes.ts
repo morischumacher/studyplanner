@@ -1,12 +1,32 @@
-export const PROGRAM_OPTIONS = [
+/**
+ * The programmes the planner supports, and the fixed text that goes with them.
+ *
+ * The two programme codes are the identity the whole planner keys off, and they
+ * are spaced exactly as the curriculum regulations print them; a code without
+ * its space matches nothing, on purpose.
+ *
+ * The long German passages below are quoted from the curriculum regulations and
+ * are shown to students verbatim, so they are held as data rather than as
+ * component markup: an editor changing a rule should not have to read JSX.
+ */
+
+export { BACHELOR_PROGRAM_CODE } from "./terms.ts";
+
+export const MASTER_PROGRAM_CODE = "066 937";
+
+/** A programme as the programme picker lists it. */
+export interface ProgrammeOption {
+    code: string;
+    label: string;
+}
+
+export const PROGRAM_OPTIONS: ProgrammeOption[] = [
     { code: "066 937", label: "Master Software Engineering" },
     { code: "033 521", label: "Bachelor Informatics" },
 ];
 
-export const MASTER_PROGRAM_CODE = "066 937";
-export const BACHELOR_PROGRAM_CODE = "033 521";
-
-export const BACHELOR_FOCUS_OPTIONS = [
+/** The bachelor focus areas, spelled as the rule checker expects them. */
+export const BACHELOR_FOCUS_OPTIONS: string[] = [
     "Artificial Intelligence und Machine Learning",
     "Cybersecurity",
     "Digital Health",
@@ -16,7 +36,7 @@ export const BACHELOR_FOCUS_OPTIONS = [
     "Visual Computing",
 ];
 
-export const DEFAULT_PLANNED_SECTION_ORDER = [
+export const DEFAULT_PLANNED_SECTION_ORDER: string[] = [
     "steop",
     "focus",
     "planned_exam_subject",
@@ -27,7 +47,7 @@ export const DEFAULT_PLANNED_SECTION_ORDER = [
     "warnings",
 ];
 
-export const DEFAULT_DONE_SECTION_ORDER = [
+export const DEFAULT_DONE_SECTION_ORDER: string[] = [
     "steop",
     "focus",
     "exam_subject",
@@ -36,16 +56,31 @@ export const DEFAULT_DONE_SECTION_ORDER = [
     "category",
 ];
 
-export const EMPTY_RULE_CHECK_STATE = {
+/** What the planner knows about the rule check before one has run. */
+export interface RuleCheckState {
+    sending: boolean;
+    error: string;
+    /** The rule checker's reply, whose shape is the backend's to decide. */
+    response: unknown;
+    lastUpdatedAt: number | null;
+}
+
+export const EMPTY_RULE_CHECK_STATE: RuleCheckState = {
     sending: false,
     error: "",
     response: null,
     lastUpdatedAt: null,
 };
 
-export function sanitizeSectionOrder(rawOrder, defaults) {
-    const base = Array.isArray(defaults) ? defaults : [];
-    const incoming = Array.isArray(rawOrder) ? rawOrder : [];
+/**
+ * Reconciles a stored dashboard section order with the sections that currently
+ * exist. Unknown keys are dropped and new ones are appended, so a student who
+ * reordered their dashboard before a section was added keeps their order and
+ * still sees the addition.
+ */
+export function sanitizeSectionOrder(rawOrder: unknown, defaults: readonly string[]): string[] {
+    const base: readonly string[] = Array.isArray(defaults) ? defaults : [];
+    const incoming: string[] = Array.isArray(rawOrder) ? rawOrder : [];
     const set = new Set(base);
     const filtered = incoming.filter((key, idx) => set.has(key) && incoming.indexOf(key) === idx);
     return [...filtered, ...base.filter((key) => !filtered.includes(key))];

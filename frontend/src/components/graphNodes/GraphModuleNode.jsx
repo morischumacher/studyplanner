@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, NODE_HEIGHT } from "../../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../../domain/layout.ts";
 import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../../utils/examSubjectColors.js";
 import {
     combinedCardShadow,
@@ -8,7 +8,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
-import { displayCourseTitle } from "../../utils/courseCodeDisplay.js";
+import { displayCourseTitle } from "../../domain/course-names.ts";
 
 export default function GraphModuleNode({ data }) {
     const color = data?.color || "#4b5563";

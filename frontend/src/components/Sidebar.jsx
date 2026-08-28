@@ -10,8 +10,8 @@ import {
     stateVisualByStatus,
     renderRecommendationPatch,
 } from "../utils/courseVisuals.js";
-import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
-import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
+import { resolveModuleVariantCourses } from "../domain/prefill/index.ts";
+import { displayCourseHeader, displayCourseTitle } from "../domain/course-names.ts";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({

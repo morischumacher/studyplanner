@@ -22,7 +22,7 @@ import {
     normalizeStartSeason,
     normalizeTermAvailability,
     semesterBoundsForProgram,
-} from "../../src/utils/semesters.js";
+} from "../../src/domain/terms.ts";
 
 describe("semesterBoundsForProgram", () => {
     it("gives the bachelor programme a longer range than the master", () => {

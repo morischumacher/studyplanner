@@ -1,4 +1,45 @@
-function normalizeText(value) {
+/**
+ * Modules a student satisfies in more than one way.
+ *
+ * A few bachelor modules are taught twice over: as a single combined course, or
+ * as a lecture paired with an exercise. Both routes carry the same credit and
+ * only one may be planned, so the module has to resolve to a set of courses
+ * before anything can be placed on the canvas.
+ *
+ * The modules are recognised by name, and Computational Statistics also by the
+ * course codes it is made of, because that module reaches the planner under
+ * several names while its courses keep their codes.
+ */
+
+import type { CatalogueCourse, CatalogueModule } from "../types.ts";
+
+/** One way of satisfying a split module. */
+export interface VariantOption {
+    id: string;
+    label: string;
+}
+
+export interface VariantMeta {
+    moduleKey: string;
+    variants: VariantOption[];
+}
+
+export interface ModuleVariantResolution {
+    isSplitModule: boolean;
+    activeVariantId: string | null;
+    /** The courses the chosen variant puts in the plan. */
+    selectedCourses: CatalogueCourse[];
+    /** Every course of the module, deduplicated, whichever variant is chosen. */
+    allVariantCourses: CatalogueCourse[];
+    variantMeta: VariantMeta | null;
+    variantOptions?: VariantOption[];
+}
+
+interface CourseVariantOption extends VariantOption {
+    courses: CatalogueCourse[];
+}
+
+function normalizeText(value: unknown): string {
     return String(value || "")
         .normalize("NFKD")
         .replace(/[\u0300-\u036f]/g, "")
@@ -8,14 +49,15 @@ function normalizeText(value) {
         .trim();
 }
 
-const SPLIT_MODULES = {
+const SPLIT_MODULES: Record<string, boolean> = {
     "algebra und diskrete mathematik": true,
     analysis: true,
     "statistik und wahrscheinlichkeitstheorie": true,
 };
 const COMPUTATIONAL_STATISTICS_MODULE_KEY = "computational statistics";
 
-function detectVariantPart(course) {
+/** Which half of a lecture-plus-exercise module a course belongs to. */
+function detectVariantPart(course: CatalogueCourse | null | undefined): "vu" | "vo" | "ue" | null {
     const code = normalizeText(course?.code);
     const name = normalizeText(course?.name);
     const type = normalizeText(course?.type);
@@ -26,7 +68,7 @@ function detectVariantPart(course) {
     return null;
 }
 
-export function getSplitModuleVariantMeta(moduleName) {
+export function getSplitModuleVariantMeta(moduleName: string | null | undefined): VariantMeta | null {
     const moduleKey = normalizeText(moduleName);
     if (!SPLIT_MODULES[moduleKey]) return null;
     return {
@@ -38,14 +80,20 @@ export function getSplitModuleVariantMeta(moduleName) {
     };
 }
 
-function buildComputationalStatisticsOptions(courses) {
+/**
+ * Computational Statistics is satisfied by any two of its three courses, so its
+ * variants are the pairs rather than a lecture-and-exercise split.
+ */
+function buildComputationalStatisticsOptions(courses: CatalogueCourse[]): CourseVariantOption[] {
     const byCode = new Map((courses || []).map((c) => [normalizeText(c?.code), c]));
     const byName = new Map((courses || []).map((c) => [normalizeText(c?.name), c]));
-    const resolve = (...aliases) => {
+    const resolve = (...aliases: string[]): CatalogueCourse | null => {
         for (const alias of aliases) {
             const k = normalizeText(alias);
-            if (byCode.has(k)) return byCode.get(k);
-            if (byName.has(k)) return byName.get(k);
+            const byCodeMatch = byCode.get(k);
+            if (byCodeMatch) return byCodeMatch;
+            const byNameMatch = byName.get(k);
+            if (byNameMatch) return byNameMatch;
         }
         return null;
     };
@@ -54,7 +102,7 @@ function buildComputationalStatisticsOptions(courses) {
     const scomp = resolve("SCOMP-VU", "Statistical Computing");
     const sim = resolve("SIM-VU", "Statistische Simulation und computerintensive Methoden");
 
-    const variants = [];
+    const variants: CourseVariantOption[] = [];
     if (cstat && scomp) variants.push({ id: "cstat_scomp", label: "Computerstatistik + Statistical Computing", courses: [cstat, scomp] });
     if (cstat && sim) variants.push({ id: "cstat_sim", label: "Computerstatistik + Simulation", courses: [cstat, sim] });
     if (scomp && sim) variants.push({ id: "scomp_sim", label: "Statistical Computing + Simulation", courses: [scomp, sim] });
@@ -68,7 +116,7 @@ function buildComputationalStatisticsOptions(courses) {
     return variants;
 }
 
-function hasComputationalStatisticsSignature(courses) {
+function hasComputationalStatisticsSignature(courses: CatalogueCourse[]): boolean {
     const normalizedCodes = (courses || [])
         .map((c) => normalizeText(c?.code))
         .filter(Boolean)
@@ -81,7 +129,10 @@ function hasComputationalStatisticsSignature(courses) {
     );
 }
 
-export function resolveModuleVariantCourses(modulePayload, requestedVariantId = null) {
+export function resolveModuleVariantCourses(
+    modulePayload: Pick<CatalogueModule, "name" | "courses"> | null | undefined,
+    requestedVariantId: string | null = null
+): ModuleVariantResolution {
     const courses = Array.isArray(modulePayload?.courses) ? modulePayload.courses.filter((c) => c?.code) : [];
     const moduleName = modulePayload?.name || "";
     const moduleKey = normalizeText(moduleName);
@@ -98,7 +149,7 @@ export function resolveModuleVariantCourses(modulePayload, requestedVariantId = 
             };
         }
         const chosen = variantOptions.find((opt) => opt.id === requestedVariantId) || variantOptions[0];
-        const selectedCourses = Array.isArray(chosen?.courses) ? chosen.courses : [];
+        const selectedCourses = chosen && Array.isArray(chosen.courses) ? chosen.courses : [];
         return {
             isSplitModule: true,
             activeVariantId: chosen?.id || null,
@@ -134,6 +185,8 @@ export function resolveModuleVariantCourses(modulePayload, requestedVariantId = 
     }
 
     const selectedCourses = activeVariantId === "vo_ue" ? voUeCourses : vuCourses;
+    // A module can be listed as split while the catalogue carries only one of
+    // the two routes, and an empty selection would leave nothing to place.
     const fallbackSelected = selectedCourses.length > 0
         ? selectedCourses
         : (activeVariantId === "vu" ? voUeCourses : vuCourses);

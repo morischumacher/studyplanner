@@ -1,4 +1,46 @@
-const BASELINE_PLAN = [
+/**
+ * The prebuilt bachelor plan.
+ *
+ * The plan is a template of course aliases rather than of course codes, because
+ * the catalogue renames courses between curriculum versions far more often than
+ * it renumbers them, and a template that misses is worse than useless: it
+ * silently drops a course from a student's plan. Every alias that finds nothing
+ * is therefore reported back rather than skipped quietly.
+ *
+ * A summer start mirrors the plan across the winter/summer pairs of semesters,
+ * except where a course is only ever taught in one of them. Those exceptions are
+ * listed explicitly below, since nothing in the catalogue records them.
+ */
+
+import type {
+    BachelorPlannedCourse,
+    Catalogue,
+    FlattenedCourse,
+    PrefillTemplateItem,
+} from "../types.ts";
+
+/** The focus areas the plan knows how to specialise for. */
+export type FocusKey =
+    | "ai_ml"
+    | "cybersecurity"
+    | "digital_health"
+    | "human_centered_computing"
+    | "software_engineering"
+    | "theoretical_cs_logic"
+    | "visual_computing"
+    | "general";
+
+export interface BachelorPrefillOptions {
+    startSeason?: string | null | undefined;
+}
+
+export interface BachelorPrefillPlan {
+    focusKey: FocusKey;
+    plannedCourses: BachelorPlannedCourse[];
+    missingAliases: string[];
+}
+
+const BASELINE_PLAN: PrefillTemplateItem[] = [
     { semester: 1, aliases: ["Einführung in die Programmierung 1"] },
     { semester: 1, aliases: ["Grundzüge digitaler Systeme"] },
     { semester: 1, aliases: ["Denkweisen der Informatik"] },
@@ -32,13 +74,12 @@ const BASELINE_PLAN = [
     { semester: 6, aliases: ["Daten- und Informatikrecht"] },
 ];
 
-const FOCUS_ADDITIONS = {
+const FOCUS_ADDITIONS: Record<FocusKey, PrefillTemplateItem[]> = {
     ai_ml: [
         { semester: 5, aliases: ["Einführung in Machine Learning"] },
     ],
     digital_health: [
         { semester: 5, aliases: ["Einführung in Visual Computing"], prefillFixedSemester: true },
-        // Keep this in semester 5 for the prebuilt plan.
         { semester: 5, aliases: ["Methods for Data Generation and Analytics in Medicine and Life Sciences"], prefillFixedSemester: true },
     ],
     human_centered_computing: [
@@ -57,7 +98,12 @@ const FOCUS_ADDITIONS = {
     general: [],
 };
 
-const FOCUS_EXCLUSIONS = {
+/**
+ * Courses the baseline plan drops for a given focus. A focus adds depth in one
+ * area at the cost of breadth elsewhere, and the plan has to stay within the
+ * ECTS a semester can hold.
+ */
+const FOCUS_EXCLUSIONS: Record<FocusKey, string[]> = {
     general: [
         "Einführung in Visual Computing",
         "Daten- und Informatikrecht",
@@ -142,7 +188,8 @@ const FOCUS_EXCLUSIONS = {
     ],
 };
 
-const SUMMER_SWAP_MAP = {
+/** Winter and summer semesters swap places when the student starts in summer. */
+const SUMMER_SWAP_MAP: Record<number, number> = {
     1: 2,
     2: 1,
     3: 4,
@@ -151,13 +198,25 @@ const SUMMER_SWAP_MAP = {
     6: 5,
 };
 
+function normalizeText(value: unknown): string {
+    return String(value || "")
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+/** Thesis work stays at the end of the degree whichever season it started in. */
 const SUMMER_LOCKED_ALIAS_SET = new Set([
     "Wissenschaftliches Arbeiten",
     "Bachelorarbeit",
     "Bachelorarbeit für Informatik und Wirtschaftsinformatik",
 ].map((entry) => normalizeText(entry)));
 
-const STRICT_FIXED_ALIAS_SEMESTER = new Map([
+/** The programming sequence is taught in a fixed order regardless of season. */
+const STRICT_FIXED_ALIAS_SEMESTER = new Map<string, number>([
     [normalizeText("Einführung in die Programmierung 1"), 1],
     [normalizeText("Einführung in die Programmierung 2"), 2],
 ]);
@@ -168,17 +227,7 @@ const SUMMER_FIRST_SEMESTER_ALIAS_SET = new Set([
     "Algebra und Diskrete Mathematik",
 ].map((entry) => normalizeText(entry)));
 
-function normalizeText(value) {
-    return String(value || "")
-        .normalize("NFKD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function resolveFocusKey(selectedFocus) {
+function resolveFocusKey(selectedFocus: string | null | undefined): FocusKey {
     const key = normalizeText(selectedFocus);
     if (!key) return "general";
     if (key.includes("artificial intelligence") && key.includes("machine learning")) return "ai_ml";
@@ -191,8 +240,13 @@ function resolveFocusKey(selectedFocus) {
     return "general";
 }
 
-function flattenCatalogCourses(catalog) {
-    const out = [];
+/**
+ * Every course the catalogue offers, one entry each. A module with no courses
+ * of its own still yields an entry, because some requirements are stated at
+ * module level and the plan has to be able to name them.
+ */
+function flattenCatalogCourses(catalog: Catalogue | null | undefined): FlattenedCourse[] {
+    const out: FlattenedCourse[] = [];
     for (const subject of Array.isArray(catalog) ? catalog : []) {
         const examSubject = subject?.pruefungsfach ?? null;
         for (const moduleEntry of Array.isArray(subject?.modules) ? subject.modules : []) {
@@ -237,17 +291,27 @@ function flattenCatalogCourses(catalog) {
     return out;
 }
 
-function scoreMatch(entry, aliasNorm, desiredEcts = null) {
+/**
+ * How well a catalogue entry answers an alias. A code match outranks a name
+ * match, which outranks a module match, and a matching ECTS value breaks ties
+ * between the split variants of a module that share a name.
+ */
+function scoreMatch(entry: FlattenedCourse, aliasNorm: string, desiredEcts: number | null = null): number {
     let score = 0;
     if (entry._normCode === aliasNorm) score += 120;
     if (entry._normName === aliasNorm) score += 100;
     if (entry._normModule === aliasNorm) score += 80;
-    if (desiredEcts != null && Number.isFinite(entry.ects) && Math.abs(entry.ects - desiredEcts) < 1e-6) score += 25;
+    if (desiredEcts != null && Number.isFinite(entry.ects) && Math.abs(Number(entry.ects) - desiredEcts) < 1e-6) score += 25;
     return score;
 }
 
-function findBestCourse(catalogEntries, aliases, desiredEcts, usedCodes) {
-    let best = null;
+function findBestCourse(
+    catalogEntries: FlattenedCourse[],
+    aliases: string[],
+    desiredEcts: number | null,
+    usedCodes: Set<string>
+): FlattenedCourse | null {
+    let best: FlattenedCourse | null = null;
     let bestScore = -1;
     for (const alias of aliases) {
         const aliasNorm = normalizeText(alias);
@@ -265,41 +329,49 @@ function findBestCourse(catalogEntries, aliases, desiredEcts, usedCodes) {
     return best;
 }
 
-function isSummerStart(startSeason) {
+function isSummerStart(startSeason: string | null | undefined): boolean {
     return normalizeText(startSeason) === "summer";
 }
 
-function isSummerSwapLocked(aliases) {
+function isSummerSwapLocked(aliases: string[]): boolean {
     const list = Array.isArray(aliases) ? aliases : [];
     return list.some((alias) => SUMMER_LOCKED_ALIAS_SET.has(normalizeText(alias)));
 }
 
-function resolveStrictFixedSemester(aliases) {
+function resolveStrictFixedSemester(aliases: string[]): number | null {
     const list = Array.isArray(aliases) ? aliases : [];
     for (const alias of list) {
         const fixed = STRICT_FIXED_ALIAS_SEMESTER.get(normalizeText(alias));
-        if (Number.isInteger(fixed)) return fixed;
+        if (Number.isInteger(fixed)) return Number(fixed);
     }
     return null;
 }
 
-function isSummerFirstSemesterLocked(aliases) {
+function isSummerFirstSemesterLocked(aliases: string[]): boolean {
     const list = Array.isArray(aliases) ? aliases : [];
     return list.some((alias) => SUMMER_FIRST_SEMESTER_ALIAS_SET.has(normalizeText(alias)));
 }
 
-function remapSemesterForStart(semester, aliases, startSeason) {
+function remapSemesterForStart(
+    semester: number,
+    aliases: string[],
+    startSeason: string | null | undefined
+): number {
     const sem = Number(semester);
     if (!Number.isInteger(sem) || sem < 1) return sem;
     const strictFixed = resolveStrictFixedSemester(aliases);
-    if (Number.isInteger(strictFixed)) return strictFixed;
+    if (Number.isInteger(strictFixed)) return Number(strictFixed);
     if (!isSummerStart(startSeason)) return sem;
     if (isSummerFirstSemesterLocked(aliases)) return 1;
     if (isSummerSwapLocked(aliases)) return sem;
     return SUMMER_SWAP_MAP[sem] || sem;
 }
 
-export function buildBachelorPrefillPlan(catalog, selectedFocus, options = {}) {
+export function buildBachelorPrefillPlan(
+    catalog: Catalogue | null | undefined,
+    selectedFocus: string | null | undefined,
+    options: BachelorPrefillOptions = {}
+): BachelorPrefillPlan {
     const startSeason = options?.startSeason;
     const focusKey = resolveFocusKey(selectedFocus);
     const additions = FOCUS_ADDITIONS[focusKey] || FOCUS_ADDITIONS.general;
@@ -319,9 +391,9 @@ export function buildBachelorPrefillPlan(catalog, selectedFocus, options = {}) {
             };
         });
     const catalogEntries = flattenCatalogCourses(catalog);
-    const usedCodes = new Set();
-    const plannedCourses = [];
-    const missingAliases = [];
+    const usedCodes = new Set<string>();
+    const plannedCourses: BachelorPlannedCourse[] = [];
+    const missingAliases: string[] = [];
 
     for (const item of template) {
         const aliases = Array.isArray(item?.aliases) ? item.aliases : [];
@@ -346,7 +418,7 @@ export function buildBachelorPrefillPlan(catalog, selectedFocus, options = {}) {
                 key: match._normModule || `code:${normalizeText(match.code)}`,
                 title: match.moduleName || match.name || match.code,
                 code: match.moduleCode || null,
-                ects: match.moduleEcts,
+                ects: match.moduleEcts ?? null,
                 category: match.category,
             },
         });

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, NODE_HEIGHT } from "../../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../../domain/layout.ts";
 import { hexToRgba } from "../../utils/examSubjectColors.js";
 import {
     combinedCardShadow,
@@ -8,7 +8,7 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
-import { displayCourseHeader, displayCourseTitle } from "../../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle } from "../../domain/course-names.ts";
 
 
 

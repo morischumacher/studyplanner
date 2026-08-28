@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { CANVAS_HEIGHT, LANE_WIDTH } from "../utils/constants.js";
+import { CANVAS_HEIGHT, LANE_WIDTH } from "../domain/layout.ts";
 
 
 /** LaneColumn — background strip for each semester lane. */

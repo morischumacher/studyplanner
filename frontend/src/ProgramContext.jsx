@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, useCallback } from "react";
-import { laneIndexFromX } from "./utils/geometry.js";
-import { BACHELOR_PROGRAM_CODE, semesterBoundsForProgram } from "./utils/semesters.js";
+import { laneIndexFromX } from "./domain/layout.ts";
+import { BACHELOR_PROGRAM_CODE, semesterBoundsForProgram } from "./domain/terms.ts";
 
 const ProgramContext = createContext();
 const EMPTY_DONE_CODES = [];

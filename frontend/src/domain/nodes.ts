@@ -1,3 +1,16 @@
+/**
+ * Keeping the nodes on the planning canvas from overlapping.
+ *
+ * Every function here takes the whole node list and returns a new one, because
+ * moving a course can move the module panel behind it, which can in turn push
+ * another course; there is no local edit that is safe to apply on its own.
+ *
+ * A module panel is not a parent in React Flow's sense. It is a sibling node
+ * drawn behind its courses, and its position and size are recomputed from those
+ * courses rather than the other way round, which is why a panel with no courses
+ * left is removed instead of resized.
+ */
+
 import {
     CARD_WIDTH,
     COLLISION_GAP,
@@ -10,15 +23,42 @@ import {
     LANE_WIDTH,
     MODULE_BOTTOM_PADDING,
     MODULE_HEADER_HEIGHT,
-} from "../utils/constants.js";
+} from "./layout.ts";
+import type { PlanNode } from "./types.ts";
 
-export function laneIdx(node) {
+/** What the vertical order of a lane is meant to mean to the reader. */
+export type VerticalSemantics = "no_meaning" | "alphabetical" | "ects" | "custom";
+
+export interface LaneLayoutOptions {
+    maxSemesterCount: number;
+    minModuleGroupTopY: number;
+    verticalSemantics?: VerticalSemantics | undefined;
+}
+
+/** The rectangle a node occupies, plus its height. */
+interface BoundingBox {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    h: number;
+}
+
+/** The topmost row courses are allowed to occupy, below the lane headers. */
+const MIN_COURSE_Y = 96;
+
+export function laneIdx(node: PlanNode | null | undefined): number {
     const span = LANE_WIDTH + LANE_GAP;
     const idx = Math.floor((Number(node?.position?.x || 0) + LANE_GAP * 0.5) / span);
+    // Minus one is the parking lane, which sits to the left of semester one.
     return Math.max(-1, idx);
 }
 
-export function recomputeGroupFromChildren(nodes, groupId) {
+/**
+ * Resizes a module panel around the courses it holds. A panel whose last course
+ * has been moved out is dropped, since an empty panel labels nothing.
+ */
+export function recomputeGroupFromChildren(nodes: PlanNode[], groupId: string): PlanNode[] {
     const children = nodes.filter((n) => n.type === "course" && n.data?.groupId === groupId);
     const group = nodes.find((n) => n.type === "moduleBg" && n.id === groupId);
     if (!group) return nodes;
@@ -40,7 +80,9 @@ export function recomputeGroupFromChildren(nodes, groupId) {
                 : (statuses.some((s) => s === "in_plan" || s === "done") ? "in_plan" : "todo")
         );
     const moduleEctsFromChildren = children.reduce((sum, c) => sum + Number(c?.data?.ects || 0), 0);
-    const moduleCourseCodes = children.map((c) => c?.data?.code).filter(Boolean);
+    const moduleCourseCodes = children
+        .map((c) => c?.data?.code)
+        .filter((code): code is string => Boolean(code));
     const height = maxY - minY + GROUP_PADDING_Y + MODULE_HEADER_HEIGHT + MODULE_BOTTOM_PADDING;
 
     return nodes.map((n) =>
@@ -56,6 +98,8 @@ export function recomputeGroupFromChildren(nodes, groupId) {
                     width,
                     height,
                     moduleCourseCount: children.length,
+                    // The catalogue's own figure wins, because a module can be
+                    // worth fewer credits than its courses add up to.
                     moduleEcts: Number(n?.data?.moduleEcts ?? 0) || moduleEctsFromChildren || null,
                     moduleCourseCodes,
                     status: groupStatus,
@@ -65,14 +109,15 @@ export function recomputeGroupFromChildren(nodes, groupId) {
     );
 }
 
-export function resolveGroupCourseOverlaps(nodes, groupId) {
+/** Stacks the courses of one module so that none covers another. */
+export function resolveGroupCourseOverlaps(nodes: PlanNode[], groupId: string): PlanNode[] {
     const children = nodes
         .filter((n) => n.type === "course" && n.data?.groupId === groupId)
         .sort((a, b) => a.position.y - b.position.y);
     if (children.length <= 1) return nodes;
 
     let next = nodes.slice();
-    const placed = [];
+    const placed: PlanNode[] = [];
     for (const child of children) {
         const current = next.find((n) => n.id === child.id) || child;
         let minY = current.position.y;
@@ -93,7 +138,7 @@ export function resolveGroupCourseOverlaps(nodes, groupId) {
     return next;
 }
 
-function nodeBBox(n) {
+function nodeBBox(n: PlanNode): BoundingBox {
     if (n.type === "course") {
         return {
             x1: n.position.x,
@@ -111,26 +156,28 @@ function nodeBBox(n) {
     return { x1: n.position.x, y1: n.position.y, x2: n.position.x, y2: n.position.y, h: 0 };
 }
 
-function isRelevantForCollision(n) {
-    return n.type === "course";
-}
-
-function coveredLaneIndicesForNode(n, maxSemesterCount) {
+/** The lanes a node reaches into. Only a module panel can span more than one. */
+function coveredLaneIndicesForNode(n: PlanNode, maxSemesterCount: number): number[] {
     if (n?.type !== "moduleBg") return [laneIdx(n)];
     const box = nodeBBox(n);
-    const laneFromX = (x) => {
+    const laneFromX = (x: number) => {
         const span = LANE_WIDTH + LANE_GAP;
         const idx = Math.floor((Number(x) + LANE_GAP * 0.5) / span);
         return Math.max(-1, Math.min(maxSemesterCount - 1, idx));
     };
     const start = laneFromX(box.x1);
     const end = laneFromX(Math.max(box.x1, box.x2 - 1));
-    const out = [];
+    const out: number[] = [];
     for (let li = start; li <= end; li += 1) out.push(li);
     return out.length ? out : [start];
 }
 
-function applyDeltaToGroupChildren(nodes, groupId, dx, dy) {
+function applyDeltaToGroupChildren(
+    nodes: PlanNode[],
+    groupId: string | undefined,
+    dx: number,
+    dy: number
+): PlanNode[] {
     if (!groupId || (dx === 0 && dy === 0)) return nodes;
     return nodes.map((n) =>
         n.type === "course" && n.data?.groupId === groupId
@@ -139,7 +186,8 @@ function applyDeltaToGroupChildren(nodes, groupId, dx, dy) {
     );
 }
 
-function enforceModuleHeaderClearance(allNodes, minModuleGroupTopY) {
+/** Keeps a module panel low enough that its header is not cut off by the lane header. */
+function enforceModuleHeaderClearance(allNodes: PlanNode[], minModuleGroupTopY: number): PlanNode[] {
     let nodes = allNodes.slice();
     const groups = nodes.filter((n) => n?.type === "moduleBg");
     for (const group of groups) {
@@ -156,11 +204,12 @@ function enforceModuleHeaderClearance(allNodes, minModuleGroupTopY) {
     return nodes;
 }
 
-function pushStandaloneCoursesBelowModuleBackgrounds(allNodes) {
-    return allNodes;
-}
-
-function enforceStackingOrder(allNodes) {
+/**
+ * Lane backgrounds sit behind module panels, which sit behind course cards. The
+ * order is set here rather than in the components because React Flow paints by
+ * `zIndex` alone and a node added later would otherwise land on top.
+ */
+function enforceStackingOrder(allNodes: PlanNode[]): PlanNode[] {
     return allNodes.map((node) => {
         if (node?.type === "lane") {
             if (node?.zIndex === 0) return node;
@@ -178,7 +227,29 @@ function enforceStackingOrder(allNodes) {
     });
 }
 
-export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGroupTopY }) {
+function resizeAllGroups(nodes: PlanNode[]): PlanNode[] {
+    const groupIds = [...new Set(
+        nodes
+            .filter((n) => n.type === "course" && n.data?.groupId)
+            .map((n) => n.data?.groupId)
+            .filter((id): id is string => Boolean(id))
+    )];
+    let resolved = nodes;
+    for (const gId of groupIds) {
+        resolved = recomputeGroupFromChildren(resolved, gId);
+    }
+    return resolved;
+}
+
+/**
+ * Pulls a freshly prefilled plan upwards until nothing overlaps. Courses are
+ * settled top to bottom so that each one only ever has to clear what is already
+ * placed above it.
+ */
+export function compactPrefillLayout(
+    allNodes: PlanNode[],
+    { minModuleGroupTopY }: LaneLayoutOptions
+): PlanNode[] {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
     const candidates = nodes
         .filter((n) => n.type === "course")
@@ -191,12 +262,12 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
             return ax - bx;
         });
 
-    const placed = [];
+    const placed: string[] = [];
     for (const candidate of candidates) {
         const current = nodes.find((n) => n.id === candidate.id);
         if (!current) continue;
         const cBox = nodeBBox(current);
-        let minAllowedY = 96;
+        let minAllowedY = MIN_COURSE_Y;
 
         for (const placedId of placed) {
             const prior = nodes.find((n) => n.id === placedId);
@@ -221,32 +292,35 @@ export function compactPrefillLayout(allNodes, { maxSemesterCount, minModuleGrou
     }
 
     const headerSafe = enforceModuleHeaderClearance(nodes, minModuleGroupTopY);
-    const groupIds = [...new Set(headerSafe.filter(n => n.type === "course" && n.data?.groupId).map(n => n.data.groupId))];
-    let resolved = headerSafe;
-    for (const gId of groupIds) {
-        resolved = recomputeGroupFromChildren(resolved, gId);
-    }
-
-    return enforceStackingOrder(resolved);
+    return enforceStackingOrder(resizeAllGroups(headerSafe));
 }
 
-export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGroupTopY, verticalSemantics }) {
+/**
+ * Settles every lane after a drag. Where the vertical order carries a meaning
+ * the student chose, the lane is laid out from the top in that order; otherwise
+ * courses keep the positions they were dropped at and are only pushed apart.
+ */
+export function resolveLaneCollisions(
+    allNodes: PlanNode[],
+    { maxSemesterCount, minModuleGroupTopY, verticalSemantics }: LaneLayoutOptions
+): PlanNode[] {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
 
-    const lanes = new Map();
+    const lanes = new Map<number, string[]>();
     for (const n of nodes) {
         if (n.type !== "course") continue;
         const laneIndices = coveredLaneIndicesForNode(n, maxSemesterCount);
         for (const li of laneIndices) {
-            if (!lanes.has(li)) lanes.set(li, []);
-            lanes.get(li).push(n.id);
+            const members = lanes.get(li);
+            if (members) members.push(n.id);
+            else lanes.set(li, [n.id]);
         }
     }
 
     for (const ids of lanes.values()) {
         const laneNodes = ids
             .map((id) => nodes.find((n) => n.id === id))
-            .filter(Boolean)
+            .filter((n): n is PlanNode => Boolean(n))
             .sort((a, b) => {
                 if (verticalSemantics === "alphabetical") {
                     const nameA = (a.data?.name || "").toLowerCase();
@@ -261,8 +335,8 @@ export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGro
                 return a.position.y - b.position.y;
             });
 
-        let prev = null;
-        let currentY = 96;
+        let prev: PlanNode | null = null;
+        let currentY = MIN_COURSE_Y;
         for (const curr of laneNodes) {
             if (verticalSemantics === "alphabetical" || verticalSemantics === "ects") {
                 const dy = currentY - curr.position.y;
@@ -293,11 +367,5 @@ export function resolveLaneCollisions(allNodes, { maxSemesterCount, minModuleGro
     }
 
     const headerSafe = enforceModuleHeaderClearance(nodes, minModuleGroupTopY);
-    const groupIds = [...new Set(headerSafe.filter(n => n.type === "course" && n.data?.groupId).map(n => n.data.groupId))];
-    let resolved = headerSafe;
-    for (const gId of groupIds) {
-        resolved = recomputeGroupFromChildren(resolved, gId);
-    }
-
-    return enforceStackingOrder(resolved);
+    return enforceStackingOrder(resizeAllGroups(headerSafe));
 }
