@@ -19,11 +19,9 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 
-import { sendRuleCheckUpdate } from "./lib/api";
 import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar, OnboardingTour } from "./components";
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
-import PlannerNotifications from "./components/app/PlannerNotifications.jsx";
 import {
     ProfileModal,
     SignupSetupModal,
@@ -39,6 +37,21 @@ import {
     useRecommendationList,
     useRecommendationRequests,
 } from "./features/recommendations/index.ts";
+import {
+    PrefillNotifications,
+    useFocusPrefillOffer,
+    usePrefillPrompts,
+    usePrefilledPlans,
+} from "./features/prefill/index.ts";
+import {
+    useProgressMilestone,
+    useRuleCheckRollbacks,
+    useRuleCheckState,
+    useRuleCheckSync,
+    useStickyViolation,
+    useStickyViolationExpiry,
+    useTransientSuccessFeedback,
+} from "./features/rule-check/index.ts";
 import { useOnboardingTour } from "./features/tour/index.ts";
 import { usePlannerPersistence } from "./app/persistence/index.ts";
 import {
@@ -63,22 +76,16 @@ import {
     isLaneAllowedForTerm,
     semesterBoundsForProgram,
 } from "./domain/terms.ts";
-import {
-    buildBachelorPrefillPlan,
-    buildMasterPrefillPlan,
-    resolveModuleVariantCourses,
-} from "./domain/prefill/index.ts";
+import { resolveModuleVariantCourses } from "./domain/prefill/index.ts";
 import {
     BACHELOR_FOCUS_OPTIONS,
     BACHELOR_PROGRAM_CODE,
-    EMPTY_RULE_CHECK_STATE,
     MASTER_PROGRAM_CODE,
     PROGRAM_OPTIONS,
 } from "./domain/programmes.ts";
 import {
     getCourseTypeForCode,
     getExamSubjectForCode,
-    normalizeRulecheckCategoryForProgram,
 } from "./domain/catalogue.ts";
 import {
     compactPrefillLayout as compactPrefillLayoutBase,
@@ -152,7 +159,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [tableVerticalCustomText, setTableVerticalCustomText] = useState("");
     const [isTableSemanticsPopupOpen, setIsTableSemanticsPopupOpen] = useState(false);
 
-    const [ruleCheckStateByProgram, setRuleCheckStateByProgram] = useState({});
+    const { ruleCheckState, setProgramRuleCheckState } = useRuleCheckState({ programCode });
     const dashboardPanels = useDashboardPanels({ programCode });
     const {
         isRuleDashboardOpen,
@@ -173,8 +180,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setRecommendations,
         recommendedCourseMap,
     } = useRecommendationList();
-    const [stickyViolation, setStickyViolation] = useState({ message: "", until: 0, tone: "" });
-    const [progressMilestone, setProgressMilestone] = useState({ text: "", until: 0 });
+    const { stickyViolation, setStickyViolation } = useStickyViolation();
 
     // React Flow refs
     const wrapperRef = useRef(null);
@@ -183,12 +189,10 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const groupDragRef = useRef(new Map()); // Map<groupId, { lastX, lastY }>
     const nodeDragStartPosRef = useRef(new Map()); // Map<nodeId, { x, y }>
     const nodeDragInProgressRef = useRef(false);
-    const latestRuleCheckChangeIdRef = useRef({});
     const pendingInitialSyncProgramRef = useRef(programCode);
     const pendingDragPayloadRef = useRef(null);
     const hydratedProgramRef = useRef(null);
     const latestGraphSnapshotRef = useRef(null);
-    const progressMilestoneRef = useRef({ programCode: null, pct: 0 });
     const [isSigningOut, setIsSigningOut] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRecPanelOpen, setIsRecPanelOpen] = useState(false);
@@ -204,24 +208,12 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
 
     const [isParkingCollapsed, setIsParkingCollapsed] = useState(false);
     const [tableInteractionMode, setTableInteractionMode] = useState("pan");
-    const [showTransientSuccessFeedback, setShowTransientSuccessFeedback] = useState(true);
-    const [focusPrefillPrompt, setFocusPrefillPrompt] = useState(null);
-    const [dismissedInitialPrefillPrompt, setDismissedInitialPrefillPrompt] = useState(false);
-    const focusSelectionTrackerRef = useRef({ programCode, selectedFocus });
-    const successFeedbackSignatureRef = useRef("");
-    const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
-
-    const setProgramRuleCheckState = useCallback((targetProgramCode, updater) => {
-        if (!targetProgramCode) return;
-        setRuleCheckStateByProgram((prev) => {
-            const current = prev?.[targetProgramCode] ?? EMPTY_RULE_CHECK_STATE;
-            const next = typeof updater === "function" ? updater(current) : updater;
-            return {
-                ...(prev || {}),
-                [targetProgramCode]: next,
-            };
-        });
-    }, []);
+    const {
+        focusPrefillPrompt,
+        setFocusPrefillPrompt,
+        dismissedInitialPrefillPrompt,
+        setDismissedInitialPrefillPrompt,
+    } = usePrefillPrompts();
 
     useEffect(() => {
         latestGraphSnapshotRef.current = null;
@@ -916,111 +908,16 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setNodes((prev) => prev.filter((n) => n.id !== groupId && n.data?.groupId !== groupId));
         setNeedsPersist(true);
     }, [setNodes]);
-    const rollbackAddedCourses = useCallback((change) => {
-        const addedIds = Array.isArray(change?.added) ? change.added.map((a) => a?.id).filter(Boolean) : [];
-        if (!addedIds.length) return;
-
-        setNodes((prev) => {
-            let next = prev.filter((n) => !addedIds.includes(n.id));
-            const affectedGroupIds = new Set(
-                prev
-                    .filter((n) => addedIds.includes(n.id) && n.type === "course" && n.data?.groupId)
-                    .map((n) => n.data.groupId)
-            );
-
-            for (const groupId of affectedGroupIds) {
-                next = recomputeGroupFromChildren(next, groupId);
-            }
-            return next;
-        });
-        setNeedsPersist(true);
-    }, [setNodes]);
-
-    const rollbackMovedCourses = useCallback((change) => {
-        const movedItems = Array.isArray(change?.moved) ? change.moved : [];
-        if (!movedItems.length) return;
-
-        const byId = new Map();
-        const byCode = new Map();
-        for (const item of movedItems) {
-            const id = String(item?.id || "").trim();
-            const code = String(item?.code || "").trim();
-            const fromLane = Number(item?.fromLaneIndex);
-            if (!Number.isInteger(fromLane) || fromLane < 0) continue;
-            if (id) byId.set(id, fromLane);
-            if (code && !byCode.has(code)) byCode.set(code, fromLane);
-        }
-        if (!byId.size && !byCode.size) return;
-
-        setNodes((prev) => {
-            const affectedGroupIds = new Set();
-            const next = prev.map((node) => {
-                if (node?.type !== "course") return node;
-                const nodeId = String(node?.id || "").trim();
-                const nodeCode = String(node?.data?.code || "").trim();
-                const fromLane = byId.has(nodeId)
-                    ? byId.get(nodeId)
-                    : (nodeCode && byCode.has(nodeCode) ? byCode.get(nodeCode) : null);
-                if (!Number.isInteger(fromLane) || fromLane < 0) return node;
-                if (node?.data?.groupId) affectedGroupIds.add(node.data.groupId);
-                return {
-                    ...node,
-                    position: {
-                        ...node.position,
-                        x: centerX(fromLane),
-                    },
-                };
-            });
-
-            let resolved = next;
-            for (const groupId of affectedGroupIds) {
-                resolved = recomputeGroupFromChildren(resolved, groupId);
-            }
-            return resolveLaneCollisions(resolved);
-        });
-        setNeedsPersist(true);
-    }, [centerX, recomputeGroupFromChildren, resolveLaneCollisions, setNodes]);
-
-    const rollbackCourseStatusToggle = useCallback((change) => {
-        if (change?.type !== "course_status_toggled") return;
-        const courseCodes = change?.courseCodes || (change?.courseCode ? [change.courseCode] : []);
-        if (courseCodes.length === 0) return;
-
-        const attemptedDone = change?.toStatus === "done";
-        const revertedDone = !attemptedDone;
-
-        for (const courseCode of courseCodes) {
-            rollbackCourseDone(courseCode, revertedDone);
-        }
-
-        setNodes((prev) => {
-            const updated = prev.map((n) => {
-                if (n.type === "course" && courseCodes.includes(n.data?.code)) {
-                    return { ...n, data: { ...n.data, status: revertedDone ? "done" : "in_plan" } };
-                }
-                return n;
-            });
-            const groupIds = prev
-                .filter((n) => n.type === "course" && courseCodes.includes(n.data?.code))
-                .map((n) => n.data?.groupId)
-                .filter(Boolean);
-            if (groupIds.length > 0) {
-                let currentNodes = updated;
-                for (const groupId of [...new Set(groupIds)]) {
-                    const groupCourses = currentNodes.filter((n) => n.type === "course" && n.data?.groupId === groupId);
-                    const allDone = groupCourses.length > 0 && groupCourses.every((n) => n.data?.status === "done");
-                    currentNodes = currentNodes.map((n) => {
-                        if (n.type === "moduleBg" && n.id === groupId) {
-                            return { ...n, data: { ...n.data, status: allDone ? "done" : "in_plan" } };
-                        }
-                        return n;
-                    });
-                }
-                return currentNodes;
-            }
-            return updated;
-        });
-    }, [rollbackCourseDone, setNodes]);
+    const {
+        rollbackAddedCourses,
+        rollbackMovedCourses,
+        rollbackCourseStatusToggle,
+    } = useRuleCheckRollbacks({
+        setNodes,
+        setNeedsPersist,
+        resolveLaneCollisions,
+        rollbackCourseDone,
+    });
 
     const toggleCourseDone = useCallback((courseCode, nextDone, nodeId) => {
         setCourseDone(courseCode, nextDone);
@@ -1964,325 +1861,31 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         return removeGraphCoursesFromPlan(codes);
     }, [removeGraphCoursesFromPlan]);
 
-    const applyBachelorPrefilledPlan = useCallback((focusName) => {
-        if (programCode !== BACHELOR_PROGRAM_CODE) return false;
-        const { plannedCourses, missingAliases } = buildBachelorPrefillPlan(catalog, focusName, {
-            startSeason: startTermSeason,
-        });
-        if (!plannedCourses.length) {
-            setStickyViolation({
-                message: "Prebuilt bachelor plan could not be applied (no matching catalog courses found).",
-                until: Date.now() + 5000,
-                tone: "error",
-            });
-            return false;
-        }
-
-        const doneSet = new Set(doneCourseCodes || []);
-        const groupedByModule = new Map();
-        for (const course of plannedCourses) {
-            const moduleKey = course?.module?.key || "";
-            if (!moduleKey) continue;
-            if (!groupedByModule.has(moduleKey)) groupedByModule.set(moduleKey, []);
-            groupedByModule.get(moduleKey).push(course);
-        }
-        const groupedModuleKeys = new Set(
-            [...groupedByModule.entries()]
-                .filter(([, list]) => Array.isArray(list) && list.length >= 2)
-                .map(([key]) => key)
-        );
-        const groupedModuleEntries = [...groupedByModule.entries()]
-            .filter(([key]) => groupedModuleKeys.has(key))
-            .sort((a, b) => {
-                const aFirstSem = Math.min(...(a[1] || []).map((c) => Number(c?.semester) || 99));
-                const bFirstSem = Math.min(...(b[1] || []).map((c) => Number(c?.semester) || 99));
-                if (aFirstSem !== bFirstSem) return aFirstSem - bFirstSem;
-                const aTitle = String(a?.[1]?.[0]?.module?.title || "").toLowerCase();
-                const bTitle = String(b?.[1]?.[0]?.module?.title || "").toLowerCase();
-                return aTitle.localeCompare(bTitle);
-            });
-        const moduleRowYByKey = new Map();
-        groupedModuleEntries.forEach(([moduleKey], rowIdx) => {
-            moduleRowYByKey.set(moduleKey, MIN_GROUP_CHILD_Y + rowIdx * (COURSE_LAYOUT_HEIGHT + 32));
-        });
-
-        const bySemester = new Map();
-        for (const item of plannedCourses) {
-            const semester = Number(item?.semester);
-            if (!Number.isInteger(semester) || semester < 1 || semester > maxSemesterCount) continue;
-            const preferredLane = semester - 1;
-            const targetLane = item?.prefillFixedSemester
-                ? preferredLane
-                : firstAllowedLaneForCourse(item?.code, preferredLane);
-            if (targetLane == null) continue;
-            const targetSemester = targetLane + 1;
-            if (!bySemester.has(targetSemester)) bySemester.set(targetSemester, []);
-            bySemester.get(targetSemester).push(item);
-        }
-
-        const now = Date.now();
-        const rebuilt = [...laneNodes];
-        const groupNodeMetaByModuleKey = new Map();
-        const groupedModuleSemesterOffset = new Map();
-        let sequence = 0;
-        for (let semesterId = 1; semesterId <= maxSemesterCount; semesterId += 1) {
-            const laneIndex = semesterId - 1;
-            const list = bySemester.get(semesterId) || [];
-            list.forEach((course, idx) => {
-                const examSubject = course?.examSubject ?? getExamSubjectForCode(catalog, course?.code);
-                const subjectColor =
-                    (examSubject ? subjectColors?.[examSubject] : null) ||
-                    "#2563eb";
-                const moduleKey = course?.module?.key || "";
-                const isGroupedModuleCourse = groupedModuleKeys.has(moduleKey);
-                const moduleRowY = moduleRowYByKey.get(moduleKey);
-                let groupId = null;
-                if (isGroupedModuleCourse) {
-                    const existing = groupNodeMetaByModuleKey.get(moduleKey);
-                    if (existing?.groupId) {
-                        groupId = existing.groupId;
-                    } else {
-                        groupId = `mod-prefill-${now}-${groupNodeMetaByModuleKey.size}`;
-                        groupNodeMetaByModuleKey.set(moduleKey, {
-                            groupId,
-                            module: course?.module ?? null,
-                            examSubject,
-                            subjectColor,
-                            category: course?.module?.category ?? course?.category ?? "unknown",
-                        });
-                    }
-                }
-                let targetY = 96 + idx * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP);
-                if (isGroupedModuleCourse && Number.isFinite(moduleRowY)) {
-                    const semesterOffsetKey = `${moduleKey}::${semesterId}`;
-                    const duplicateOffset = groupedModuleSemesterOffset.get(semesterOffsetKey) || 0;
-                    groupedModuleSemesterOffset.set(semesterOffsetKey, duplicateOffset + 1);
-                    targetY = moduleRowY + duplicateOffset * (COURSE_LAYOUT_HEIGHT + COURSE_VERTICAL_GAP);
-                }
-                const id = `${course?.code || "course"}-prefill-${now}-${sequence}`;
-                sequence += 1;
-                rebuilt.push({
-                    id,
-                    type: "course",
-                    data: {
-                        label: course?.name || course?.code || "Course",
-                        code: course?.code ?? null,
-                        type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
-                        ects: course?.ects ?? null,
-                        moduleMeta: null,
-                        groupId,
-                        baseY: targetY,
-                        onRemove: removeCourseNode,
-                        onRemoveModuleGroup: removeModuleGroup,
-                        onToggleDone: toggleCourseDone,
-                        onUpdateEcts: updateCourseEcts,
-                        nodeId: id,
-                        examSubject,
-                        category: course?.category ?? "unknown",
-                        programCode,
-                        subjectColor,
-                        status: doneSet.has(course?.code) ? "done" : "in_plan",
-                        termAvailability: termAvailabilityForCode(course?.code),
-                    },
-                    position: {
-                        x: centerX(laneIndex),
-                        y: targetY,
-                    },
-                    sourcePosition: "right",
-                    targetPosition: "left",
-                    zIndex: 1,
-                });
-            });
-        }
-
-        for (const [, groupMeta] of groupNodeMetaByModuleKey.entries()) {
-            const groupId = groupMeta?.groupId;
-            if (!groupId) continue;
-            const children = rebuilt.filter((n) => n.type === "course" && n?.data?.groupId === groupId);
-            if (children.length < 2) continue;
-            const moduleTitle = groupMeta?.module?.title || "Module";
-            const moduleCode = groupMeta?.module?.code ?? null;
-            const moduleEcts = groupMeta?.module?.ects ?? null;
-            const moduleCourseCodes = children.map((n) => n?.data?.code).filter(Boolean);
-            rebuilt.push({
-                id: groupId,
-                type: "moduleBg",
-                data: {
-                    title: moduleTitle,
-                    code: null,
-                    moduleCode,
-                    moduleEcts,
-                    moduleCourseCount: children.length,
-                    moduleCourseCodes,
-                    status: "in_plan",
-                    groupId,
-                    onRemoveGroup: removeModuleGroup,
-                    onRemove: () => removeModuleGroup(groupId),
-                    onToggleModuleDone: toggleModuleDoneCodes,
-                    examSubject: groupMeta?.examSubject ?? null,
-                    category: groupMeta?.category ?? "unknown",
-                    programCode,
-                    subjectColor: groupMeta?.subjectColor ?? "#2563eb",
-                },
-                position: { x: children[0].position.x, y: children[0].position.y },
-                draggable: true,
-                dragHandle: ".module-bg-drag-handle",
-                selectable: false,
-                zIndex: 0,
-            });
-        }
-
-        let withGroups = rebuilt;
-        for (const [, groupMeta] of groupNodeMetaByModuleKey.entries()) {
-            if (!groupMeta?.groupId) continue;
-            withGroups = recomputeGroupFromChildren(withGroups, groupMeta.groupId);
-        }
-        const resolved = resolveLaneCollisions(withGroups);
-        const compacted = resolveLaneCollisions(compactPrefillLayout(resolved));
-        setNodes(compacted);
-        setCoursesFromNodes(compacted.filter((n) => n.type !== "lane"));
-        setNeedsPersist(false);
-        setDragPreviewSemesterCount(null);
-
-        if (missingAliases.length > 0) {
-            setStickyViolation({
-                message: `Prebuilt plan applied with missing courses: ${missingAliases.join(", ")}`,
-                until: Date.now() + 7000,
-                tone: "success",
-            });
-        } else {
-            setStickyViolation({
-                message: "Prebuilt bachelor plan applied.",
-                until: Date.now() + 3500,
-                tone: "success",
-            });
-        }
-        return true;
-    }, [
-        MIN_GROUP_CHILD_Y,
-        catalog,
-        doneCourseCodes,
-        firstAllowedLaneForCourse,
-        laneNodes,
-        maxSemesterCount,
+    const { applyBachelorPrefilledPlan, applyMasterPrefilledPlan } = usePrefilledPlans({
         programCode,
-        removeModuleGroup,
-        removeCourseNode,
-        setCoursesFromNodes,
-        setNodes,
+        catalog,
         startTermSeason,
+        doneCourseCodes,
+        maxSemesterCount,
+        subjectColors,
+        laneNodes,
+        minGroupChildY: MIN_GROUP_CHILD_Y,
+        firstAllowedLaneForCourse,
+        termAvailabilityForCode,
+        resolveLaneCollisions,
+        compactPrefillLayout,
+        recomputeGroupFromChildren,
+        setNodes,
+        setCoursesFromNodes,
+        setNeedsPersist,
+        setDragPreviewSemesterCount,
+        setStickyViolation,
+        removeCourseNode,
+        removeModuleGroup,
         toggleCourseDone,
         toggleModuleDoneCodes,
         updateCourseEcts,
-        termAvailabilityForCode,
-    ]);
-
-    const applyMasterPrefilledPlan = useCallback(() => {
-        if (programCode !== MASTER_PROGRAM_CODE) return false;
-        const { plannedCourses, missingAliases } = buildMasterPrefillPlan(catalog, {
-            startSeason: startTermSeason,
-        });
-        if (!plannedCourses.length) {
-            setStickyViolation({
-                message: "Prebuilt master plan could not be applied (no matching catalog courses found).",
-                until: Date.now() + 5000,
-                tone: "error",
-            });
-            return false;
-        }
-
-        const doneSet = new Set(doneCourseCodes || []);
-        const bySemester = new Map();
-        for (const item of plannedCourses) {
-            const semester = Number(item?.semester);
-            if (!Number.isInteger(semester) || semester < 1 || semester > maxSemesterCount) continue;
-            const preferredLane = semester - 1;
-            const targetLane = firstAllowedLaneForCourse(item?.code, preferredLane);
-            if (targetLane == null) continue;
-            const targetSemester = targetLane + 1;
-            if (!bySemester.has(targetSemester)) bySemester.set(targetSemester, []);
-            bySemester.get(targetSemester).push(item);
-        }
-
-        const now = Date.now();
-        const rebuilt = [...laneNodes];
-        let sequence = 0;
-        for (let semesterId = 1; semesterId <= maxSemesterCount; semesterId += 1) {
-            const laneIndex = semesterId - 1;
-            const list = bySemester.get(semesterId) || [];
-            list.forEach((course, idx) => {
-                const examSubject = course?.examSubject ?? getExamSubjectForCode(catalog, course?.code);
-                const subjectColor =
-                    (examSubject ? subjectColors?.[examSubject] : null) ||
-                    "#2563eb";
-                const id = `${course?.code || "course"}-prefill-master-${now}-${sequence}`;
-                sequence += 1;
-                rebuilt.push({
-                    id,
-                    type: "course",
-                    data: {
-                        label: course?.name || course?.code || "Course",
-                        code: course?.code ?? null,
-                        type: course?.type ?? getCourseTypeForCode(catalog, course?.code),
-                        ects: course?.ects ?? null,
-                        moduleMeta: null,
-                        onRemove: removeCourseNode,
-                        onToggleDone: toggleCourseDone,
-                        onUpdateEcts: updateCourseEcts,
-                        nodeId: id,
-                        examSubject,
-                        category: course?.category ?? "unknown",
-                        programCode,
-                        subjectColor,
-                        status: doneSet.has(course?.code) ? "done" : "in_plan",
-                        termAvailability: termAvailabilityForCode(course?.code),
-                    },
-                    position: {
-                        x: centerX(laneIndex),
-                        y: 96 + idx * (COURSE_LAYOUT_HEIGHT + COLLISION_GAP),
-                    },
-                    sourcePosition: "right",
-                    targetPosition: "left",
-                    zIndex: 1,
-                });
-            });
-        }
-
-        const resolved = resolveLaneCollisions(rebuilt);
-        const compacted = resolveLaneCollisions(compactPrefillLayout(resolved));
-        setNodes(compacted);
-        setCoursesFromNodes(compacted.filter((n) => n.type !== "lane"));
-        setNeedsPersist(false);
-        setDragPreviewSemesterCount(null);
-
-        if (missingAliases.length > 0) {
-            setStickyViolation({
-                message: `Prebuilt master plan applied with missing courses: ${missingAliases.join(", ")}`,
-                until: Date.now() + 7000,
-                tone: "success",
-            });
-        } else {
-            setStickyViolation({
-                message: "Prebuilt master plan applied.",
-                until: Date.now() + 3500,
-                tone: "success",
-            });
-        }
-        return true;
-    }, [
-        catalog,
-        doneCourseCodes,
-        firstAllowedLaneForCourse,
-        laneNodes,
-        maxSemesterCount,
-        programCode,
-        removeCourseNode,
-        setCoursesFromNodes,
-        setNodes,
-        toggleCourseDone,
-        updateCourseEcts,
-        termAvailabilityForCode,
-    ]);
+    });
 
     /************************
      * Group drag mechanics *
@@ -2382,139 +1985,21 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         });
     }, [doneCourseCodes, parkedCourseCodes, setNodes]);
 
-    // Notify backend rule-check endpoint on each plan/status change.
-    useEffect(() => {
-        if (!lastPlanChange) return;
-        const requestProgramCode = programCode;
-        latestRuleCheckChangeIdRef.current = {
-            ...(latestRuleCheckChangeIdRef.current || {}),
-            [requestProgramCode]: lastPlanChange.id ?? null,
-        };
-        const doneSet = new Set(doneCourseCodes || []);
-        const allCourses = Object.values(coursesBySemester || {})
-            .flat()
-            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
-        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
-        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
-        const changeSnapshot = lastPlanChange;
-        const changeIdSnapshot = changeSnapshot.id ?? null;
-
-        setProgramRuleCheckState(requestProgramCode, (prev) => ({ ...prev, sending: true, error: "" }));
-        sendRuleCheckUpdate({
-            programCode: requestProgramCode,
-            plannedCourses,
-            doneCourses,
-            change: changeSnapshot,
-            selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
-            maxEctsPerSemester: Number(semesterLoadLimits?.maxEctsPerSemester),
-            recommendedEctsPerSemester: Number(semesterLoadLimits?.recommendedEctsPerSemester),
-            maxWeekHoursPerSemester: Number(semesterLoadLimits?.maxWeekHoursPerSemester),
-            recommendedWeekHoursPerSemester: Number(semesterLoadLimits?.recommendedWeekHoursPerSemester),
-        })
-            .then((response) => {
-                if ((latestRuleCheckChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
-                setProgramRuleCheckState(requestProgramCode, {
-                    sending: false,
-                    error: "",
-                    response,
-                    lastUpdatedAt: Date.now(),
-                });
-
-                const isAddChange =
-                    changeSnapshot?.type === "plan_updated" &&
-                    Array.isArray(changeSnapshot?.added) &&
-                    changeSnapshot.added.length > 0;
-                const isMoveChange =
-                    changeSnapshot?.type === "plan_updated" &&
-                    Array.isArray(changeSnapshot?.moved) &&
-                    changeSnapshot.moved.length > 0;
-                if (isAddChange && response?.ok === false) {
-                    setStickyViolation({
-                        message: response?.message || "Rule violation: change rejected.",
-                        until: Date.now() + 5000,
-                        tone: "error",
-                    });
-                    rollbackAddedCourses(changeSnapshot);
-                }
-                if (isMoveChange && response?.ok === false) {
-                    setStickyViolation({
-                        message: response?.message || "Rule violation: change rejected.",
-                        until: Date.now() + 5000,
-                        tone: "error",
-                    });
-                    rollbackMovedCourses(changeSnapshot);
-                }
-                const isStatusToggleChange = changeSnapshot?.type === "course_status_toggled";
-                if (isStatusToggleChange && response?.ok === false) {
-                    setStickyViolation({
-                        message: response?.message || "Rule violation: change rejected.",
-                        until: Date.now() + 5000,
-                        tone: "error",
-                    });
-                    rollbackCourseStatusToggle(changeSnapshot);
-                }
-            })
-            .catch((err) => {
-                if ((latestRuleCheckChangeIdRef.current?.[requestProgramCode] ?? null) !== changeIdSnapshot) return;
-                console.error("Failed to send rulecheck update", err);
-                setStickyViolation({
-                    message: String(err?.message || err),
-                    until: Date.now() + 5000,
-                    tone: "error",
-                });
-                setProgramRuleCheckState(requestProgramCode, (prev) => ({
-                    ...prev,
-                    sending: false,
-                    error: String(err?.message || err),
-                    lastUpdatedAt: Date.now(),
-                }));
-            });
-    }, [coursesBySemester, doneCourseCodes, lastPlanChange, programCode, rollbackAddedCourses, rollbackMovedCourses, rollbackCourseStatusToggle, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, semesterLoadLimits?.maxWeekHoursPerSemester, semesterLoadLimits?.recommendedWeekHoursPerSemester, setProgramRuleCheckState]);
-
-    // Initial sync for current program so dashboard has data before first edit.
-    useEffect(() => {
-        if (!plannerHydrated) return;
-        if (pendingInitialSyncProgramRef.current !== programCode) return;
-        const requestProgramCode = programCode;
-        const allCourses = Object.values(coursesBySemester || {})
-            .flat()
-            .map((course) => normalizeRulecheckCategoryForProgram(course, requestProgramCode));
-
-        const doneSet = new Set(doneCourseCodes || []);
-        const doneCourses = allCourses.filter((c) => c?.code && doneSet.has(c.code));
-        const plannedCourses = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
-
-        setProgramRuleCheckState(requestProgramCode, (prev) => ({ ...prev, sending: true, error: "" }));
-        sendRuleCheckUpdate({
-            programCode: requestProgramCode,
-            plannedCourses,
-            doneCourses,
-            change: { type: "initial_sync" },
-            selectedFocus: requestProgramCode === BACHELOR_PROGRAM_CODE ? (selectedFocus || null) : null,
-            maxEctsPerSemester: Number(semesterLoadLimits?.maxEctsPerSemester),
-            recommendedEctsPerSemester: Number(semesterLoadLimits?.recommendedEctsPerSemester),
-            maxWeekHoursPerSemester: Number(semesterLoadLimits?.maxWeekHoursPerSemester),
-            recommendedWeekHoursPerSemester: Number(semesterLoadLimits?.recommendedWeekHoursPerSemester),
-        })
-            .then((response) => {
-                setProgramRuleCheckState(requestProgramCode, {
-                    sending: false,
-                    error: "",
-                    response,
-                    lastUpdatedAt: Date.now(),
-                });
-                pendingInitialSyncProgramRef.current = null;
-            })
-            .catch((err) => {
-                setProgramRuleCheckState(requestProgramCode, (prev) => ({
-                    ...prev,
-                    sending: false,
-                    error: String(err?.message || err),
-                    lastUpdatedAt: Date.now(),
-                }));
-                pendingInitialSyncProgramRef.current = null;
-            });
-    }, [plannerHydrated, coursesBySemester, doneCourseCodes, programCode, selectedFocus, semesterLoadLimits?.maxEctsPerSemester, semesterLoadLimits?.recommendedEctsPerSemester, semesterLoadLimits?.maxWeekHoursPerSemester, semesterLoadLimits?.recommendedWeekHoursPerSemester, setProgramRuleCheckState]);
+    useRuleCheckSync({
+        programCode,
+        plannerHydrated,
+        lastPlanChange,
+        coursesBySemester,
+        doneCourseCodes,
+        selectedFocus,
+        semesterLoadLimits,
+        setProgramRuleCheckState,
+        setStickyViolation,
+        rollbackAddedCourses,
+        rollbackMovedCourses,
+        rollbackCourseStatusToggle,
+        pendingInitialSyncProgramRef,
+    });
 
     const { handleRecommendationToggle } = useRecommendationRequests({
         programCode,
@@ -2528,14 +2013,7 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setRecommendations,
     });
 
-    useEffect(() => {
-        if (!stickyViolation?.message) return;
-        const waitMs = Math.max(0, (stickyViolation.until || 0) - Date.now());
-        const t = window.setTimeout(() => {
-            setStickyViolation({ message: "", until: 0, tone: "" });
-        }, waitMs);
-        return () => window.clearTimeout(t);
-    }, [stickyViolation]);
+    useStickyViolationExpiry(stickyViolation, setStickyViolation);
 
     /***************************
      * Snap & collision resolve *
@@ -3288,96 +2766,42 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     }, [addGraphCourseToPlan]);
     useEmptySectionAutoClose(dashboardPanels, { hasMissingRequirements, hasWarnings });
 
-    useEffect(() => {
-        if (!plannerHydrated) return;
-        const last = progressMilestoneRef.current;
-        const roundedPct = Math.round(totalPctKpi);
-        if (last?.programCode !== programCode) {
-            progressMilestoneRef.current = { programCode, pct: roundedPct };
-            return;
-        }
-        const milestones = [25, 50, 75, 100];
-        const crossed = milestones.find((m) => last.pct < m && roundedPct >= m);
-        progressMilestoneRef.current = { programCode, pct: roundedPct };
-        if (!crossed) return;
-        setProgressMilestone({
-            text: `Milestone reached: ${crossed}% completion (${totalEctsKpi.toFixed(1)}/${targetEctsKpi.toFixed(1)} ECTS).`,
-            until: Date.now() + 3000,
-        });
-    }, [plannerHydrated, programCode, targetEctsKpi, totalEctsKpi, totalPctKpi]);
-
-    useEffect(() => {
-        if (!progressMilestone?.text) return;
-        const waitMs = Math.max(0, (progressMilestone.until || 0) - Date.now());
-        const t = window.setTimeout(() => {
-            setProgressMilestone({ text: "", until: 0 });
-        }, waitMs);
-        return () => window.clearTimeout(t);
-    }, [progressMilestone]);
-
-    const isRuleSuccessFeedback =
-        !stickyActive &&
-        !ruleCheckState?.sending &&
-        !ruleCheckState?.error &&
-        Boolean(ruleCheckState?.response?.ok);
-    useEffect(() => {
-        if (!isRuleSuccessFeedback) {
-            setShowTransientSuccessFeedback(true);
-            return;
-        }
-        const signature = `${programCode}:${ruleCheckState?.lastUpdatedAt ?? ""}:${ruleCheckState?.response?.message ?? ""}`;
-        if (successFeedbackSignatureRef.current !== signature) {
-            successFeedbackSignatureRef.current = signature;
-            setShowTransientSuccessFeedback(true);
-        }
-        const t = window.setTimeout(() => setShowTransientSuccessFeedback(false), 3000);
-        return () => window.clearTimeout(t);
-    }, [
+    const { progressMilestoneText } = useProgressMilestone({
+        plannerHydrated,
         programCode,
-        isRuleSuccessFeedback,
-        ruleCheckState?.lastUpdatedAt,
-        ruleCheckState?.response?.message,
-    ]);
+        targetEctsKpi,
+        totalEctsKpi,
+        totalPctKpi,
+    });
 
-    useEffect(() => {
-        setFocusPrefillPrompt(null);
-        setDismissedInitialPrefillPrompt(false);
-    }, [programCode]);
+    const { isRuleSuccessFeedback, showTransientSuccessFeedback } = useTransientSuccessFeedback({
+        programCode,
+        stickyActive,
+        ruleCheckState,
+    });
 
-    useEffect(() => {
-        const previous = focusSelectionTrackerRef.current;
-        const programChanged = previous?.programCode !== programCode;
-        const focusChanged = previous?.selectedFocus !== selectedFocus;
-        focusSelectionTrackerRef.current = { programCode, selectedFocus };
-        if (!plannerHydrated) return;
-        if (programChanged || !focusChanged) return;
-        if (programCode !== BACHELOR_PROGRAM_CODE) return;
-        if (!hasAnyPlannedOrDoneCourses) return;
-        setFocusPrefillPrompt({ focus: selectedFocus || "" });
-    }, [hasAnyPlannedOrDoneCourses, plannerHydrated, programCode, selectedFocus]);
+    useFocusPrefillOffer({
+        plannerHydrated,
+        programCode,
+        selectedFocus,
+        hasAnyPlannedOrDoneCourses,
+        setFocusPrefillPrompt,
+        setDismissedInitialPrefillPrompt,
+    });
 
     const plannerNotificationsNode = (
-        <PlannerNotifications
+        <PrefillNotifications
             focusPrefillPrompt={focusPrefillPrompt}
-            onApplyFocusPrefill={(focus) => {
-                applyBachelorPrefilledPlan(focus);
-                setFocusPrefillPrompt(null);
-            }}
-            onDismissFocusPrefill={() => setFocusPrefillPrompt(null)}
+            setFocusPrefillPrompt={setFocusPrefillPrompt}
+            setDismissedInitialPrefillPrompt={setDismissedInitialPrefillPrompt}
             shouldOfferInitialBachelorPrefill={shouldOfferInitialBachelorPrefill}
             shouldOfferInitialMasterPrefill={shouldOfferInitialMasterPrefill}
             programCode={programCode}
-            bachelorProgramCode={BACHELOR_PROGRAM_CODE}
             selectedFocus={selectedFocus}
             tourCompleted={tourCompleted}
-            onApplyInitialPrefill={(focus) => {
-                const applied = programCode === BACHELOR_PROGRAM_CODE
-                    ? applyBachelorPrefilledPlan(focus)
-                    : applyMasterPrefilledPlan();
-                if (applied) setDismissedInitialPrefillPrompt(true);
-            }}
-            onDismissInitialPrefill={() => setDismissedInitialPrefillPrompt(true)}
-            progressMilestoneText={progressMilestone?.text || ""}
+            applyBachelorPrefilledPlan={applyBachelorPrefilledPlan}
+            applyMasterPrefilledPlan={applyMasterPrefilledPlan}
+            progressMilestoneText={progressMilestoneText}
         />
     );
     const topActionsNode = (
