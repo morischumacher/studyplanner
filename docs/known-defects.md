@@ -128,12 +128,13 @@ programme code, never evicted, shared across requests.
 ### Found while fixing the above
 
 **A candidate is offered to the rule checker in a semester past every one the
-student uses.** A course recommended *because a planned course needs it first* is
-therefore judged as arriving after the course that needs it. The master's
-prerequisites are hard, so the filter refuses it and the student sees nothing;
-the bachelor's ordering is advisory and survives only because the check returns
-early when the plan is acceptable and never compares warnings in that case. Both
-outcomes are now recorded in the corpus. `backend/app/recommendations/rules.py`.
+student uses.** Fixed. A recommendation carries no semester, so the semester is
+one more thing the filter invents, alongside the module a course sits under, and
+it is now tried in two: the late one it always used, and the earliest the plan
+uses. A candidate is refused only when neither would have it. Moving it to the
+early semester alone would have broken the other direction, where a course is
+recommended because a completed course comes before it; both directions are now
+driven by a test.
 
 ### Curriculum data
 

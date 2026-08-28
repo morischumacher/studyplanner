@@ -7,8 +7,9 @@ had added it. What counts as a refusal is measured against the plan as it alread
 stands: a plan that is already over its credit ceiling would otherwise reject
 everything, so only violations the candidate itself introduces count.
 
-A course can appear in the catalogue more than once, under different modules. It
-survives if any one of those placements is acceptable.
+A course can appear in the catalogue more than once, under different modules, and
+a recommendation carries no semester of its own. Both are placements the filter
+has to invent, and a candidate survives if any one of them is acceptable.
 
 A checker that raises has said nothing, and silence is not consent: a candidate
 whose trial the checker could not answer is dropped, because the premise above
@@ -30,10 +31,10 @@ RESULT_LIMIT = 15
 # put through it. Anything past this point could not reach the result anyway.
 _CHECK_LIMIT = 100
 
-# The candidate is offered to the checker in a semester of its own, past any the
-# student is actually using, so that it is judged on its own merits rather than
-# on whichever semester it happened to land in.
-_TRIAL_LANE = 99
+# A semester of the candidate's own, past any the student is actually using, so
+# that its credits are judged on their own merits rather than on whichever
+# semester it happened to land in.
+_LATE_TRIAL_LANE = 99
 
 
 def _payload(plan: PlanContext, extra: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -41,14 +42,38 @@ def _payload(plan: PlanContext, extra: dict[str, Any] | None = None) -> dict[str
     return {"plannedCourses": planned, "doneCourses": plan.done_courses}
 
 
-def _trial_course(row: dict[str, Any]) -> dict[str, Any]:
+def _lane_of(course: dict[str, Any]) -> int:
+    try:
+        return int(course.get("laneIndex", 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _trial_lanes(plan: PlanContext) -> tuple[int, ...]:
+    """The semesters a candidate is tried in, in the order they are tried.
+
+    The late semester alone would decide the curriculum's ordering against every
+    course put forward because a planned course needs it first: such a course
+    would be read as arriving after the course that needs it, and refused for a
+    position the student never asked it to take. So it is also tried in the
+    earliest semester the plan uses, which is no later than anything already
+    planned. Between them the two cover both directions of the ordering, and a
+    candidate is refused only when neither semester would have it.
+    """
+    lanes = [_lane_of(c) for c in plan.planned_courses + plan.done_courses]
+    if not lanes:
+        return (_LATE_TRIAL_LANE,)
+    return (_LATE_TRIAL_LANE, min(lanes))
+
+
+def _trial_course(row: dict[str, Any], lane: int) -> dict[str, Any]:
     return {
         "code": row.get("code"),
         "name": row.get("title") or row.get("name"),
         "ects": row.get("ects"),
         "category": row.get("category") or row.get("type"),
         "examSubject": row.get("exam_subject") or row.get("examSubject") or "",
-        "laneIndex": _TRIAL_LANE,
+        "laneIndex": lane,
     }
 
 
@@ -73,6 +98,7 @@ def filter_by_rules(
     for candidate in plan.candidates:
         variants.setdefault(candidate.code, []).append(candidate.row)
 
+    lanes = _trial_lanes(plan)
     kept: list[dict[str, Any]] = []
     for recommendation in recommendations[:_CHECK_LIMIT]:
         rows = variants.get(recommendation["courseCode"], [])
@@ -82,7 +108,8 @@ def filter_by_rules(
             kept.append(recommendation)
             continue
         if any(
-            _is_acceptable(plan, row, rule_checker, base_errors, base_warnings)
+            _is_acceptable(plan, row, lane, rule_checker, base_errors, base_warnings)
+            for lane in lanes
             for row in rows
         ):
             kept.append(recommendation)
@@ -94,12 +121,13 @@ def filter_by_rules(
 def _is_acceptable(
     plan: PlanContext,
     row: dict[str, Any],
+    lane: int,
     rule_checker: Any,
     base_errors: list[str],
     base_warnings: list[str],
 ) -> bool:
     try:
-        result = rule_checker.evaluate(_payload(plan, _trial_course(row)))
+        result = rule_checker.evaluate(_payload(plan, _trial_course(row, lane)))
     except Exception:
         logger.exception("rule checker could not judge candidate %r", row.get("code"))
         return False
