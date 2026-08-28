@@ -83,10 +83,11 @@ the previous season.** Fixed. The start season is in the applier's dependencies,
 as it already was in the bachelor one.
 
 **A missing or unparseable credit value raises out of the bachelor rule engine
-rather than being reported.** The introductory-phase checks run over the raw
-payload rather than the validated courses, so `_to_float` throws and the request
-becomes a 500 instead of `rejected: invalid ects`.
-`backend/app/rules/bachelor.py`.
+rather than being reported.** Fixed. The totals pass already reported such a
+course and then skipped it, so it now also records which courses survived
+parsing, and every later pass reads that list instead of the payload. A course
+the checker could not read plays no further part, which is what its own
+docstring already promised.
 
 ### Recommendations
 

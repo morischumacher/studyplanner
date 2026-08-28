@@ -18,8 +18,13 @@ class _PlanTotals:
 
     Almost every rule needs a different slice of the same arithmetic, so it is
     computed once and handed around rather than recomputed per rule.
+
+    `validated` is the part of the plan that survived parsing. A course whose
+    credits could not be read is reported once and then plays no further part, so
+    the rules that run afterwards read it rather than the payload.
     """
 
+    validated: List[Tuple[dict[str, Any], str]] = field(default_factory=list)
     seen: Dict[str, str] = field(default_factory=dict)
     lane_ects: Dict[int, float] = field(default_factory=dict)
     mod_done: Dict[str, float] = field(default_factory=dict)
@@ -346,6 +351,8 @@ class RuleChecker:
             if ects <= 0 or ects > 60:
                 errors.append(f"rejected: implausible ects={ects} for '{code}'")
                 continue
+
+            totals.validated.append((course, status))
 
             li = self._lane_index_of(course, fallback=0)
             totals.lane_ects[li] = totals.lane_ects.get(li, 0.0) + ects
@@ -923,9 +930,10 @@ class RuleChecker:
         self._check_variant_mixing(totals, errors)
 
         # The done-only snapshot gates later courses; done+planned drives the UI progress.
-        items_done = [(c, s) for (c, s) in items if s == "done"]
+        counted = totals.validated
+        items_done = [(c, s) for (c, s) in counted if s == "done"]
         steop_done = self._steop_snapshot(items_done)
-        steop_plan = self._steop_snapshot(items)
+        steop_plan = self._steop_snapshot(counted)
 
         missing.extend(self._steop_missing(steop_plan))
 
@@ -936,7 +944,7 @@ class RuleChecker:
 
         warnings.extend(self._recommended_sequencing_warnings(totals))
 
-        total_ects = self._apply_transferable_skills_cap(items, totals, warnings)
+        total_ects = self._apply_transferable_skills_cap(counted, totals, warnings)
 
         narrow_completed, narrow_all = self._collect_missing_requirements(totals, total_ects, missing)
 
