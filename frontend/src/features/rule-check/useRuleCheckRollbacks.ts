@@ -25,7 +25,6 @@ export interface RolledBackChange {
     added?: readonly { id?: string | null | undefined }[] | undefined;
     moved?: readonly {
         id?: string | null | undefined;
-        code?: string | null | undefined;
         fromLaneIndex?: number | null | undefined;
     }[] | undefined;
     courseCode?: string | undefined;
@@ -83,28 +82,24 @@ export function useRuleCheckRollbacks({
         const movedItems = Array.isArray(change?.moved) ? change.moved : [];
         if (!movedItems.length) return;
 
+        // Only by id. A plan may hold the same course twice, and the diff keeps
+        // the two apart for that reason; matching a card by its code as well
+        // would put back whichever copy came first in the array.
         const byId = new Map<string, number>();
-        const byCode = new Map<string, number>();
         for (const item of movedItems) {
             const id = String(item?.id || "").trim();
-            const code = String(item?.code || "").trim();
             const fromLane = Number(item?.fromLaneIndex);
-            if (!Number.isInteger(fromLane) || fromLane < 0) continue;
-            if (id) byId.set(id, fromLane);
-            if (code && !byCode.has(code)) byCode.set(code, fromLane);
+            if (!id || !Number.isInteger(fromLane) || fromLane < 0) continue;
+            byId.set(id, fromLane);
         }
-        if (!byId.size && !byCode.size) return;
+        if (!byId.size) return;
 
         setNodes((prev) => {
             const affectedGroupIds = new Set<string>();
             const next = prev.map((node) => {
                 if (node?.type !== "course") return node;
-                const nodeId = String(node?.id || "").trim();
-                const nodeCode = String(node?.data?.code || "").trim();
-                const fromLane = byId.has(nodeId)
-                    ? byId.get(nodeId)
-                    : (nodeCode && byCode.has(nodeCode) ? byCode.get(nodeCode) : null);
-                if (fromLane == null || !Number.isInteger(fromLane) || fromLane < 0) return node;
+                const fromLane = byId.get(String(node?.id || "").trim()) ?? null;
+                if (fromLane == null) return node;
                 if (node?.data?.groupId) affectedGroupIds.add(node.data.groupId);
                 return {
                     ...node,
