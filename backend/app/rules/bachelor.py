@@ -62,7 +62,7 @@ class RuleChecker:
     # The thresholds the curriculum sets, and the two the application adds.
     # MAX and RECOMMENDED_ECTS_PER_SEMESTER are not curriculum law: they are the
     # plan-sanity limits the planner enforces, one as a rejection and one as a
-    # warning. All seven are read from the curriculum document.
+    # warning. All nine are read from the curriculum document.
     TOTAL_ECTS = _CURRICULUM.TOTAL_ECTS
     MIN_NARROW_ELECTIVE_MODULES = _CURRICULUM.MIN_NARROW_ELECTIVE_MODULES
     TRANSFERABLE_SKILLS_MIN_ECTS = _CURRICULUM.TRANSFERABLE_SKILLS_MIN_ECTS
@@ -70,6 +70,16 @@ class RuleChecker:
     BACHELORARBEIT_ECTS = _CURRICULUM.BACHELORARBEIT_ECTS
     MAX_ECTS_PER_SEMESTER = _CURRICULUM.MAX_ECTS_PER_SEMESTER
     RECOMMENDED_ECTS_PER_SEMESTER = _CURRICULUM.RECOMMENDED_ECTS_PER_SEMESTER
+    STEOP_POOL_MIN_ECTS = _CURRICULUM.STEOP_POOL_MIN_ECTS
+    MAX_NON_STEOP_ECTS_BEFORE_STEOP = _CURRICULUM.MAX_NON_STEOP_ECTS_BEFORE_STEOP
+
+    # Which of the compulsory introductory-phase courses the plan has to carry.
+    # The wording each one is reported as is prose and stays below.
+    _STEOP_MANDATORY_MISSING = {
+        "eidi1": "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
+        "ma": "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+        "ori": "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
+    }
 
     @staticmethod
     def _norm(text: Optional[str]) -> str:
@@ -124,6 +134,7 @@ class RuleChecker:
         self.modules: Dict[str, Dict[str, Any]] = curriculum.modules
         self.course_to_module: Dict[str, str] = curriculum.course_to_module
         self.steop_mandatory_lv_keys: Dict[str, str] = curriculum.steop_mandatory_lv_keys
+        self.steop_mandatory_tags: List[str] = curriculum.steop_mandatory_tags
         self.steop_pool_keys: set = curriculum.steop_pool_keys
         self.allowed_before_steop_extra: set = curriculum.allowed_before_steop_extra
         self.focuses: Dict[str, Any] = curriculum.focuses
@@ -288,8 +299,8 @@ class RuleChecker:
             if self._is_steop_pool_item(c):
                 pool_ects += self._to_float(c.get("ects"))
 
-        mandatory_ok = {"eidi1", "ma", "ori"}.issubset(tags)
-        pool_ok = pool_ects >= 8.0 - 1e-6
+        mandatory_ok = set(self.steop_mandatory_tags).issubset(tags)
+        pool_ok = pool_ects >= self.STEOP_POOL_MIN_ECTS - 1e-6
 
         return {
             "mandatoryPresent": sorted(list(tags)),
@@ -435,18 +446,15 @@ class RuleChecker:
         missing: List[str] = []
         present = set(steop_plan["mandatoryPresent"])
 
-        if "eidi1" not in present:
-            missing.append("StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)")
-        if "ma" not in present:
-            missing.append("StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)")
-        if "ori" not in present:
-            missing.append("StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)")
+        for tag in self.steop_mandatory_tags:
+            if tag not in present:
+                missing.append(self._STEOP_MANDATORY_MISSING[tag])
 
-        # The pool is a free choice of 8 ECTS, so we can only name the gap and the menu.
-        pool_missing = max(0.0, 8.0 - float(steop_plan["poolEcts"]))
+        # The pool is a free choice, so we can only name the gap and the menu.
+        pool_missing = max(0.0, self.STEOP_POOL_MIN_ECTS - float(steop_plan["poolEcts"]))
         if pool_missing > 1e-6:
             missing.append(
-                f"StEOP Pool: {pool_missing:.1f} ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme)."
+                f"StEOP Pool: {pool_missing:.1f} ECTS fehlen (mind. {self.STEOP_POOL_MIN_ECTS:.0f} ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme)."
             )
 
         return missing
@@ -475,7 +483,7 @@ class RuleChecker:
                 if self._is_steop_pool_item(c):
                     pool_ects += self._to_float(c.get("ects"))
 
-            if {"eidi1", "ma", "ori"}.issubset(tags) and pool_ects >= 8.0 - 1e-6:
+            if set(self.steop_mandatory_tags).issubset(tags) and pool_ects >= self.STEOP_POOL_MIN_ECTS - 1e-6:
                 return li
 
         return None
@@ -487,7 +495,7 @@ class RuleChecker:
         warnings: List[str],
         errors: List[str],
     ) -> float:
-        """Until the StEOP is passed, only 22 ECTS outside it may be completed, and only from a permitted list.
+        """Until the StEOP is passed, only so many ECTS outside it may be completed, and only from a permitted list.
 
         Returns the non-StEOP ECTS completed before that point, which the dashboard also reports.
         """
@@ -516,9 +524,10 @@ class RuleChecker:
                     if (code_k not in self.allowed_before_steop_extra) and (not self._is_fwts_like(canonical_cat, module_title)):
                         illegal_non_steop.append(f"{self._course_code(c)} (Semester {li+1})")
 
-        if non_steop_ects_before > 22.0 + 1e-6:
+        if non_steop_ects_before > self.MAX_NON_STEOP_ECTS_BEFORE_STEOP + 1e-6:
             errors.append(
-                f"rejected: before completing StEOP, {non_steop_ects_before:.1f} ECTS outside StEOP are DONE (max 22)."
+                f"rejected: before completing StEOP, {non_steop_ects_before:.1f} ECTS outside StEOP are DONE "
+                f"(max {self.MAX_NON_STEOP_ECTS_BEFORE_STEOP:.0f})."
             )
         if illegal_non_steop:
             errors.append(
@@ -809,8 +818,8 @@ class RuleChecker:
 
         return lines
 
-    @staticmethod
     def _build_steop_stats(
+        self,
         steop_done: Dict[str, Any],
         steop_plan: Dict[str, Any],
         steop_complete_lane_done: Optional[int],
@@ -822,7 +831,7 @@ class RuleChecker:
                 "completeLaneIndex": steop_complete_lane_done,
                 **steop_done,
                 "nonSteopEctsBeforeCompletion": round(non_steop_ects_before, 2),
-                "maxNonSteopBeforeCompletion": 22.0,
+                "maxNonSteopBeforeCompletion": self.MAX_NON_STEOP_ECTS_BEFORE_STEOP,
             },
             "planned": steop_plan,
         }

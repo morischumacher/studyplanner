@@ -143,8 +143,11 @@ kind falls back to a default: AM, AVP, CMUS, CMP, FP, LPC. Pinned by
 `backend/tests/curriculum/test_curriculum_documents.py` rather than fixed.
 
 **Four curriculum numbers are still literals in the checker** rather than in the
-curriculum document: the introductory-phase pool minimum, the pre-phase
-allowance, and the phase tags. `backend/app/rules/bachelor.py`.
+curriculum document. Fixed. The introductory-phase pool minimum and the pre-phase
+allowance are constants in `bachelor.json` and are read wherever they are
+enforced, printed or reported; the three phase tags are an entry in the same
+document, and the wording each is reported as stays in the checker, keyed by tag.
+A pure relocation: the golden master does not move.
 
 **A wording mismatch between two references to the same course**, "Mathematisches
 Arbeiten 1" where the matcher uses "Mathematisches Arbeiten". Cosmetic but
@@ -186,6 +189,12 @@ is fetched again. `frontend/src/features/recommendations/`.
 - The graph filter engine's ancestor walk keeps no visited set and would loop for
   ever on a cycle. Unreachable from the current graph builder.
   `frontend/src/domain/filters.ts`.
+- `steop_mandatory_lv_keys` is loaded from the curriculum document and never
+  read. The checker recognises the three compulsory introductory-phase courses
+  from a list of titles and codes written into `_steop_mandatory_tag` instead,
+  which is the same information in a second place. Found while moving the phase
+  tags into the document; left alone because the entry is curriculum data that
+  should be read rather than dead code that should go.
 - Two profile save functions are called from nowhere.
 - `rightPanelTab` is declared, never read, never persisted.
 - The onboarding tour writes an unsuffixed `localStorage` key that nothing reads.

@@ -6,7 +6,9 @@
     "TRANSFERABLE_SKILLS_MAX_ECTS": 9.0,
     "BACHELORARBEIT_ECTS": 13.0,
     "MAX_ECTS_PER_SEMESTER": 42.0,
-    "RECOMMENDED_ECTS_PER_SEMESTER": 30.0
+    "RECOMMENDED_ECTS_PER_SEMESTER": 30.0,
+    "STEOP_POOL_MIN_ECTS": 8.0,
+    "MAX_NON_STEOP_ECTS_BEFORE_STEOP": 22.0
   },
   "data": {
     "program_code": "033 521",
@@ -590,6 +592,11 @@
       "oiw": 1.0,
       "ori vu": 1.0
     },
+    "steop_mandatory_tags": [
+      "eidi1",
+      "ma",
+      "ori"
+    ],
     "steop_pool_keys": {
       "__set__": [
         "adm",
