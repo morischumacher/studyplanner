@@ -19,11 +19,12 @@ the same style `app/curriculum` uses for sets and tuples, because a plain string
 would reach the rule checker's arithmetic and the API response as a string and
 the recorded behaviour would not be the real behaviour.
 
-The captured rows are sorted by code. The repository's query has no ORDER BY, so
-the database does not promise an order, and the recommender's answer depends on
-one: candidates are considered in the order given, and the final sort by score is
-stable, so ties keep it. The fixture therefore pins an order rather than records
-one.
+The captured rows are sorted by code, which the repository's query now asks for
+too. Sorting again here is not redundant: the corpus should pin the order it
+records rather than inherit it, so that a query whose ordering changed shows up
+as a moved snapshot instead of as a silently different pool. The recommender's
+answer depends on that order, since candidates are considered in the order given
+and the final sort by score is stable, so ties keep it.
 
     python3 -m tests.golden.build_recommender_fixtures
 

@@ -100,10 +100,11 @@ the completed channel derives its co-occurrence from the same deterministic
 synthetic cohort the peer channel builds, so both match on real codes. The
 knowledge graph is gone.
 
-**The candidate query has no `ORDER BY`.** The recommender's output depends on
-candidate order, so results can shift with whatever row order PostgreSQL happens
-to return. Distinct from the hash-ordering non-determinism, which is fixed.
-`backend/app/repositories/catalog.py`.
+**The candidate query has no `ORDER BY`.** Fixed. It orders by course code, then
+by the three columns that separate the rows a code can still be duplicated by, so
+the order is both stable and total. The recorded corpus does not move: it sorted
+the captured pool itself, which is why the defect was invisible to the golden
+master.
 
 **Set iteration still reaches an evidence string.** Where several finished
 courses would each justify the same candidate, which share the evidence quotes

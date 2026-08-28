@@ -55,6 +55,13 @@ class CatalogRepository:
         The recommender needs the courses without the catalogue's nesting. Going
         through the JSON view instead would mean materialising the whole
         document only to take it apart again.
+
+        The order is part of the answer. Candidates are considered in the order
+        they arrive in and the recommender's final sort by score is stable, so
+        ties keep it; without a stated order two students with the same plan can
+        be shown different courses. The four ordering columns are a key of the
+        result: everything else the query selects comes from the course row and
+        is settled by its id.
         """
         rows = await self._connection.fetch(
             """
@@ -71,6 +78,7 @@ class CatalogRepository:
             LEFT JOIN module_grouping mg ON mg.module_id = m.id
             LEFT JOIN exam_subject es ON es.id = mg.exam_subject_id
             WHERE sp.code = $1
+            ORDER BY c.code, c.id, m.category, es.name
             """,
             program_code,
         )
