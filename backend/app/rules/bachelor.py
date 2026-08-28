@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, List, Dict, Tuple, Optional, Set
 import unicodedata
 
@@ -9,16 +10,47 @@ from .result import RuleCheckResult
 _CURRICULUM = load_curriculum(BACHELOR)
 
 
+@dataclass
+class _PlanTotals:
+    """
+    The sums one pass over the courses produces.
+
+    Almost every rule needs a different slice of the same arithmetic, so it is
+    computed once and handed around rather than recomputed per rule.
+    """
+
+    seen: Dict[str, str] = field(default_factory=dict)
+    lane_ects: Dict[int, float] = field(default_factory=dict)
+    mod_done: Dict[str, float] = field(default_factory=dict)
+    mod_planned: Dict[str, float] = field(default_factory=dict)
+    mod_all: Dict[str, float] = field(default_factory=dict)
+    cat_ects: Dict[str, float] = field(default_factory=dict)
+    subj_ects: Dict[str, float] = field(default_factory=dict)
+    earliest_lane_for_course: Dict[str, int] = field(default_factory=dict)
+    earliest_lane_for_module: Dict[str, int] = field(default_factory=dict)
+    per_course_canonical_cat: Dict[str, str] = field(default_factory=dict)
+    per_course_module_title: Dict[str, str] = field(default_factory=dict)
+    split_module_parts: Dict[str, Set[str]] = field(default_factory=dict)
+
+
 class RuleChecker:
     """
-    Rule engine for TU Wien Bachelorstudium Informatik (180 ECTS) based on the provided text.
+    Compliance checking for the TU Wien bachelor programme in Informatics.
 
-    Key fixes vs your version:
-      - StEOP: compute BOTH done-based completion (for gating) and planned+done progress (for UI),
-              and identify mandatory StEOP LVs by LV title/code (not by module mapping).
-      - Focus: robust recognition via aliases (ai/ml/cyber/se/hcc/vc/...) + normalization.
-      - Soft prereqs: fix lane=0 bug (0 is falsy).
-      - Pre-StEOP extra: use canonical category (not just incoming) so FWTS/TS are handled correctly.
+    Three things about this curriculum shape the checks below.
+
+    The introductory phase, StEOP, is a gate rather than a requirement: until it
+    is complete, only a limited amount of other work may be taken. It is measured
+    twice, once over completed courses to decide whether the gate has opened, and
+    once over completed and planned together to show progress.
+
+    A focus area is optional. Choosing one adds requirements without removing
+    any, and students name theirs inconsistently, so it is matched through a
+    table of aliases rather than by exact title.
+
+    Several modules are split into parts that come in variants. A plan may take
+    any one variant, and mixing parts from two variants of the same module is
+    rejected.
     """
 
     # The thresholds the curriculum sets, and the two the application adds.
@@ -33,9 +65,6 @@ class RuleChecker:
     MAX_ECTS_PER_SEMESTER = _CURRICULUM.MAX_ECTS_PER_SEMESTER
     RECOMMENDED_ECTS_PER_SEMESTER = _CURRICULUM.RECOMMENDED_ECTS_PER_SEMESTER
 
-    # ----------------------------
-    # Helpers: normalization/parsing
-    # ----------------------------
     @staticmethod
     def _norm(text: Optional[str]) -> str:
         if not text:
@@ -94,9 +123,6 @@ class RuleChecker:
             recommended_ects = max_ects
         return max_ects, recommended_ects
 
-    # ----------------------------
-    # Init curriculum model
-    # ----------------------------
     def __init__(self) -> None:
         # The curriculum itself is data, loaded from app/curriculum/bachelor.json.
         # What stays here is the checking, which is the part that is code.
@@ -113,9 +139,6 @@ class RuleChecker:
         self.soft_prereqs: List[Any] = curriculum.soft_prereqs
         self.split_variant_module_keys: set = curriculum.split_variant_module_keys
 
-    # ----------------------------
-    # Internal: canonicalization
-    # ----------------------------
     def _canonical_exam_subject(self, raw: Optional[str]) -> str:
         s = self._norm(raw)
         if s in self.exam_subject_aliases:
@@ -201,9 +224,6 @@ class RuleChecker:
             )
         return expected
 
-    # ----------------------------
-    # Parsing input payload
-    # ----------------------------
     def _extract_courses(self, payload: dict[str, Any]) -> List[Tuple[dict[str, Any], str]]:
         out: List[Tuple[dict[str, Any], str]] = []
         if isinstance(payload.get("lanes"), list):
@@ -222,12 +242,11 @@ class RuleChecker:
             out.append((c, "done"))
         return out
 
-    # ----------------------------
-    # StEOP helpers (LV-level)
-    # ----------------------------
     def _steop_mandatory_tag(self, course: dict[str, Any]) -> Optional[str]:
-        """
-        Identify the 3 mandatory StEOP LVs by LV code/title (not module mapping).
+        """Which of the three compulsory StEOP courses this is, recognised by its own code or title.
+
+        Deliberately not resolved through the module mapping: the StEOP names
+        individual courses, not whole modules.
         """
         k = self._norm(self._course_code(course))
         if k in (self._norm("Einführung in die Programmierung 1"), self._norm("EIDI1"), self._norm("EIDI1-VU")):
@@ -244,7 +263,6 @@ class RuleChecker:
         return (code_k in self.steop_pool_keys) or (mod_k in self.steop_pool_keys)
 
     def _is_steop_any_item(self, course: dict[str, Any]) -> bool:
-        # mandatory LVs OR pool
         if self._steop_mandatory_tag(course) is not None:
             return True
         return self._is_steop_pool_item(course)
@@ -266,49 +284,60 @@ class RuleChecker:
             return "ue"
         return None
 
-    # ----------------------------
-    # Evaluate
-    # ----------------------------
-    def evaluate(self, payload: dict[str, Any]) -> RuleCheckResult:
-        max_ects_per_semester, recommended_ects_per_semester = self._resolve_semester_load_limits(payload)
-        warnings: List[str] = []
-        errors: List[str] = []
-        missing: List[str] = []
+    def _steop_snapshot(self, courses: List[Tuple[dict[str, Any], str]]) -> Dict[str, Any]:
+        """How far the given courses take the student through the StEOP."""
+        tags: Set[str] = set()
+        pool_ects = 0.0
 
-        program = str(payload.get("programCode") or "").strip()
-        if program and program != self.program_code:
-            return RuleCheckResult(
-                ok=False,
-                message=f"rejected: RuleChecker is for program {self.program_code}, but payload has {program}",
-                stats={"programCode": program, "expectedProgramCode": self.program_code},
-                missing=[],
-            )
+        for c, _status in courses:
+            tag = self._steop_mandatory_tag(c)
+            if tag:
+                tags.add(tag)
+            if self._is_steop_pool_item(c):
+                pool_ects += self._to_float(c.get("ects"))
 
-        items = self._extract_courses(payload)
-        if not items:
-            # Continue with empty items so dashboard sections (StEOP, narrow electives, etc.)
-            # are still fully populated on initial load.
-            warnings.append("No courses in plan.")
+        mandatory_ok = {"eidi1", "ma", "ori"}.issubset(tags)
+        pool_ok = pool_ects >= 8.0 - 1e-6
 
-        seen: Dict[str, str] = {}
-        lane_ects: Dict[int, float] = {}
+        return {
+            "mandatoryPresent": sorted(list(tags)),
+            "poolEcts": round(pool_ects, 2),
+            "mandatoryOk": mandatory_ok,
+            "poolOk": pool_ok,
+            "isComplete": bool(mandatory_ok and pool_ok),
+        }
 
-        mod_done: Dict[str, float] = {}
-        mod_planned: Dict[str, float] = {}
-        mod_all: Dict[str, float] = {}
+    def _required_ects_for_module(self, module_key: str) -> Optional[float]:
+        """How many ECTS a module needs before it counts as complete."""
+        m = self.modules.get(module_key)
+        if not m:
+            return None
+        return float(m["min_ects"] if m["min_ects"] is not None else m["ects"])
 
-        cat_ects: Dict[str, float] = {}
-        subj_ects: Dict[str, float] = {}
+    def _module_is_complete(self, mod_all: Dict[str, float], module_key: str) -> bool:
+        """Has the plan booked enough ECTS on this module?"""
+        req = self._required_ects_for_module(module_key)
+        if req is None:
+            return False
+        return mod_all.get(module_key, 0.0) >= req - 1e-6
 
-        earliest_lane_for_course: Dict[str, int] = {}
-        earliest_lane_for_module: Dict[str, int] = {}
+    def _title_is_complete(self, mod_all: Dict[str, float], title: str) -> bool:
+        """Same question as _module_is_complete, but asked by module title."""
+        return self._module_is_complete(mod_all, self._norm(title))
 
-        # Store per-course canonical category (used later for StEOP pre-check)
-        per_course_canonical_cat: Dict[str, str] = {}
-        per_course_module_title: Dict[str, str] = {}
-        split_module_parts: Dict[str, Set[str]] = {}
+    def _collect_plan_totals(
+        self,
+        items: List[Tuple[dict[str, Any], str]],
+        warnings: List[str],
+        errors: List[str],
+    ) -> _PlanTotals:
+        """Sum the plan up per lane, module, category and exam subject in one pass.
 
-        # Parse all courses
+        A course that fails validation is reported and then skipped, so a broken
+        entry never contributes ECTS to any of the totals.
+        """
+        totals = _PlanTotals()
+
         for course, status in items:
             code = self._course_code(course)
             if not code:
@@ -316,10 +345,10 @@ class RuleChecker:
                 continue
 
             code_key = self._norm(code)
-            if code_key in seen:
-                errors.append(f"rejected: duplicate course '{code}' (already present as '{seen[code_key]}').")
+            if code_key in totals.seen:
+                errors.append(f"rejected: duplicate course '{code}' (already present as '{totals.seen[code_key]}').")
             else:
-                seen[code_key] = code
+                totals.seen[code_key] = code
 
             try:
                 ects = self._to_float(course.get("ects"))
@@ -332,146 +361,147 @@ class RuleChecker:
                 continue
 
             li = self._lane_index_of(course, fallback=0)
-            lane_ects[li] = lane_ects.get(li, 0.0) + ects
+            totals.lane_ects[li] = totals.lane_ects.get(li, 0.0) + ects
 
             module_title = self._infer_module_title(course)
             module_key = self._norm(module_title)
-            per_course_module_title[code_key] = module_title
+            totals.per_course_module_title[code_key] = module_title
             if module_key in self.split_variant_module_keys:
                 part = self._variant_part_for_course(course)
                 if part:
-                    if module_key not in split_module_parts:
-                        split_module_parts[module_key] = set()
-                    split_module_parts[module_key].add(part)
+                    if module_key not in totals.split_module_parts:
+                        totals.split_module_parts[module_key] = set()
+                    totals.split_module_parts[module_key].add(part)
 
             canonical_cat = self._canonical_category(course, module_title, warnings)
-            per_course_canonical_cat[code_key] = canonical_cat
-            cat_ects[canonical_cat] = cat_ects.get(canonical_cat, 0.0) + ects
+            totals.per_course_canonical_cat[code_key] = canonical_cat
+            totals.cat_ects[canonical_cat] = totals.cat_ects.get(canonical_cat, 0.0) + ects
 
             raw_subj = course.get("examSubject") or ""
             subj = self._canonical_exam_subject(raw_subj)
             subj_key = self._norm(subj) or "(none)"
-            subj_ects[subj_key] = subj_ects.get(subj_key, 0.0) + ects
+            totals.subj_ects[subj_key] = totals.subj_ects.get(subj_key, 0.0) + ects
 
             if status == "done":
-                mod_done[module_key] = mod_done.get(module_key, 0.0) + ects
+                totals.mod_done[module_key] = totals.mod_done.get(module_key, 0.0) + ects
             else:
-                mod_planned[module_key] = mod_planned.get(module_key, 0.0) + ects
-            mod_all[module_key] = mod_all.get(module_key, 0.0) + ects
+                totals.mod_planned[module_key] = totals.mod_planned.get(module_key, 0.0) + ects
+            totals.mod_all[module_key] = totals.mod_all.get(module_key, 0.0) + ects
 
-            # earliest lane tracking (for warnings)
-            if code_key not in earliest_lane_for_course or li < earliest_lane_for_course[code_key]:
-                earliest_lane_for_course[code_key] = li
-            if module_key not in earliest_lane_for_module or li < earliest_lane_for_module[module_key]:
-                earliest_lane_for_module[module_key] = li
+            if code_key not in totals.earliest_lane_for_course or li < totals.earliest_lane_for_course[code_key]:
+                totals.earliest_lane_for_course[code_key] = li
+            if module_key not in totals.earliest_lane_for_module or li < totals.earliest_lane_for_module[module_key]:
+                totals.earliest_lane_for_module[module_key] = li
 
-        # Per-semester overload check:
-        # - warning above recommended load
-        # - missing-requirement + hard reject above max load
-        if not errors:
-            for li, s in lane_ects.items():
-                if s > recommended_ects_per_semester + 1e-6:
-                    warnings.append(
-                        f"Semester {li + 1} is heavy: {s:.1f} ECTS planned/done (recommended ~{recommended_ects_per_semester:.1f})."
-                    )
-                if s > max_ects_per_semester + 1e-6:
-                    missing.append(
-                        f"Semester load limit exceeded in semester {li + 1}: {s:.1f}/{max_ects_per_semester:.1f} ECTS. "
-                        f"Reduce by {max(0.0, s - max_ects_per_semester):.1f} ECTS."
-                    )
-                    errors.append(f"rejected: semester {li+1} exceeds max load ({s:.1f} ECTS > {max_ects_per_semester:.1f}).")
+        return totals
 
-        for module_key, parts in split_module_parts.items():
+    def _check_semester_load(
+        self,
+        totals: _PlanTotals,
+        max_ects_per_semester: float,
+        recommended_ects_per_semester: float,
+        warnings: List[str],
+        errors: List[str],
+        missing: List[str],
+    ) -> None:
+        """Is any semester too full? Above the recommendation we warn, above the maximum we reject.
+
+        Skipped once the plan already has errors, because the totals of a plan we
+        could not fully parse would produce misleading load figures.
+        """
+        if errors:
+            return
+
+        for li, s in totals.lane_ects.items():
+            if s > recommended_ects_per_semester + 1e-6:
+                warnings.append(
+                    f"Semester {li + 1} is heavy: {s:.1f} ECTS planned/done (recommended ~{recommended_ects_per_semester:.1f})."
+                )
+            if s > max_ects_per_semester + 1e-6:
+                missing.append(
+                    f"Semester load limit exceeded in semester {li + 1}: {s:.1f}/{max_ects_per_semester:.1f} ECTS. "
+                    f"Reduce by {max(0.0, s - max_ects_per_semester):.1f} ECTS."
+                )
+                errors.append(f"rejected: semester {li+1} exceeds max load ({s:.1f} ECTS > {max_ects_per_semester:.1f}).")
+
+    def _check_variant_mixing(self, totals: _PlanTotals, errors: List[str]) -> None:
+        """Some modules are offered either as one VU or as a VO plus a UE, and the two forms cannot be combined."""
+        for module_key, parts in totals.split_module_parts.items():
             if "vu" in parts and ("vo" in parts or "ue" in parts):
                 module_title = self.modules.get(module_key, {}).get("title") or module_key
                 errors.append(
                     f"rejected: {module_title} mixes variants. Use either VU or VO+UE, not both."
                 )
 
-        # -----------------------------------------
-        # StEOP: compute DONE (for gating) AND DONE+PLANNED (for progress)
-        # -----------------------------------------
-        def compute_steop(courses: List[Tuple[dict[str, Any], str]]) -> Dict[str, Any]:
-            tags: Set[str] = set()
-            pool_ects = 0.0
+    def _steop_missing(self, steop_plan: Dict[str, Any]) -> List[str]:
+        """Which parts of the StEOP the plan still does not cover, mandatory LVs first, then the pool gap."""
+        if steop_plan["isComplete"]:
+            return []
 
-            for c, _status in courses:
+        missing: List[str] = []
+        present = set(steop_plan["mandatoryPresent"])
+
+        if "eidi1" not in present:
+            missing.append("StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)")
+        if "ma" not in present:
+            missing.append("StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)")
+        if "ori" not in present:
+            missing.append("StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)")
+
+        # The pool is a free choice of 8 ECTS, so we can only name the gap and the menu.
+        pool_missing = max(0.0, 8.0 - float(steop_plan["poolEcts"]))
+        if pool_missing > 1e-6:
+            missing.append(
+                f"StEOP Pool: {pool_missing:.1f} ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme)."
+            )
+
+        return missing
+
+    @staticmethod
+    def _group_by_lane(items: List[Tuple[dict[str, Any], str]]) -> Dict[int, List[dict[str, Any]]]:
+        by_lane: Dict[int, List[dict[str, Any]]] = {}
+        for c, _ in items:
+            li = RuleChecker._lane_index_of(c, 0)
+            by_lane.setdefault(li, []).append(c)
+        return by_lane
+
+    def _steop_completion_lane(self, items_done: List[Tuple[dict[str, Any], str]]) -> Optional[int]:
+        """In which semester the completed courses first satisfy the StEOP, or None if they never do."""
+        if not items_done:
+            return None
+
+        by_lane_done = self._group_by_lane(items_done)
+        tags: Set[str] = set()
+        pool_ects = 0.0
+        for li in sorted(by_lane_done.keys()):
+            for c in by_lane_done[li]:
                 tag = self._steop_mandatory_tag(c)
                 if tag:
                     tags.add(tag)
                 if self._is_steop_pool_item(c):
                     pool_ects += self._to_float(c.get("ects"))
 
-            mandatory_ok = {"eidi1", "ma", "ori"}.issubset(tags)
-            pool_ok = pool_ects >= 8.0 - 1e-6
+            if {"eidi1", "ma", "ori"}.issubset(tags) and pool_ects >= 8.0 - 1e-6:
+                return li
 
-            return {
-                "mandatoryPresent": sorted(list(tags)),
-                "poolEcts": round(pool_ects, 2),
-                "mandatoryOk": mandatory_ok,
-                "poolOk": pool_ok,
-                "isComplete": bool(mandatory_ok and pool_ok),
-            }
+        return None
 
-        items_done = [(c, s) for (c, s) in items if s == "done"]
-        steop_done = compute_steop(items_done)
-        steop_plan = compute_steop(items)  # done + planned
+    def _check_pre_steop_courses(
+        self,
+        items_done: List[Tuple[dict[str, Any], str]],
+        steop_complete_lane_done: Optional[int],
+        warnings: List[str],
+        errors: List[str],
+    ) -> float:
+        """Until the StEOP is passed, only 22 ECTS outside it may be completed, and only from a permitted list.
 
-        # --- Add StEOP missing items to RuleCheckResult.missing (only if missed) ---
-        if not steop_plan["isComplete"]:
-            present = set(steop_plan["mandatoryPresent"])
-
-            if "eidi1" not in present:
-                missing.append("StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)")
-            if "ma" not in present:
-                missing.append("StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)")
-            if "ori" not in present:
-                missing.append("StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)")
-
-            # Pool (>= 8 ECTS) — cannot know “which” exact LVs you want, so report the ECTS gap + pool menu.
-            pool_missing = max(0.0, 8.0 - float(steop_plan["poolEcts"]))
-            if pool_missing > 1e-6:
-                missing.append(
-                    f"StEOP Pool: {pool_missing:.1f} ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme)."
-                )
-
-        # Determine completion lane index for DONE StEOP (earliest lane where done completeness holds)
-        steop_complete_lane_done: Optional[int] = None
-        if items_done:
-            # accumulate by lane
-            by_lane_done: Dict[int, List[dict[str, Any]]] = {}
-            for c, _ in items_done:
-                li = self._lane_index_of(c, 0)
-                by_lane_done.setdefault(li, []).append(c)
-
-            tags: Set[str] = set()
-            pool_ects = 0.0
-            for li in sorted(by_lane_done.keys()):
-                for c in by_lane_done[li]:
-                    tag = self._steop_mandatory_tag(c)
-                    if tag:
-                        tags.add(tag)
-                    if self._is_steop_pool_item(c):
-                        pool_ects += self._to_float(c.get("ects"))
-
-                if {"eidi1", "ma", "ori"}.issubset(tags) and pool_ects >= 8.0 - 1e-6:
-                    steop_complete_lane_done = li
-                    break
-
-        # -----------------------------------------
-        # Pre-StEOP rule: before DONE StEOP completion:
-        #   - max 22 ECTS outside StEOP (DONE)
-        #   - only allowed extra list + FWTS/TS
-        # -----------------------------------------
+        Returns the non-StEOP ECTS completed before that point, which the dashboard also reports.
+        """
         non_steop_ects_before = 0.0
         illegal_non_steop: List[str] = []
 
         if items_done:
-            # group done by lane for correct "before completion" semantics
-            by_lane_done: Dict[int, List[dict[str, Any]]] = {}
-            for c, _ in items_done:
-                li = self._lane_index_of(c, 0)
-                by_lane_done.setdefault(li, []).append(c)
+            by_lane_done = self._group_by_lane(items_done)
 
             for li in sorted(by_lane_done.keys()):
                 if steop_complete_lane_done is not None and li >= steop_complete_lane_done:
@@ -486,7 +516,7 @@ class RuleChecker:
                     code_k = self._norm(self._course_code(c))
                     module_title = self._infer_module_title(c)
 
-                    # Use canonical category (not incoming)
+                    # The incoming category may disagree with the curriculum, so judge on the canonical one.
                     canonical_cat = self._canonical_category(c, module_title, warnings)
 
                     if (code_k not in self.allowed_before_steop_extra) and (not self._is_fwts_like(canonical_cat, module_title)):
@@ -502,16 +532,21 @@ class RuleChecker:
                 + ", ".join(illegal_non_steop)
             )
 
-        # -----------------------------------------
-        # Bachelorarbeit gating: ONLY if thesis is DONE
-        # -----------------------------------------
+        return non_steop_ects_before
+
+    def _check_thesis_gating(
+        self,
+        items_done: List[Tuple[dict[str, Any], str]],
+        steop_complete_lane_done: Optional[int],
+        errors: List[str],
+    ) -> None:
+        """The Bachelorarbeit may not be finished before the StEOP is. Merely planning it early is fine."""
         thesis_done_lane: Optional[int] = None
-        if items_done:
-            for c, _ in items_done:
-                mod_title = self._infer_module_title(c)
-                if self._norm(mod_title) == self._norm("Bachelorarbeit") or self._norm(self._course_code(c)) in (self._norm("BA"), self._norm("WA"), self._norm("BA-PR"), self._norm("WISS-SE")):
-                    li = self._lane_index_of(c, 0)
-                    thesis_done_lane = li if thesis_done_lane is None else min(thesis_done_lane, li)
+        for c, _ in items_done:
+            mod_title = self._infer_module_title(c)
+            if self._norm(mod_title) == self._norm("Bachelorarbeit") or self._norm(self._course_code(c)) in (self._norm("BA"), self._norm("WA"), self._norm("BA-PR"), self._norm("WISS-SE")):
+                li = self._lane_index_of(c, 0)
+                thesis_done_lane = li if thesis_done_lane is None else min(thesis_done_lane, li)
 
         if thesis_done_lane is not None:
             if steop_complete_lane_done is None:
@@ -519,49 +554,59 @@ class RuleChecker:
             elif thesis_done_lane < steop_complete_lane_done:
                 errors.append("rejected: Bachelorarbeit is DONE before StEOP completion.")
 
-        # -----------------------------------------
-        # Soft order warnings (fix lane=0 bug)
-        # -----------------------------------------
+    def _recommended_sequencing_warnings(self, totals: _PlanTotals) -> List[str]:
+        """Where the plan puts a course before the one usually taken first. Advisory only, never a rejection."""
+        warnings: List[str] = []
+
         for prereq, target in self.soft_prereqs:
             prereq_k = self._norm(prereq)
             target_k = self._norm(target)
 
-            prereq_lane = earliest_lane_for_course.get(prereq_k)
+            prereq_lane = totals.earliest_lane_for_course.get(prereq_k)
             if prereq_lane is None:
-                prereq_lane = earliest_lane_for_module.get(prereq_k)
+                prereq_lane = totals.earliest_lane_for_module.get(prereq_k)
 
-            target_lane = earliest_lane_for_course.get(target_k)
+            target_lane = totals.earliest_lane_for_course.get(target_k)
             if target_lane is None:
-                target_lane = earliest_lane_for_module.get(target_k)
+                target_lane = totals.earliest_lane_for_module.get(target_k)
 
             if prereq_lane is not None and target_lane is not None and target_lane < prereq_lane:
                 warnings.append(
                     f"Reihenfolge-Hinweis: '{target}' ist vor '{prereq}' geplant. Das ist erlaubt, aber normalerweise wird '{prereq}' davor empfohlen."
                 )
 
-        # ----------------------------
-        # Dashboard + missing requirements
-        # ----------------------------
-        ts_ects = cat_ects.get("transferable_skills", 0.0)
-        ts_done = sum(self._to_float(c.get("ects")) for c, status in items if status == "done" and per_course_canonical_cat.get(self._norm(self._course_code(c))) == "transferable_skills")
+        return warnings
+
+    def _apply_transferable_skills_cap(
+        self,
+        items: List[Tuple[dict[str, Any], str]],
+        totals: _PlanTotals,
+        warnings: List[str],
+    ) -> float:
+        """Trim the Transferable Skills that exceed the creditable maximum and return the ECTS that still count.
+
+        Anything above the cap stays in the plan but earns nothing, so it is removed
+        from the category, from the FWTS module and from the overall total.
+        """
+        ts_ects = totals.cat_ects.get("transferable_skills", 0.0)
+        ts_done = sum(self._to_float(c.get("ects")) for c, status in items if status == "done" and totals.per_course_canonical_cat.get(self._norm(self._course_code(c))) == "transferable_skills")
         excess_ts = max(0.0, ts_ects - self.TRANSFERABLE_SKILLS_MAX_ECTS)
 
-        # Cap the category ects for transferable skills
-        if "transferable_skills" in cat_ects:
-            cat_ects["transferable_skills"] = min(self.TRANSFERABLE_SKILLS_MAX_ECTS, ts_ects)
+        if "transferable_skills" in totals.cat_ects:
+            totals.cat_ects["transferable_skills"] = min(self.TRANSFERABLE_SKILLS_MAX_ECTS, ts_ects)
 
-        # Adjust FWTS module ECTS
         fwts_key = self._norm("Freie Wahlfächer und Transferable Skills")
-        if fwts_key in mod_all:
-            mod_all[fwts_key] = max(0.0, mod_all[fwts_key] - excess_ts)
+        if fwts_key in totals.mod_all:
+            totals.mod_all[fwts_key] = max(0.0, totals.mod_all[fwts_key] - excess_ts)
 
+        # Completed courses fill the cap first, so only what is left over is taken off the planned side.
         done_excess = max(0.0, ts_done - self.TRANSFERABLE_SKILLS_MAX_ECTS)
         planned_excess = excess_ts - done_excess
 
-        if fwts_key in mod_done:
-            mod_done[fwts_key] = max(0.0, mod_done[fwts_key] - done_excess)
-        if fwts_key in mod_planned:
-            mod_planned[fwts_key] = max(0.0, mod_planned[fwts_key] - planned_excess)
+        if fwts_key in totals.mod_done:
+            totals.mod_done[fwts_key] = max(0.0, totals.mod_done[fwts_key] - done_excess)
+        if fwts_key in totals.mod_planned:
+            totals.mod_planned[fwts_key] = max(0.0, totals.mod_planned[fwts_key] - planned_excess)
 
         total_ects = sum(self._to_float(c.get("ects")) for c, _ in items) - excess_ts
 
@@ -571,46 +616,36 @@ class RuleChecker:
                 f"(aktuell {ts_ects:.1f} ECTS geplant/done, {excess_ts:.1f} ECTS werden nicht angerechnet)."
             )
 
-        def required_ects_for_module(module_key: str) -> Optional[float]:
-            m = self.modules.get(module_key)
-            if not m:
-                return None
-            return float(m["min_ects"] if m["min_ects"] is not None else m["ects"])
+        return total_ects
 
-        def module_is_complete(module_key: str) -> bool:
-            req = required_ects_for_module(module_key)
-            if req is None:
-                return False
-            return mod_all.get(module_key, 0.0) >= req - 1e-6
-        
-        def module_kind(title: str) -> Optional[str]:
-            m = self.modules.get(self._norm(title))
-            return m["kind"] if m else None
+    def _collect_missing_requirements(
+        self,
+        totals: _PlanTotals,
+        total_ects: float,
+        missing: List[str],
+    ) -> Tuple[List[str], List[str]]:
+        """What the degree still requires: compulsory modules, thesis, narrow electives, Transferable Skills and the total.
 
-        def is_complete_title(title: str) -> bool:
-            return module_is_complete(self._norm(title))
-
-        # Pflichtmodule missing
+        Also returns the completed and the available narrow elective modules, which the dashboard reports.
+        """
         for mk, m in self.modules.items():
             if m["kind"] == "mandatory":
-                req = required_ects_for_module(mk) or 0.0
-                have = mod_all.get(mk, 0.0)
+                req = self._required_ects_for_module(mk) or 0.0
+                have = totals.mod_all.get(mk, 0.0)
                 if have + 1e-6 < req:
                     missing.append(f"Pflichtmodul fehlt: {m['title']} ({req - have:.1f} ECTS)")
 
-        # Bachelorarbeit missing
         thesis_key = self._norm("Bachelorarbeit")
-        thesis_have = mod_all.get(thesis_key, 0.0)
+        thesis_have = totals.mod_all.get(thesis_key, 0.0)
         if thesis_have + 1e-6 < self.BACHELORARBEIT_ECTS:
             missing.append(f"Bachelorarbeit fehlt: {self.BACHELORARBEIT_ECTS - thesis_have:.1f} ECTS")
 
-        # Narrow elective count
         narrow_completed: List[str] = []
         narrow_all: List[str] = []
         for mk, m in self.modules.items():
             if m["kind"] == "narrow_elective":
                 narrow_all.append(m["title"])
-                if module_is_complete(mk):
+                if self._module_is_complete(totals.mod_all, mk):
                     narrow_completed.append(m["title"])
 
         if len(narrow_completed) < self.MIN_NARROW_ELECTIVE_MODULES:
@@ -618,162 +653,208 @@ class RuleChecker:
                 f"Wahlmodule der engen Wahl (+): mindestens {self.MIN_NARROW_ELECTIVE_MODULES} Module nötig, aktuell {len(narrow_completed)}."
             )
 
-        # Transferable Skills minimum
-        ts_ects = cat_ects.get("transferable_skills", 0.0)
+        ts_ects = totals.cat_ects.get("transferable_skills", 0.0)
         if ts_ects + 1e-6 < self.TRANSFERABLE_SKILLS_MIN_ECTS:
             missing.append(f"Transferable Skills: mindestens {self.TRANSFERABLE_SKILLS_MIN_ECTS:.1f} ECTS nötig (aktuell {ts_ects:.1f}).")
 
-        # Total ECTS
         if total_ects + 1e-6 < self.TOTAL_ECTS:
             missing.append(f"Gesamtumfang: {self.TOTAL_ECTS - total_ects:.1f} ECTS fehlen bis {self.TOTAL_ECTS:.0f}.")
 
-        # ----------------------------
-        # Focus / Vertiefung progress (robust)
-        # ----------------------------
+        return narrow_completed, narrow_all
+
+    def _resolve_focus_key(self, payload: dict[str, Any]) -> str:
+        """Which Vertiefung the payload selected, as a curriculum key. Empty when none was chosen."""
         focus_raw = payload.get("selectedFocus") or payload.get("vertiefung")
         focus_key_in = self._norm(focus_raw) if focus_raw else ""
-        focus_key = self.focus_aliases.get(focus_key_in, focus_key_in)
+        return self.focus_aliases.get(focus_key_in, focus_key_in)
 
+    def _build_focus_progress(
+        self,
+        payload: dict[str, Any],
+        focus_key: str,
+        totals: _PlanTotals,
+        warnings: List[str],
+    ) -> Tuple[Dict[str, Any], List[str]]:
+        """How far the plan has come towards the selected Vertiefung, as a checklist plus its open items.
+
+        A Vertiefung asks for some modules outright and for a number of modules out
+        of one or more lists, so the checklist mixes both kinds of entry.
+        """
+        focus_raw = payload.get("selectedFocus") or payload.get("vertiefung")
         focus_stats: Dict[str, Any] = {"selected": focus_raw, "recognized": False}
         focus_missing: List[str] = []
 
-        if focus_key:
-            f = self.focuses.get(focus_key)
-            if f:
-                focus_stats["recognized"] = True
-                focus_stats["canonicalName"] = self.modules.get(focus_key, {}).get("title") or None
+        if not focus_key:
+            return focus_stats, focus_missing
 
-                completed_modules: Set[str] = set()
-                for mk, m in self.modules.items():
-                    if module_is_complete(mk):
-                        completed_modules.add(self._norm(m["title"]))
+        f = self.focuses.get(focus_key)
+        if not f:
+            warnings.append(f"Vertiefung-Hinweis: selectedFocus '{focus_raw}' ist unbekannt (nicht in der curricularen Liste/Aliases).")
+            return focus_stats, focus_missing
 
-                def count_completed(from_list: List[str]) -> int:
-                    return sum(1 for t in from_list if self._norm(t) in completed_modules)
+        focus_stats["recognized"] = True
+        focus_stats["canonicalName"] = self.modules.get(focus_key, {}).get("title") or None
 
-                focus_checklist: List[Dict[str, Any]] = []
+        completed_modules: Set[str] = set()
+        for mk, m in self.modules.items():
+            if self._module_is_complete(totals.mod_all, mk):
+                completed_modules.add(self._norm(m["title"]))
 
-                req_list = f.get("required", [])
-                for t in req_list:
+        def count_completed(from_list: List[str]) -> int:
+            return sum(1 for t in from_list if self._norm(t) in completed_modules)
+
+        focus_checklist: List[Dict[str, Any]] = []
+
+        req_list = f.get("required", [])
+        for t in req_list:
+            done = self._norm(t) in completed_modules
+            focus_checklist.append({
+                "label": t,
+                "done": done,
+                "kind": "required",
+            })
+            if self._norm(t) not in completed_modules:
+                focus_missing.append(f"Vertiefung: Pflichtmodul fehlt: {t}")
+
+        if "choose" in f:
+            choose = f["choose"]
+            choose_from = choose.get("from", [])
+            for t in choose_from:
+                done = self._norm(t) in completed_modules
+                focus_checklist.append({
+                    "label": t,
+                    "done": done,
+                    "kind": "choose",
+                })
+            got = count_completed(choose["from"])
+            need = int(choose["min"])
+            if got < need:
+                focus_missing.append(f"Vertiefung: es fehlen {need - got} weitere Module aus der Vertiefungsliste.")
+            focus_stats["choose"] = {
+                "min": need,
+                "done": got,
+                "total": len(choose_from),
+            }
+
+        if "choose_groups" in f:
+            choose_groups_stats: List[Dict[str, Any]] = []
+            for grp in f["choose_groups"]:
+                grp_from = grp.get("from", [])
+                group_label = ", ".join(grp_from)
+                for t in grp_from:
                     done = self._norm(t) in completed_modules
                     focus_checklist.append({
                         "label": t,
                         "done": done,
-                        "kind": "required",
+                        "kind": "choose_group",
+                        "group": group_label,
                     })
-                    if self._norm(t) not in completed_modules:
-                        focus_missing.append(f"Vertiefung: Pflichtmodul fehlt: {t}")
+                got = count_completed(grp["from"])
+                need = int(grp["min"])
+                if got < need:
+                    focus_missing.append(f"Vertiefung: es fehlen {need - got} Module aus der Gruppe: {', '.join(grp['from'])}")
+                choose_groups_stats.append({
+                    "label": group_label,
+                    "min": need,
+                    "done": got,
+                    "total": len(grp_from),
+                })
+            focus_stats["chooseGroups"] = choose_groups_stats
 
-                if "choose" in f:
-                    choose = f["choose"]
-                    choose_from = choose.get("from", [])
-                    for t in choose_from:
-                        done = self._norm(t) in completed_modules
-                        focus_checklist.append({
-                            "label": t,
-                            "done": done,
-                            "kind": "choose",
-                        })
-                    got = count_completed(choose["from"])
-                    need = int(choose["min"])
-                    if got < need:
-                        focus_missing.append(f"Vertiefung: es fehlen {need - got} weitere Module aus der Vertiefungsliste.")
-                    focus_stats["choose"] = {
-                        "min": need,
-                        "done": got,
-                        "total": len(choose_from),
-                    }
+        focus_stats["missingCount"] = len(focus_missing)
+        focus_stats["missing"] = focus_missing[:]
+        focus_stats["checklist"] = focus_checklist
+        focus_stats["checklistDoneCount"] = sum(1 for item in focus_checklist if item.get("done"))
+        focus_stats["checklistTotalCount"] = len(focus_checklist)
 
-                if "choose_groups" in f:
-                    choose_groups_stats: List[Dict[str, Any]] = []
-                    for grp in f["choose_groups"]:
-                        grp_from = grp.get("from", [])
-                        group_label = ", ".join(grp_from)
-                        for t in grp_from:
-                            done = self._norm(t) in completed_modules
-                            focus_checklist.append({
-                                "label": t,
-                                "done": done,
-                                "kind": "choose_group",
-                                "group": group_label,
-                            })
-                        got = count_completed(grp["from"])
-                        need = int(grp["min"])
-                        if got < need:
-                            focus_missing.append(f"Vertiefung: es fehlen {need - got} Module aus der Gruppe: {', '.join(grp['from'])}")
-                        choose_groups_stats.append({
-                            "label": group_label,
-                            "min": need,
-                            "done": got,
-                            "total": len(grp_from),
-                        })
-                    focus_stats["chooseGroups"] = choose_groups_stats
+        return focus_stats, focus_missing
 
-                focus_stats["missingCount"] = len(focus_missing)
-                focus_stats["missing"] = focus_missing[:]
-                focus_stats["checklist"] = focus_checklist
-                focus_stats["checklistDoneCount"] = sum(1 for item in focus_checklist if item.get("done"))
-                focus_stats["checklistTotalCount"] = len(focus_checklist)
-            else:
-                warnings.append(f"Vertiefung-Hinweis: selectedFocus '{focus_raw}' ist unbekannt (nicht in der curricularen Liste/Aliases).")
+    def _focus_missing_requirements(
+        self,
+        payload: dict[str, Any],
+        focus_key: str,
+        totals: _PlanTotals,
+    ) -> List[str]:
+        """The same open Vertiefung items again, phrased for the missing-requirements list.
 
-        if payload.get("validateFocusAsStrict") and focus_stats.get("recognized") and focus_missing:
-            errors.append("rejected: selected focus requirements are not satisfied (strict focus validation enabled).")
+        These lines name the Vertiefung and spell out the modules still on offer,
+        which the compact checklist wording does not.
+        """
+        f = self.focuses.get(focus_key)
+        if not f:
+            return []
 
+        focus_name = (payload.get("selectedFocus") or payload.get("vertiefung") or "").strip() or "Vertiefung"
+        lines: List[str] = []
 
-        # --- Add ALL focus missing requirements into RuleCheckResult.missing (only if missed) ---
-        if focus_stats.get("recognized"):
-            f = self.focuses.get(focus_key)
-            if f:
-                focus_name = (payload.get("selectedFocus") or payload.get("vertiefung") or "").strip() or "Vertiefung"
+        def remaining_list(from_list: List[str]) -> List[str]:
+            return [t for t in from_list if not self._title_is_complete(totals.mod_all, t)]
 
-                focus_missing_lines: List[str] = []
+        for t in f.get("required", []):
+            if not self._title_is_complete(totals.mod_all, t):
+                lines.append(f"Vertiefung ({focus_name}): Pflichtmodul fehlt: {t}")
 
-                def remaining_list(from_list: List[str]) -> List[str]:
-                    return [t for t in from_list if not is_complete_title(t)]
+        if "choose" in f:
+            choose = f["choose"]
+            need = int(choose["min"])
+            rem = remaining_list(choose["from"])
+            got = len(choose["from"]) - len(rem)
+            if got < need:
+                lines.append(
+                    f"Vertiefung ({focus_name}): es fehlen {need - got} Module aus: {', '.join(rem)}"
+                )
 
-                # (A) Required modules (must-have)
-                for t in f.get("required", []):
-                    if not is_complete_title(t):
-                        focus_missing_lines.append(f"Vertiefung ({focus_name}): Pflichtmodul fehlt: {t}")
+        for grp in f.get("choose_groups", []):
+            need = int(grp["min"])
+            rem = remaining_list(grp["from"])
+            got = len(grp["from"]) - len(rem)
+            if got < need:
+                lines.append(
+                    f"Vertiefung ({focus_name}): es fehlen {need - got} Module aus: {', '.join(rem)}"
+                )
 
-                # (B) Single choose block (pick N from list)
-                if "choose" in f:
-                    choose = f["choose"]
-                    need = int(choose["min"])
-                    rem = remaining_list(choose["from"])
-                    got = len(choose["from"]) - len(rem)
-                    if got < need:
-                        # show exactly how many still needed, and the remaining options
-                        focus_missing_lines.append(
-                            f"Vertiefung ({focus_name}): es fehlen {need - got} Module aus: {', '.join(rem)}"
-                        )
+        return lines
 
-                # (C) Multiple choose groups (pick N from each group)
-                for grp in f.get("choose_groups", []):
-                    need = int(grp["min"])
-                    rem = remaining_list(grp["from"])
-                    got = len(grp["from"]) - len(rem)
-                    if got < need:
-                        focus_missing_lines.append(
-                            f"Vertiefung ({focus_name}): es fehlen {need - got} Module aus: {', '.join(rem)}"
-                        )
+    @staticmethod
+    def _build_steop_stats(
+        steop_done: Dict[str, Any],
+        steop_plan: Dict[str, Any],
+        steop_complete_lane_done: Optional[int],
+        non_steop_ects_before: float,
+    ) -> Dict[str, Any]:
+        """The StEOP section of the dashboard: what is actually passed, and what the plan will amount to."""
+        return {
+            "done": {
+                "completeLaneIndex": steop_complete_lane_done,
+                **steop_done,
+                "nonSteopEctsBeforeCompletion": round(non_steop_ects_before, 2),
+                "maxNonSteopBeforeCompletion": 22.0,
+            },
+            "planned": steop_plan,
+        }
 
-                # Only add to missing[] if there is something missing
-                missing.extend(focus_missing_lines)
-
-
-        # ----------------------------
-        # Build stats
-        # ----------------------------
+    def _build_dashboard(
+        self,
+        totals: _PlanTotals,
+        total_ects: float,
+        max_ects_per_semester: float,
+        recommended_ects_per_semester: float,
+        narrow_completed: List[str],
+        narrow_all: List[str],
+        steop_stats: Dict[str, Any],
+        focus_stats: Dict[str, Any],
+        warnings: List[str],
+        errors: List[str],
+    ) -> Dict[str, Any]:
+        """Everything the front end shows about the plan, gathered into one dictionary."""
         subj_pretty: Dict[str, float] = {}
-        for k, v in subj_ects.items():
+        for k, v in totals.subj_ects.items():
             subj_pretty[k.title() if k not in ("(none)",) else k] = round(v, 2)
 
         module_progress: List[Dict[str, Any]] = []
         for mk, m in sorted(self.modules.items(), key=lambda kv: kv[1]["title"]):
-            req = required_ects_for_module(mk)
-            have = mod_all.get(mk, 0.0)
+            req = self._required_ects_for_module(mk)
+            have = totals.mod_all.get(mk, 0.0)
             module_progress.append({
                 "title": m["title"],
                 "kind": m["kind"],
@@ -782,14 +863,14 @@ class RuleChecker:
                 "complete": (req is not None and have >= req - 1e-6),
             })
 
-        stats: Dict[str, Any] = {
+        return {
             "programCode": self.program_code,
             "totalEcts": round(total_ects, 2),
             "ectsMissingTo180": round(max(0.0, self.TOTAL_ECTS - total_ects), 2),
-            "ectsPerSemester": {str(k): round(v, 2) for k, v in sorted(lane_ects.items())},
+            "ectsPerSemester": {str(k): round(v, 2) for k, v in sorted(totals.lane_ects.items())},
             "recommendedEctsPerSemester": recommended_ects_per_semester,
             "maxEctsPerSemester": max_ects_per_semester,
-            "ectsByCategory": {k: round(v, 2) for k, v in sorted(cat_ects.items())},
+            "ectsByCategory": {k: round(v, 2) for k, v in sorted(totals.cat_ects.items())},
             "ectsByExamSubject": subj_pretty,
             "narrowElectives": {
                 "requiredCount": self.MIN_NARROW_ELECTIVE_MODULES,
@@ -797,32 +878,110 @@ class RuleChecker:
                 "completed": narrow_completed,
                 "allOptionsCount": len(narrow_all),
             },
-            "steop": {
-                "done": {
-                    "completeLaneIndex": steop_complete_lane_done,
-                    **steop_done,
-                    "nonSteopEctsBeforeCompletion": round(non_steop_ects_before, 2),
-                    "maxNonSteopBeforeCompletion": 22.0,
-                },
-                "planned": steop_plan,  # UI progress (done+planned)
-            },
+            "steop": steop_stats,
             "focus": focus_stats,
             "moduleProgress": module_progress,
             "warnings": warnings,
             "errors": errors,
         }
 
-        # ----------------------------
-        # Final decision
-        # ----------------------------
+    @staticmethod
+    def _rejection_message(payload: dict[str, Any], errors: List[str]) -> str:
+        """The first error, named after the edit that triggered it so the user knows what to undo."""
+        change = payload.get("change") or {}
+        ccode = change.get("courseCode")
+        ctype = change.get("type")
+        if ccode:
+            return f"rejected: cannot apply change ({ctype}) for '{ccode}': {errors[0].replace('rejected: ', '')}"
+        return errors[0]
+
+    def _wrong_program_result(self, payload: dict[str, Any]) -> Optional[RuleCheckResult]:
+        """Refuse a payload from another degree programme, since none of our rules would apply to it."""
+        program = str(payload.get("programCode") or "").strip()
+        if program and program != self.program_code:
+            return RuleCheckResult(
+                ok=False,
+                message=f"rejected: RuleChecker is for program {self.program_code}, but payload has {program}",
+                stats={"programCode": program, "expectedProgramCode": self.program_code},
+                missing=[],
+            )
+        return None
+
+    def evaluate(self, payload: dict[str, Any]) -> RuleCheckResult:
+        wrong_program = self._wrong_program_result(payload)
+        if wrong_program is not None:
+            return wrong_program
+
+        max_ects_per_semester, recommended_ects_per_semester = self._resolve_semester_load_limits(payload)
+        warnings: List[str] = []
+        errors: List[str] = []
+        missing: List[str] = []
+
+        items = self._extract_courses(payload)
+        if not items:
+            # Continue with empty items so dashboard sections (StEOP, narrow electives, etc.)
+            # are still fully populated on initial load.
+            warnings.append("No courses in plan.")
+
+        totals = self._collect_plan_totals(items, warnings, errors)
+
+        self._check_semester_load(
+            totals,
+            max_ects_per_semester,
+            recommended_ects_per_semester,
+            warnings,
+            errors,
+            missing,
+        )
+        self._check_variant_mixing(totals, errors)
+
+        # The done-only snapshot gates later courses; done+planned drives the UI progress.
+        items_done = [(c, s) for (c, s) in items if s == "done"]
+        steop_done = self._steop_snapshot(items_done)
+        steop_plan = self._steop_snapshot(items)
+
+        missing.extend(self._steop_missing(steop_plan))
+
+        steop_complete_lane_done = self._steop_completion_lane(items_done)
+
+        non_steop_ects_before = self._check_pre_steop_courses(items_done, steop_complete_lane_done, warnings, errors)
+        self._check_thesis_gating(items_done, steop_complete_lane_done, errors)
+
+        warnings.extend(self._recommended_sequencing_warnings(totals))
+
+        total_ects = self._apply_transferable_skills_cap(items, totals, warnings)
+
+        narrow_completed, narrow_all = self._collect_missing_requirements(totals, total_ects, missing)
+
+        focus_key = self._resolve_focus_key(payload)
+        focus_stats, focus_missing = self._build_focus_progress(payload, focus_key, totals, warnings)
+
+        if payload.get("validateFocusAsStrict") and focus_stats.get("recognized") and focus_missing:
+            errors.append("rejected: selected focus requirements are not satisfied (strict focus validation enabled).")
+
+        if focus_stats.get("recognized"):
+            missing.extend(self._focus_missing_requirements(payload, focus_key, totals))
+
+        stats = self._build_dashboard(
+            totals,
+            total_ects,
+            max_ects_per_semester,
+            recommended_ects_per_semester,
+            narrow_completed,
+            narrow_all,
+            self._build_steop_stats(steop_done, steop_plan, steop_complete_lane_done, non_steop_ects_before),
+            focus_stats,
+            warnings,
+            errors,
+        )
+
         if errors:
-            change = payload.get("change") or {}
-            ccode = change.get("courseCode")
-            ctype = change.get("type")
-            if ccode:
-                msg = f"rejected: cannot apply change ({ctype}) for '{ccode}': {errors[0].replace('rejected: ', '')}"
-            else:
-                msg = errors[0]
-            return RuleCheckResult(ok=False, message=msg, stats=stats, missing=missing, errors=errors)
+            return RuleCheckResult(
+                ok=False,
+                message=self._rejection_message(payload, errors),
+                stats=stats,
+                missing=missing,
+                errors=errors,
+            )
 
         return RuleCheckResult(ok=True, message="accepted", stats=stats, missing=missing, errors=[])

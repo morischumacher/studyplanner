@@ -46,9 +46,6 @@ class RuleChecker:
         self.special_category_by_code: Dict[str, str] = curriculum.special_category_by_code
         self.course_alias_to_name: Dict[str, str] = curriculum.course_alias_to_name
 
-    # ----------------------------
-    # Public API
-    # ----------------------------
     def evaluate(self, payload: dict[str, Any]) -> RuleCheckResult:
         max_ects_per_semester, recommended_ects_per_semester = self._resolve_semester_load_limits(payload)
         lanes = self._extract_lanes(payload)
@@ -111,9 +108,6 @@ class RuleChecker:
 
         return RuleCheckResult(ok=True, message="accepted", stats=stats, missing=missing, errors=[])
 
-    # ----------------------------
-    # Parsing & normalization
-    # ----------------------------
     def _extract_lanes(self, payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         if isinstance(payload.get("lanes"), list):
             return payload["lanes"]
@@ -268,9 +262,6 @@ class RuleChecker:
 
         return parsed, None
 
-    # ----------------------------
-    # Dashboard
-    # ----------------------------
     def _build_dashboard(self, courses: List[Dict[str, Any]]) -> Tuple[Dict[str, Any], List[str]]:
         by_cat: Dict[str, float] = {}
         by_exam: Dict[str, float] = {}
@@ -423,9 +414,6 @@ class RuleChecker:
         }
         return stats, missing
 
-    # ----------------------------
-    # Validations (hard reject)
-    # ----------------------------
     @staticmethod
     def _resolve_semester_load_limits(payload: Dict[str, Any]) -> Tuple[float, float]:
         default_max = RuleChecker.MAX_ECTS_PER_SEMESTER
@@ -683,9 +671,6 @@ class RuleChecker:
         return warnings, missing
 
 
-    # ----------------------------
-    # Rejection message tuned to the most recent change
-    # ----------------------------
     def _lane_to_semester_number(self, lane_index: Any) -> Optional[int]:
         if not isinstance(lane_index, int) or lane_index < 0:
             return None
