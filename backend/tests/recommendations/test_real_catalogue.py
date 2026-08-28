@@ -19,7 +19,9 @@ from typing import Any
 
 import pytest
 
+from app.recommendations.completed import CompletedStrategy
 from app.recommendations.context import Course, build_context
+from app.recommendations.peer import cohort_for, forget_cohorts
 from app.recommendations.sequence import SequenceStrategy, ordered_pairs
 
 from tests.golden.build_recommender_fixtures import restore
@@ -35,6 +37,14 @@ _CORPUS = restore(
     )
 )
 POOLS: dict[str, list[dict[str, Any]]] = _CORPUS["pools"]
+
+
+@pytest.fixture(autouse=True)
+def _fresh_cohorts():
+    """The cohort is memoised for the life of the process, and other tests seed it."""
+    forget_cohorts()
+    yield
+    forget_cohorts()
 
 
 def plan_for(program_code: str, **over: Any):
@@ -112,3 +122,50 @@ def test_the_ordering_carries_no_relation_the_curriculum_does_not_state(
     assert len(ordered_pairs(program_code, POOLS[program_code])) <= len(
         _curriculum_relations(program_code)
     )
+
+
+def a_course_the_cohort_took(program_code: str) -> str:
+    """A catalogue code some of the synthetic prior students have in common."""
+    cohort = cohort_for(program_code, POOLS[program_code])
+    assert cohort, f"no cohort for {program_code}"
+    return sorted(cohort[0])[0]
+
+
+@pytest.mark.parametrize("program_code", PROGRAMMES)
+def test_a_finished_catalogue_course_has_co_occurrences(program_code: str) -> None:
+    done = a_course_the_cohort_took(program_code)
+    plan = plan_for(program_code, done_courses=[as_planned(program_code, done)])
+    strategy = CompletedStrategy()
+
+    suggestions = [s for c in plan.candidates for s in strategy.suggest(plan, c)]
+
+    assert suggestions, f"no co-occurrence for {done} in {program_code}"
+    assert all(f"who completed {done} also took this" in s.evidence for s in suggestions)
+    assert all(s.score >= 0.5 for s in suggestions)
+
+
+@pytest.mark.parametrize("program_code", PROGRAMMES)
+def test_the_same_plan_gets_the_same_co_occurrences_twice(program_code: str) -> None:
+    """The cohort is drawn from a fixed seed, so the shares must not move."""
+    done = a_course_the_cohort_took(program_code)
+    plan = plan_for(program_code, done_courses=[as_planned(program_code, done)])
+
+    def answer() -> list[tuple[str, float, str]]:
+        strategy = CompletedStrategy()
+        return [
+            (c.code, s.score, s.evidence)
+            for c in plan.candidates
+            for s in strategy.suggest(plan, c)
+        ]
+
+    first = answer()
+    forget_cohorts()
+    assert answer() == first
+
+
+@pytest.mark.parametrize("program_code", PROGRAMMES)
+def test_nothing_finished_means_nothing_to_report(program_code: str) -> None:
+    plan = plan_for(program_code)
+    strategy = CompletedStrategy()
+
+    assert [s for c in plan.candidates for s in strategy.suggest(plan, c)] == []
