@@ -2678,6 +2678,22 @@
   "recommendedEctsPerSemester": 30.0,
   "selectedFocus": null
  },
+ "course-with-unreadable-ects": {
+  "change": {},
+  "doneCourses": [],
+  "maxEctsPerSemester": 42.0,
+  "plannedCourses": [
+   {
+    "code": "X1",
+    "ects": "n/a",
+    "laneIndex": 0,
+    "title": "Not A Number"
+   }
+  ],
+  "programCode": "033 521",
+  "recommendedEctsPerSemester": 30.0,
+  "selectedFocus": null
+ },
  "course-without-ects": {
   "change": {},
   "doneCourses": [],
@@ -12245,6 +12261,38 @@
     "type": "VU"
    }
   ],
+  "programCode": "033 521",
+  "recommendedEctsPerSemester": 30.0,
+  "selectedFocus": null
+ },
+ "steop-done-with-unreadable-ects": {
+  "change": {},
+  "doneCourses": [
+   {
+    "category": "mandatory",
+    "code": "DI",
+    "ects": "n/a",
+    "examSubject": "Human-Centered Computing",
+    "laneIndex": 0,
+    "module": "Denkweisen der Informatik",
+    "termAvailability": "both",
+    "title": "Denkweisen der Informatik",
+    "type": "VU"
+   },
+   {
+    "category": "mandatory",
+    "code": "EIDI1",
+    "ects": "n/a",
+    "examSubject": "Algorithmen und Programmierung",
+    "laneIndex": 0,
+    "module": "Einführung in die Programmierung",
+    "termAvailability": "both",
+    "title": "Einführung in die Programmierung 1",
+    "type": "VU"
+   }
+  ],
+  "maxEctsPerSemester": 42.0,
+  "plannedCourses": [],
   "programCode": "033 521",
   "recommendedEctsPerSemester": 30.0,
   "selectedFocus": null

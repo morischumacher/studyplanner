@@ -111,6 +111,9 @@ def build(catalogue: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     cases["course-without-ects"] = payload(
         plannedCourses=[{"code": "X1", "title": "No ECTS", "laneIndex": 0}]
     )
+    cases["course-with-unreadable-ects"] = payload(
+        plannedCourses=[{"code": "X1", "title": "Not A Number", "ects": "n/a", "laneIndex": 0}]
+    )
     cases["course-in-lane-zero"] = payload(
         plannedCourses=[course(ordered[0], 0)]
     )
@@ -153,6 +156,13 @@ def build(catalogue: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         cases["steop-done-plus-later"] = payload(
             doneCourses=[course(c, 0) for c in steop_like],
             plannedCourses=[course(c, 3) for c in ordered[20:30]],
+        )
+        # The introductory-phase passes read a course's credits themselves, so a
+        # value they cannot read has to reach them as a verdict rather than as a
+        # raise. Recorded on a completed course, which is the path that also
+        # runs the completion-semester scan and the pre-phase allowance.
+        cases["steop-done-with-unreadable-ects"] = payload(
+            doneCourses=[{**course(c, 0), "ects": "n/a"} for c in steop_like]
         )
 
     # --- focus area, including values the engine has to normalise

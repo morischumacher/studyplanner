@@ -4963,8 +4963,1049 @@
    "warnings": []
   }
  },
+ "course-with-unreadable-ects": {
+  "errors": [
+   "rejected: invalid ects for 'X1'"
+  ],
+  "message": "rejected: invalid ects for 'X1'",
+  "missing": [
+   "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
+   "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
+   "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
+   "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
+   "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
+   "Pflichtmodul fehlt: Grundzüge digitaler Systeme (6.0 ECTS)",
+   "Pflichtmodul fehlt: Denkweisen der Informatik (6.5 ECTS)",
+   "Pflichtmodul fehlt: Datenbanksysteme (6.0 ECTS)",
+   "Pflichtmodul fehlt: Einführung in Security (6.0 ECTS)",
+   "Pflichtmodul fehlt: Algebra und Diskrete Mathematik (9.0 ECTS)",
+   "Pflichtmodul fehlt: Analysis (6.0 ECTS)",
+   "Pflichtmodul fehlt: Mathematisches Arbeiten (2.0 ECTS)",
+   "Pflichtmodul fehlt: Statistik und Wahrscheinlichkeitstheorie (6.0 ECTS)",
+   "Pflichtmodul fehlt: Theoretische Informatik (6.0 ECTS)",
+   "Bachelorarbeit fehlt: 13.0 ECTS",
+   "Wahlmodule der engen Wahl (+): mindestens 7 Module nötig, aktuell 0.",
+   "Transferable Skills: mindestens 6.0 ECTS nötig (aktuell 0.0).",
+   "Gesamtumfang: 180.0 ECTS fehlen bis 180."
+  ],
+  "ok": false,
+  "stats": {
+   "ectsByCategory": {},
+   "ectsByExamSubject": {},
+   "ectsMissingTo180": 180.0,
+   "ectsPerSemester": {},
+   "errors": [
+    "rejected: invalid ects for 'X1'"
+   ],
+   "focus": {
+    "recognized": false,
+    "selected": null
+   },
+   "maxEctsPerSemester": 42.0,
+   "moduleProgress": [
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Access Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 9.0,
+     "title": "Algebra und Diskrete Mathematik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 8.0,
+     "title": "Algorithmen und Datenstrukturen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Analysis"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Argumentieren und Beweisen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Attacks and Defenses in Computer Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "thesis",
+     "requiredEcts": 13.0,
+     "title": "Bachelorarbeit"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Betriebssysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Bio-Medical Visualization and Visual Analytics"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Computational Statistics"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Computersysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Daten- und Informatikrecht"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Datenanalyse"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Datenbanksysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Deklaratives Problemlösen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.5,
+     "title": "Denkweisen der Informatik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Design und Entwicklung von Anwendungen im Gesundheitswesen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Design und Fertigung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Effiziente Algorithmen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Artificial Intelligence"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Information Retrieval"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Machine Learning"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Quantencomputing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Visual Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 9.5,
+     "title": "Einführung in die Programmierung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in wissensbasierte Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Foundations of System and Application Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "fwts",
+     "requiredEcts": 18.0,
+     "title": "Freie Wahlfächer und Transferable Skills"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Computer Vision"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Computergraphik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Visualisierung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Grundzüge digitaler Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Human Augmentation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Informationssysteme des Gesundheitswesens"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Interface und Interaction Design"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Introduction to Cryptography"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Logic and Reasoning in Computer Science"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Logik für Wissensrepräsentation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Logik und Grundlagen der Mathematik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 2.0,
+     "title": "Mathematisches Arbeiten"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Menschzentrierte Künstliche Intelligenz"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Methoden der Angewandten Statistik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Methods for Data Generation and Analytics in Medicine and Life Sciences"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Multimedia"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Multivariate Statistik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Numerical Computation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Parallel Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Privacy-Enhancing Technologies"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Programm- und Systemverifikation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Programmierparadigmen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Programmiertechniken für Visual Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Semistrukturierte Daten"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Software Engineering"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Software Engineering Projekt"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Software-Qualitätssicherung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Sozio-technische Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Statistik und Wahrscheinlichkeitstheorie"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Theoretische Informatik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Usability Engineering and Mobile Interaction"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Verteilte Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Web Engineering"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 5.0,
+     "title": "Zuverlässige Echtzeitsysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Übersetzerbau"
+    }
+   ],
+   "narrowElectives": {
+    "allOptionsCount": 10,
+    "completed": [],
+    "completedCount": 0,
+    "requiredCount": 7
+   },
+   "programCode": "033 521",
+   "recommendedEctsPerSemester": 30.0,
+   "steop": {
+    "done": {
+     "completeLaneIndex": null,
+     "isComplete": false,
+     "mandatoryOk": false,
+     "mandatoryPresent": [],
+     "maxNonSteopBeforeCompletion": 22.0,
+     "nonSteopEctsBeforeCompletion": 0.0,
+     "poolEcts": 0.0,
+     "poolOk": false
+    },
+    "planned": {
+     "isComplete": false,
+     "mandatoryOk": false,
+     "mandatoryPresent": [],
+     "poolEcts": 0.0,
+     "poolOk": false
+    }
+   },
+   "totalEcts": 0.0,
+   "warnings": []
+  }
+ },
  "course-without-ects": {
-  "__raised__": "ValueError: ects is missing"
+  "errors": [
+   "rejected: invalid ects for 'X1'"
+  ],
+  "message": "rejected: invalid ects for 'X1'",
+  "missing": [
+   "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
+   "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
+   "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
+   "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
+   "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
+   "Pflichtmodul fehlt: Grundzüge digitaler Systeme (6.0 ECTS)",
+   "Pflichtmodul fehlt: Denkweisen der Informatik (6.5 ECTS)",
+   "Pflichtmodul fehlt: Datenbanksysteme (6.0 ECTS)",
+   "Pflichtmodul fehlt: Einführung in Security (6.0 ECTS)",
+   "Pflichtmodul fehlt: Algebra und Diskrete Mathematik (9.0 ECTS)",
+   "Pflichtmodul fehlt: Analysis (6.0 ECTS)",
+   "Pflichtmodul fehlt: Mathematisches Arbeiten (2.0 ECTS)",
+   "Pflichtmodul fehlt: Statistik und Wahrscheinlichkeitstheorie (6.0 ECTS)",
+   "Pflichtmodul fehlt: Theoretische Informatik (6.0 ECTS)",
+   "Bachelorarbeit fehlt: 13.0 ECTS",
+   "Wahlmodule der engen Wahl (+): mindestens 7 Module nötig, aktuell 0.",
+   "Transferable Skills: mindestens 6.0 ECTS nötig (aktuell 0.0).",
+   "Gesamtumfang: 180.0 ECTS fehlen bis 180."
+  ],
+  "ok": false,
+  "stats": {
+   "ectsByCategory": {},
+   "ectsByExamSubject": {},
+   "ectsMissingTo180": 180.0,
+   "ectsPerSemester": {},
+   "errors": [
+    "rejected: invalid ects for 'X1'"
+   ],
+   "focus": {
+    "recognized": false,
+    "selected": null
+   },
+   "maxEctsPerSemester": 42.0,
+   "moduleProgress": [
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Access Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 9.0,
+     "title": "Algebra und Diskrete Mathematik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 8.0,
+     "title": "Algorithmen und Datenstrukturen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Analysis"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Argumentieren und Beweisen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Attacks and Defenses in Computer Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "thesis",
+     "requiredEcts": 13.0,
+     "title": "Bachelorarbeit"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Betriebssysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Bio-Medical Visualization and Visual Analytics"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Computational Statistics"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Computersysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Daten- und Informatikrecht"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Datenanalyse"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Datenbanksysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Deklaratives Problemlösen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.5,
+     "title": "Denkweisen der Informatik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Design und Entwicklung von Anwendungen im Gesundheitswesen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Design und Fertigung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Effiziente Algorithmen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Artificial Intelligence"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Information Retrieval"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Machine Learning"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Quantencomputing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Visual Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 9.5,
+     "title": "Einführung in die Programmierung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in wissensbasierte Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Foundations of System and Application Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "fwts",
+     "requiredEcts": 18.0,
+     "title": "Freie Wahlfächer und Transferable Skills"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Computer Vision"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Computergraphik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Visualisierung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Grundzüge digitaler Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Human Augmentation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Informationssysteme des Gesundheitswesens"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Interface und Interaction Design"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Introduction to Cryptography"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Logic and Reasoning in Computer Science"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Logik für Wissensrepräsentation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Logik und Grundlagen der Mathematik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 2.0,
+     "title": "Mathematisches Arbeiten"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Menschzentrierte Künstliche Intelligenz"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Methoden der Angewandten Statistik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Methods for Data Generation and Analytics in Medicine and Life Sciences"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Multimedia"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Multivariate Statistik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Numerical Computation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Parallel Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Privacy-Enhancing Technologies"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Programm- und Systemverifikation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Programmierparadigmen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Programmiertechniken für Visual Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Semistrukturierte Daten"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Software Engineering"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Software Engineering Projekt"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Software-Qualitätssicherung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Sozio-technische Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Statistik und Wahrscheinlichkeitstheorie"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Theoretische Informatik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Usability Engineering and Mobile Interaction"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Verteilte Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Web Engineering"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 5.0,
+     "title": "Zuverlässige Echtzeitsysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Übersetzerbau"
+    }
+   ],
+   "narrowElectives": {
+    "allOptionsCount": 10,
+    "completed": [],
+    "completedCount": 0,
+    "requiredCount": 7
+   },
+   "programCode": "033 521",
+   "recommendedEctsPerSemester": 30.0,
+   "steop": {
+    "done": {
+     "completeLaneIndex": null,
+     "isComplete": false,
+     "mandatoryOk": false,
+     "mandatoryPresent": [],
+     "maxNonSteopBeforeCompletion": 22.0,
+     "nonSteopEctsBeforeCompletion": 0.0,
+     "poolEcts": 0.0,
+     "poolOk": false
+    },
+    "planned": {
+     "isComplete": false,
+     "mandatoryOk": false,
+     "mandatoryPresent": [],
+     "poolEcts": 0.0,
+     "poolOk": false
+    }
+   },
+   "totalEcts": 0.0,
+   "warnings": []
+  }
  },
  "duplicate-course": {
   "errors": [
@@ -15758,6 +16799,530 @@
    "warnings": [
     "Semester 4 is heavy: 54.0 ECTS planned/done (recommended ~30.0)."
    ]
+  }
+ },
+ "steop-done-with-unreadable-ects": {
+  "errors": [
+   "rejected: invalid ects for 'DI'",
+   "rejected: invalid ects for 'EIDI1'"
+  ],
+  "message": "rejected: invalid ects for 'DI'",
+  "missing": [
+   "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
+   "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
+   "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
+   "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
+   "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
+   "Pflichtmodul fehlt: Grundzüge digitaler Systeme (6.0 ECTS)",
+   "Pflichtmodul fehlt: Denkweisen der Informatik (6.5 ECTS)",
+   "Pflichtmodul fehlt: Datenbanksysteme (6.0 ECTS)",
+   "Pflichtmodul fehlt: Einführung in Security (6.0 ECTS)",
+   "Pflichtmodul fehlt: Algebra und Diskrete Mathematik (9.0 ECTS)",
+   "Pflichtmodul fehlt: Analysis (6.0 ECTS)",
+   "Pflichtmodul fehlt: Mathematisches Arbeiten (2.0 ECTS)",
+   "Pflichtmodul fehlt: Statistik und Wahrscheinlichkeitstheorie (6.0 ECTS)",
+   "Pflichtmodul fehlt: Theoretische Informatik (6.0 ECTS)",
+   "Bachelorarbeit fehlt: 13.0 ECTS",
+   "Wahlmodule der engen Wahl (+): mindestens 7 Module nötig, aktuell 0.",
+   "Transferable Skills: mindestens 6.0 ECTS nötig (aktuell 0.0).",
+   "Gesamtumfang: 180.0 ECTS fehlen bis 180."
+  ],
+  "ok": false,
+  "stats": {
+   "ectsByCategory": {},
+   "ectsByExamSubject": {},
+   "ectsMissingTo180": 180.0,
+   "ectsPerSemester": {},
+   "errors": [
+    "rejected: invalid ects for 'DI'",
+    "rejected: invalid ects for 'EIDI1'"
+   ],
+   "focus": {
+    "recognized": false,
+    "selected": null
+   },
+   "maxEctsPerSemester": 42.0,
+   "moduleProgress": [
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Access Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 9.0,
+     "title": "Algebra und Diskrete Mathematik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 8.0,
+     "title": "Algorithmen und Datenstrukturen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Analysis"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Argumentieren und Beweisen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Attacks and Defenses in Computer Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "thesis",
+     "requiredEcts": 13.0,
+     "title": "Bachelorarbeit"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Betriebssysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Bio-Medical Visualization and Visual Analytics"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Computational Statistics"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Computersysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Daten- und Informatikrecht"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Datenanalyse"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Datenbanksysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Deklaratives Problemlösen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.5,
+     "title": "Denkweisen der Informatik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Design und Entwicklung von Anwendungen im Gesundheitswesen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Design und Fertigung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Effiziente Algorithmen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Artificial Intelligence"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Information Retrieval"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Machine Learning"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Quantencomputing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in Visual Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 9.5,
+     "title": "Einführung in die Programmierung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Einführung in wissensbasierte Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Foundations of System and Application Security"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "fwts",
+     "requiredEcts": 18.0,
+     "title": "Freie Wahlfächer und Transferable Skills"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Computer Vision"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Computergraphik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Grundlagen der Visualisierung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Grundzüge digitaler Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Human Augmentation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Informationssysteme des Gesundheitswesens"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Interface und Interaction Design"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Introduction to Cryptography"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Logic and Reasoning in Computer Science"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Logik für Wissensrepräsentation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Logik und Grundlagen der Mathematik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 2.0,
+     "title": "Mathematisches Arbeiten"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Menschzentrierte Künstliche Intelligenz"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Methoden der Angewandten Statistik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Methods for Data Generation and Analytics in Medicine and Life Sciences"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Multimedia"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Multivariate Statistik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Numerical Computation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Parallel Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Privacy-Enhancing Technologies"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Programm- und Systemverifikation"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Programmierparadigmen"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Programmiertechniken für Visual Computing"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Semistrukturierte Daten"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Software Engineering"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Software Engineering Projekt"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Software-Qualitätssicherung"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Sozio-technische Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Statistik und Wahrscheinlichkeitstheorie"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "mandatory",
+     "requiredEcts": 6.0,
+     "title": "Theoretische Informatik"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Usability Engineering and Mobile Interaction"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "narrow_elective",
+     "requiredEcts": 6.0,
+     "title": "Verteilte Systeme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Web Engineering"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 5.0,
+     "title": "Zuverlässige Echtzeitsysteme"
+    },
+    {
+     "complete": false,
+     "haveEcts": 0.0,
+     "kind": "broad_elective",
+     "requiredEcts": 6.0,
+     "title": "Übersetzerbau"
+    }
+   ],
+   "narrowElectives": {
+    "allOptionsCount": 10,
+    "completed": [],
+    "completedCount": 0,
+    "requiredCount": 7
+   },
+   "programCode": "033 521",
+   "recommendedEctsPerSemester": 30.0,
+   "steop": {
+    "done": {
+     "completeLaneIndex": null,
+     "isComplete": false,
+     "mandatoryOk": false,
+     "mandatoryPresent": [],
+     "maxNonSteopBeforeCompletion": 22.0,
+     "nonSteopEctsBeforeCompletion": 0.0,
+     "poolEcts": 0.0,
+     "poolOk": false
+    },
+    "planned": {
+     "isComplete": false,
+     "mandatoryOk": false,
+     "mandatoryPresent": [],
+     "poolEcts": 0.0,
+     "poolOk": false
+    }
+   },
+   "totalEcts": 0.0,
+   "warnings": []
   }
  },
  "steop-planned-only": {
