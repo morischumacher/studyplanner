@@ -150,8 +150,12 @@ document, and the wording each is reported as stays in the checker, keyed by tag
 A pure relocation: the golden master does not move.
 
 **A wording mismatch between two references to the same course**, "Mathematisches
-Arbeiten 1" where the matcher uses "Mathematisches Arbeiten". Cosmetic but
-observable in a missing-requirement message.
+Arbeiten 1" where the matcher uses "Mathematisches Arbeiten". Fixed in the
+message, because the matcher is the side that agrees with everything else: the
+catalogue, the curriculum document and the dashboard's own checklist label all
+call the course "Mathematisches Arbeiten", and the trailing 1 appeared nowhere
+but this one line. The golden master moved, in 32 scenarios and in that string
+only.
 
 ### Display
 

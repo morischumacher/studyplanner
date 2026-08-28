@@ -77,7 +77,7 @@ class RuleChecker:
     # The wording each one is reported as is prose and stays below.
     _STEOP_MANDATORY_MISSING = {
         "eidi1": "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-        "ma": "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+        "ma": "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
         "ori": "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
     }
 
