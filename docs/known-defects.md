@@ -201,7 +201,7 @@ is fetched again. `frontend/src/features/recommendations/`.
   tags into the document; left alone because the entry is curriculum data that
   should be read rather than dead code that should go.
 - Two profile save functions are called from nowhere.
-- `rightPanelTab` is declared, never read, never persisted.
+- `rightPanelTab` is declared, never read, never persisted. Removed.
 - The onboarding tour writes an unsuffixed `localStorage` key that nothing reads.
 - Per-module done and planned totals are computed, adjusted for the transferable
   skills cap, and then discarded; `per_course_module_title` is written and never

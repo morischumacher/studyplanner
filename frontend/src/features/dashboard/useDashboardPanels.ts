@@ -72,9 +72,6 @@ export interface UseDashboardPanelsInput {
 export interface DashboardPanels {
     isRuleDashboardOpen: boolean;
     setIsRuleDashboardOpen: Dispatch<SetStateAction<boolean>>;
-    /** Which tab the right-hand panel shows. Nothing reads it yet. */
-    rightPanelTab: string;
-    setRightPanelTab: Dispatch<SetStateAction<string>>;
     dashboardViewMode: DashboardViewMode;
     setDashboardViewMode: Dispatch<SetStateAction<DashboardViewMode>>;
     isLegendOpen: boolean;
@@ -122,7 +119,6 @@ export interface DashboardPanels {
 
 export function useDashboardPanels({ programCode }: UseDashboardPanelsInput): DashboardPanels {
     const [isRuleDashboardOpen, setIsRuleDashboardOpen] = useState(false);
-    const [rightPanelTab, setRightPanelTab] = useState("dashboard");
     const [dashboardViewMode, setDashboardViewMode] = useState<DashboardViewMode>("planning");
     const [isLegendOpen, setIsLegendOpen] = useState(false);
     const [isSteopInfoOpen, setIsSteopInfoOpen] = useState(false);
@@ -255,8 +251,6 @@ export function useDashboardPanels({ programCode }: UseDashboardPanelsInput): Da
     return {
         isRuleDashboardOpen,
         setIsRuleDashboardOpen,
-        rightPanelTab,
-        setRightPanelTab,
         dashboardViewMode,
         setDashboardViewMode,
         isLegendOpen,
