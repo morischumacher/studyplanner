@@ -131,7 +131,7 @@ export function useCoursePlacement({
         const requestedByCode = new Map<string, CourseLike | null>();
         for (const item of input) {
             const isObject = item && typeof item === "object";
-            const code = String(isObject ? item?.code : item || "").trim();
+            const code = String((isObject ? item?.code : item) || "").trim();
             if (!code) continue;
             if (!requestedByCode.has(code)) {
                 requestedByCode.set(code, isObject ? item : null);
