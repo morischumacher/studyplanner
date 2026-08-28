@@ -40,8 +40,16 @@ bachelor curriculum has an introductory-phase gate with no counterpart in the
 master programme, and the master programme has a focus-area dependency structure
 with no counterpart in the bachelor. Forcing both through one pipeline would
 mean encoding each programme's exceptions as conditionals inside shared rules,
-which is how the current bachelor checker came to look the way it does. The
-engine and the rule vocabulary are shared; the composition is per programme.
+which is how the current bachelor checker came to look the way it does.
+
+What the two share, then, is smaller than it first appears, and worth stating
+exactly: the wire format, the result shape, the single entry point, the shape of
+a rule set, and the reading of the per-semester credit limits. Not the rules.
+Not even the normalisation of a title, because the bachelor programme's titles
+are German and have to be accent-folded before they can be matched. Both files
+are organised the same way and read as siblings, which is the property that
+actually helps a reader; a shared base class asserting more commonality than
+exists would not.
 
 ## Consequences
 

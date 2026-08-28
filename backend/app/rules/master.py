@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, List, Dict, Tuple, Optional
 
 from ..curriculum import MASTER, load as load_curriculum
+from .payload import resolve_semester_load_limits
 from .result import RuleCheckResult
 
 _CURRICULUM = load_curriculum(MASTER)
@@ -415,26 +416,12 @@ class RuleChecker:
         return stats, missing
 
     @staticmethod
-    def _resolve_semester_load_limits(payload: Dict[str, Any]) -> Tuple[float, float]:
-        default_max = RuleChecker.MAX_ECTS_PER_SEMESTER
-        default_recommended = RuleChecker.RECOMMENDED_ECTS_PER_SEMESTER
-        raw_max = payload.get("maxEctsPerSemester")
-        raw_recommended = payload.get("recommendedEctsPerSemester")
-        try:
-            max_ects = float(raw_max)
-        except (TypeError, ValueError):
-            max_ects = default_max
-        try:
-            recommended_ects = float(raw_recommended)
-        except (TypeError, ValueError):
-            recommended_ects = default_recommended
-        if max_ects <= 0:
-            max_ects = default_max
-        if recommended_ects <= 0:
-            recommended_ects = default_recommended
-        if recommended_ects > max_ects:
-            recommended_ects = max_ects
-        return max_ects, recommended_ects
+    def _resolve_semester_load_limits(payload: dict[str, Any]) -> Tuple[float, float]:
+        return resolve_semester_load_limits(
+            payload,
+            RuleChecker.MAX_ECTS_PER_SEMESTER,
+            RuleChecker.RECOMMENDED_ECTS_PER_SEMESTER,
+        )
 
     def _check_duplicates(self, courses: List[Dict[str, Any]]) -> Optional[str]:
         seen: Dict[str, Dict[str, Any]] = {}
