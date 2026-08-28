@@ -8,7 +8,7 @@
   "missing": [
    "Semester load limit exceeded in semester 1: 74.0/42.0 ECTS. Reduce by 32.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -549,7 +549,7 @@
   "missing": [
    "Semester load limit exceeded in semester 1: 74.0/27.0 ECTS. Reduce by 47.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -1103,7 +1103,7 @@
    "Semester load limit exceeded in semester 6: 30.0/21.0 ECTS. Reduce by 9.0 ECTS.",
    "Semester load limit exceeded in semester 7: 25.0/21.0 ECTS. Reduce by 4.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -1677,7 +1677,7 @@
    "Semester load limit exceeded in semester 5: 31.0/27.0 ECTS. Reduce by 4.0 ECTS.",
    "Semester load limit exceeded in semester 6: 30.0/27.0 ECTS. Reduce by 3.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -2248,7 +2248,7 @@
    "Semester load limit exceeded in semester 4: 31.0/30.0 ECTS. Reduce by 1.0 ECTS.",
    "Semester load limit exceeded in semester 5: 31.0/30.0 ECTS. Reduce by 1.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -2809,7 +2809,7 @@
   "missing": [
    "Semester load limit exceeded in semester 2: 36.0/33.0 ECTS. Reduce by 3.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -3363,7 +3363,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -3909,7 +3909,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -4444,7 +4444,7 @@
   "message": "accepted",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -4970,7 +4970,7 @@
   "message": "rejected: invalid ects for 'X1'",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -5492,7 +5492,7 @@
   "message": "rejected: invalid ects for 'X1'",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -6014,7 +6014,7 @@
   "message": "rejected: duplicate course 'ABD' (already present as 'ABD').",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -6540,7 +6540,7 @@
   "message": "accepted",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -7110,7 +7110,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -7735,7 +7735,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -8366,7 +8366,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -8975,7 +8975,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -9600,7 +9600,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -10231,7 +10231,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -10782,7 +10782,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -11336,7 +11336,7 @@
   "message": "rejected: Analysis mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -11883,7 +11883,7 @@
   "message": "accepted",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -12403,7 +12403,7 @@
   "message": "accepted",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -12929,7 +12929,7 @@
   "message": "rejected: duplicate course 'ABD' (already present as 'ABD').",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -14063,7 +14063,7 @@
   "message": "rejected: Algebra und Diskrete Mathematik mixes variants. Use either VU or VO+UE, not both.",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -14613,7 +14613,7 @@
   "message": "accepted",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
@@ -15161,7 +15161,7 @@
    "Semester load limit exceeded in semester 2: 43.0/42.0 ECTS. Reduce by 1.0 ECTS.",
    "Semester load limit exceeded in semester 4: 44.0/42.0 ECTS. Reduce by 2.0 ECTS.",
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (9.5 ECTS)",
    "Pflichtmodul fehlt: Programmierparadigmen (6.0 ECTS)",
@@ -15733,7 +15733,7 @@
   "errors": [],
   "message": "accepted",
   "missing": [
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 2.5 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -16265,7 +16265,7 @@
   "message": "rejected: semester 4 exceeds max load (54.0 ECTS > 42.0).",
   "missing": [
    "Semester load limit exceeded in semester 4: 54.0/42.0 ECTS. Reduce by 12.0 ECTS.",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
    "Pflichtmodul fehlt: Einführung in die Programmierung (4.0 ECTS)",
@@ -16809,7 +16809,7 @@
   "message": "rejected: invalid ects for 'DI'",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -17329,7 +17329,7 @@
   "errors": [],
   "message": "accepted",
   "missing": [
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 2.5 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
@@ -17856,7 +17856,7 @@
   "message": "accepted",
   "missing": [
    "StEOP Pflicht-LV fehlt: Einführung in die Programmierung 1 (5.5 ECTS)",
-   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten 1 (2.0 ECTS)",
+   "StEOP Pflicht-LV fehlt: Mathematisches Arbeiten (2.0 ECTS)",
    "StEOP Pflicht-LV fehlt: Orientierung Informatik und Wirtschaftsinformatik (1.0 ECTS)",
    "StEOP Pool: 8.0 ECTS fehlen (mind. 8 ECTS aus: Algebra & Diskrete Mathematik, Analysis, Denkweisen der Informatik, Grundzüge digitaler Systeme).",
    "Pflichtmodul fehlt: Algorithmen und Datenstrukturen (8.0 ECTS)",
