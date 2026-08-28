@@ -41,6 +41,10 @@ export default defineConfig({
     // A failing flow is usually a genuine break rather than flake, but the first
     // run pays for a cold backend start, so one retry keeps CI honest.
     retries: process.env.CI ? 1 : 0,
+    // One worker in CI. Several browsers driving one API and one database, all
+    // on a two-core runner, was losing the web server partway through a run;
+    // the flows are quick enough that running them in sequence costs little.
+    workers: process.env.CI ? 1 : undefined,
     // The github reporter turns a failed assertion into a GitHub annotation,
     // which is the only part of a CI run that can be read without downloading
     // the log. The html report is kept as well, and uploaded on failure.
@@ -73,7 +77,7 @@ export default defineConfig({
             // through a run. The API base is baked in at build time, which is why
             // the build happens here rather than in a separate step.
             command: process.env.CI
-                ? `npx vite build && npx vite preview --port ${WEB_PORT} --strictPort`
+                ? `npx vite build && npx vite preview --host 127.0.0.1 --port ${WEB_PORT} --strictPort`
                 : `npx vite --port ${WEB_PORT} --strictPort`,
             port: Number(WEB_PORT),
             reuseExistingServer: !process.env.CI,
