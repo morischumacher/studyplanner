@@ -21,12 +21,9 @@ import "reactflow/dist/style.css";
 
 import {
     fetchCatalog,
-    fetchProfileSettings,
     fetchPlannerState,
-    saveCourseTerms,
     savePlannerState,
     saveRecommendationProfile,
-    saveStartTerm,
     sendRuleCheckUpdate,
     fetchRecommendations,
 } from "./lib/api";
@@ -34,6 +31,12 @@ import { CourseCard, LaneColumn, ModuleGroupBackground, Sidebar, OnboardingTour 
 import VisualLegend from "./components/VisualLegend.jsx";
 import CurriculumGraphView from "./components/CurriculumGraphView.jsx";
 import PlannerNotifications from "./components/app/PlannerNotifications.jsx";
+import {
+    ProfileModal,
+    SignupSetupModal,
+    useProfileForm,
+    useProfileSettings,
+} from "./features/profile/index.ts";
 import RecommendationPanel from "./components/RecommendationPanel.jsx";
 import {
     CANVAS_HEIGHT,
@@ -56,13 +59,9 @@ import {
     buildSemesterList,
     firstAllowedLaneAtOrAfter,
     isLaneAllowedForTerm,
-    laneSeason,
-    normalizeStartSeason,
     normalizeTermAvailability,
     semesterBoundsForProgram,
     TERM_BOTH,
-    TERM_SUMMER,
-    TERM_WINTER,
 } from "./domain/terms.ts";
 import {
     buildBachelorPrefillPlan,
@@ -218,28 +217,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const [plannerHydrated, setPlannerHydrated] = useState(false);
     const [plannerLoadOk, setPlannerLoadOk] = useState(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
-    const [isProfileOpen, setIsProfileOpen] = useState(false);
-    const [isSignupSetupOpen, setIsSignupSetupOpen] = useState(false);
-    const [profileSearch, setProfileSearch] = useState("");
-    const [profileSettingsByProgram, setProfileSettingsByProgram] = useState({});
-    const [lockedProgramCode, setLockedProgramCode] = useState(null);
-    const [signupSetupProgramCode, setSignupSetupProgramCode] = useState(programCode);
-    const [signupSetupStartSeason, setSignupSetupStartSeason] = useState(TERM_WINTER);
-    const [signupSetupStartYear, setSignupSetupStartYear] = useState(new Date().getFullYear());
-    const [signupSetupFocus, setSignupSetupFocus] = useState(selectedFocus || "");
-    const [isSavingSignupSetup, setIsSavingSignupSetup] = useState(false);
-    const [pendingCourseTermUpdateByCode, setPendingCourseTermUpdateByCode] = useState({});
-    const [isSavingProfileSettings, setIsSavingProfileSettings] = useState(false);
-    const [isCurriculumSettingsOpen, setIsCurriculumSettingsOpen] = useState(false);
-    const [profileDraftFocus, setProfileDraftFocus] = useState("");
-    const [profileDraftStartSeason, setProfileDraftStartSeason] = useState(TERM_WINTER);
-    const [profileDraftStartYear, setProfileDraftStartYear] = useState(new Date().getFullYear());
-    const [profileDraftMaxEcts, setProfileDraftMaxEcts] = useState(42);
-    const [profileDraftRecommendedEcts, setProfileDraftRecommendedEcts] = useState(30);
-    const [profileDraftMaxWeekHours, setProfileDraftMaxWeekHours] = useState(50);
-    const [profileDraftRecommendedWeekHours, setProfileDraftRecommendedWeekHours] = useState(40);
-    const [profileDraftInterests, setProfileDraftInterests] = useState("");
-    const [profileDraftCareer, setProfileDraftCareer] = useState("");
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isRecPanelOpen, setIsRecPanelOpen] = useState(false);
     const [profileDisableGraphView, setProfileDisableGraphView] = useState(() => {
@@ -272,49 +249,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
     const successFeedbackSignatureRef = useRef("");
     const ruleCheckState = ruleCheckStateByProgram?.[programCode] ?? EMPTY_RULE_CHECK_STATE;
 
-    useEffect(() => {
-        if (activeTourStep === null) return;
-        if (activeTourStep === 0) {
-            setIsSidebarOpen(true);
-            setIsRecPanelOpen(false);
-            setIsRuleDashboardOpen(false);
-            setIsProfileOpen(false);
-        } else if (activeTourStep === 5) {
-            setIsRecPanelOpen(false);
-        } else if (activeTourStep === 6) {
-            setIsRecPanelOpen(true);
-            setIsRuleDashboardOpen(false);
-        } else if (activeTourStep === 7) {
-            setIsRecPanelOpen(false);
-            setIsRuleDashboardOpen(false);
-        } else if (activeTourStep === 8) {
-            setIsRuleDashboardOpen(true);
-            setIsProfileOpen(false);
-        } else if (activeTourStep === 9) {
-            setIsRuleDashboardOpen(false);
-            setIsProfileOpen(false);
-        } else if (activeTourStep === 10) {
-            setIsProfileOpen(true);
-        } else if (activeTourStep === 11) {
-            setIsProfileOpen(false);
-        }
-    }, [activeTourStep]);
-
-    useEffect(() => {
-        if (!openSignupSetupOnEntry) return;
-        const defaultProgram = String(programCode || PROGRAM_OPTIONS?.[0]?.code || "").trim() || "066 937";
-        setSignupSetupProgramCode(defaultProgram);
-        setSignupSetupStartSeason(TERM_WINTER);
-        setSignupSetupStartYear(new Date().getFullYear());
-        setSignupSetupFocus(defaultProgram === BACHELOR_PROGRAM_CODE ? (selectedFocus || "") : "");
-        setIsSignupSetupOpen(true);
-        onSignupSetupPromptConsumed?.();
-    }, [
-        openSignupSetupOnEntry,
-        onSignupSetupPromptConsumed,
-        programCode,
-        selectedFocus,
-    ]);
     const setProgramRuleCheckState = useCallback((targetProgramCode, updater) => {
         if (!targetProgramCode) return;
         setRuleCheckStateByProgram((prev) => {
@@ -403,10 +337,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         setDragPreviewSemesterCount(null);
     }, [programCode]);
 
-    useEffect(() => {
-        setPendingCourseTermUpdateByCode({});
-        setProfileSearch("");
-    }, [programCode, isProfileOpen]);
     // Fetch & normalize catalog whenever programCode changes
     useEffect(() => {
         let cancelled = false;
@@ -431,52 +361,49 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         };
     }, [programCode]);
 
+    const {
+        isProfileOpen,
+        setIsProfileOpen,
+        isSignupSetupOpen,
+        setIsSignupSetupOpen,
+        profileSettingsByProgram,
+        setProfileSettingsByProgram,
+        profileSettingsForProgram,
+        setLockedProgramCode,
+        startTermSeason,
+        startTermYear,
+        isStartTermLocked,
+        isProgramLocked,
+        courseTermOverrides,
+    } = useProfileSettings({ programCode, setProgramCode });
+
     useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const payload = await fetchProfileSettings(programCode);
-                if (cancelled) return;
-                const startTerm = payload?.start_term && typeof payload.start_term === "object"
-                    ? {
-                        season: normalizeStartSeason(payload.start_term.season),
-                        year: Number(payload.start_term.year) || new Date().getFullYear(),
-                    }
-                    : null;
-                const overridesRaw =
-                    payload?.course_term_overrides && typeof payload.course_term_overrides === "object"
-                        ? payload.course_term_overrides
-                        : {};
-                const normalizedOverrides = Object.fromEntries(
-                    Object.entries(overridesRaw)
-                        .map(([code, term]) => [String(code || "").trim(), normalizeTermAvailability(term)])
-                        .filter(([code]) => Boolean(code))
-                );
-                const nextLockedProgramCode = String(payload?.locked_program_code || "").trim() || null;
-                setLockedProgramCode(nextLockedProgramCode);
-                if (nextLockedProgramCode && nextLockedProgramCode !== programCode) {
-                    setProgramCode?.(nextLockedProgramCode);
-                }
-                setProfileSettingsByProgram((prev) => ({
-                    ...(prev || {}),
-                    [programCode]: {
-                        startTerm,
-                        startTermLocked: Boolean(payload?.start_term_locked ?? startTerm),
-                        courseTermOverrides: normalizedOverrides,
-                        interests: payload?.interests || [],
-                        careerDirection: payload?.career_direction || "",
-                        recommendation_toggles: payload?.recommendation_toggles || {},
-                    },
-                }));
-            } catch (error) {
-                if (cancelled) return;
-                console.error("Failed to load profile settings", error);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [programCode]);
+        if (activeTourStep === null) return;
+        if (activeTourStep === 0) {
+            setIsSidebarOpen(true);
+            setIsRecPanelOpen(false);
+            setIsRuleDashboardOpen(false);
+            setIsProfileOpen(false);
+        } else if (activeTourStep === 5) {
+            setIsRecPanelOpen(false);
+        } else if (activeTourStep === 6) {
+            setIsRecPanelOpen(true);
+            setIsRuleDashboardOpen(false);
+        } else if (activeTourStep === 7) {
+            setIsRecPanelOpen(false);
+            setIsRuleDashboardOpen(false);
+        } else if (activeTourStep === 8) {
+            setIsRuleDashboardOpen(true);
+            setIsProfileOpen(false);
+        } else if (activeTourStep === 9) {
+            setIsRuleDashboardOpen(false);
+            setIsProfileOpen(false);
+        } else if (activeTourStep === 10) {
+            setIsProfileOpen(true);
+        } else if (activeTourStep === 11) {
+            setIsProfileOpen(false);
+        }
+    }, [activeTourStep]);
 
     useEffect(() => {
         let cancelled = false;
@@ -645,38 +572,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         })),
         [activeSemesterCount, maxSemesterCount]
     );
-    const profileSettingsForProgram = profileSettingsByProgram?.[programCode] ?? {};
-    const startTermSeason = normalizeStartSeason(profileSettingsForProgram?.startTerm?.season ?? TERM_WINTER);
-    const startTermYear = Number(profileSettingsForProgram?.startTerm?.year) || new Date().getFullYear();
-    const isStartTermLocked = Boolean(profileSettingsForProgram?.startTermLocked);
-    const isProgramLocked = Boolean(String(lockedProgramCode || "").trim());
-    const courseTermOverrides = profileSettingsForProgram?.courseTermOverrides ?? {};
-    useEffect(() => {
-        if (!isProfileOpen) return;
-        setProfileDraftFocus(selectedFocus || "");
-        setProfileDraftStartSeason(startTermSeason);
-        setProfileDraftStartYear(startTermYear);
-        setProfileDraftMaxEcts(Number(semesterLoadLimits?.maxEctsPerSemester ?? 42));
-        setProfileDraftRecommendedEcts(Number(semesterLoadLimits?.recommendedEctsPerSemester ?? 30));
-        setProfileDraftMaxWeekHours(Number(semesterLoadLimits?.maxWeekHoursPerSemester ?? 50));
-        setProfileDraftRecommendedWeekHours(Number(semesterLoadLimits?.recommendedWeekHoursPerSemester ?? 40));
-        setProfileDraftInterests(Array.isArray(profileSettingsForProgram?.interests) ? profileSettingsForProgram.interests.join(", ") : "");
-        setProfileDraftCareer(profileSettingsForProgram?.careerDirection || "");
-    }, [
-        isProfileOpen,
-        selectedFocus,
-        startTermSeason,
-        startTermYear,
-        semesterLoadLimits?.maxEctsPerSemester,
-        semesterLoadLimits?.recommendedEctsPerSemester,
-        semesterLoadLimits?.maxWeekHoursPerSemester,
-        semesterLoadLimits?.recommendedEctsPerSemester,
-        semesterLoadLimits?.maxWeekHoursPerSemester,
-        semesterLoadLimits?.recommendedWeekHoursPerSemester,
-        profileSettingsForProgram?.interests,
-        profileSettingsForProgram?.careerDirection,
-    ]);
-
     const effectiveCourseTermByCode = useMemo(() => {
         const map = {};
         for (const subject of Array.isArray(catalog) ? catalog : []) {
@@ -701,6 +596,74 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
         if (!code) return TERM_BOTH;
         return normalizeTermAvailability(effectiveCourseTermByCode?.[code] ?? TERM_BOTH);
     }, [effectiveCourseTermByCode]);
+
+    const {
+        signupSetupProgramCode,
+        setSignupSetupProgramCode,
+        signupSetupStartSeason,
+        setSignupSetupStartSeason,
+        signupSetupStartYear,
+        setSignupSetupStartYear,
+        signupSetupFocus,
+        setSignupSetupFocus,
+        isSavingSignupSetup,
+        saveSignupSetup,
+        resetSignupSetupDraft,
+        isCurriculumSettingsOpen,
+        setIsCurriculumSettingsOpen,
+        profileSearch,
+        setProfileSearch,
+        filteredCatalogCourseRows,
+        pendingTermForCode,
+        setPendingTermForCode,
+        profileDraftFocus,
+        setProfileDraftFocus,
+        profileDraftStartSeason,
+        setProfileDraftStartSeason,
+        profileDraftStartYear,
+        setProfileDraftStartYear,
+        profileDraftMaxEcts,
+        setProfileDraftMaxEcts,
+        profileDraftRecommendedEcts,
+        setProfileDraftRecommendedEcts,
+        profileDraftMaxWeekHours,
+        setProfileDraftMaxWeekHours,
+        profileDraftRecommendedWeekHours,
+        setProfileDraftRecommendedWeekHours,
+        profileDraftInterests,
+        setProfileDraftInterests,
+        profileDraftCareer,
+        setProfileDraftCareer,
+        isSavingProfileSettings,
+        saveProfileChanges,
+    } = useProfileForm({
+        programCode,
+        setProgramCode,
+        catalog,
+        termAvailabilityForCode,
+        selectedFocus,
+        setSelectedFocus,
+        setSelectedFocusForProgram,
+        semesterLoadLimits,
+        setSemesterLoadLimits,
+        coursesBySemester,
+        doneCourseCodes,
+        parkedCourseCodes,
+        buildPersistSnapshot,
+        setRecommendations,
+        setStickyViolation,
+        openSignupSetupOnEntry,
+        onSignupSetupPromptConsumed,
+        profileSettingsForProgram,
+        setProfileSettingsByProgram,
+        setLockedProgramCode,
+        startTermSeason,
+        startTermYear,
+        isStartTermLocked,
+        isProfileOpen,
+        setIsProfileOpen,
+        setIsSignupSetupOpen,
+    });
 
     const isCourseAllowedInLane = useCallback((courseCode, laneIndex) => {
         const term = termAvailabilityForCode(courseCode);
@@ -3679,332 +3642,6 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
      * Sidebar expand/collapse (per subject)
      ***************************************/
     const [expandedPf, setExpandedPf] = useState(new Set());
-    const catalogCourseRows = useMemo(() => {
-        const rows = [];
-        const seen = new Set();
-        for (const subject of Array.isArray(catalog) ? catalog : []) {
-            const subjectName = subject?.pruefungsfach ?? null;
-            for (const module of Array.isArray(subject?.modules) ? subject.modules : []) {
-                for (const course of Array.isArray(module?.courses) ? module.courses : []) {
-                    const code = String(course?.code || "").trim();
-                    if (!code || seen.has(code)) continue;
-                    seen.add(code);
-                    rows.push({
-                        code,
-                        title: course?.name || code,
-                        type: course?.type || "-",
-                        examSubject: subjectName,
-                    });
-                }
-            }
-        }
-        rows.sort((a, b) => a.code.localeCompare(b.code));
-        return rows;
-    }, [catalog]);
-    const filteredCatalogCourseRows = useMemo(() => {
-        const needle = String(profileSearch || "").trim().toLowerCase();
-        if (!needle) return catalogCourseRows;
-        return catalogCourseRows.filter((row) =>
-            String(row?.code || "").toLowerCase().includes(needle) ||
-            String(row?.title || "").toLowerCase().includes(needle)
-        );
-    }, [catalogCourseRows, profileSearch]);
-    const pendingTermForCode = useCallback((courseCode) => {
-        const code = String(courseCode || "").trim();
-        if (!code) return TERM_BOTH;
-        if (pendingCourseTermUpdateByCode?.[code]) {
-            return normalizeTermAvailability(pendingCourseTermUpdateByCode[code]);
-        }
-        return termAvailabilityForCode(code);
-    }, [pendingCourseTermUpdateByCode, termAvailabilityForCode]);
-    const setPendingTermForCode = useCallback((courseCode, termAvailability) => {
-        const code = String(courseCode || "").trim();
-        if (!code) return;
-        const normalized = normalizeTermAvailability(termAvailability);
-        setPendingCourseTermUpdateByCode((prev) => ({
-            ...(prev || {}),
-            [code]: normalized,
-        }));
-    }, []);
-    const saveStartTermSetting = useCallback(async (season, year) => {
-        if (isStartTermLocked) return;
-        const normalizedSeason = normalizeStartSeason(season);
-        const normalizedYear = Number(year) || new Date().getFullYear();
-        setIsSavingProfileSettings(true);
-        try {
-            await saveStartTerm({
-                programCode,
-                season: normalizedSeason,
-                year: normalizedYear,
-            });
-            setProfileSettingsByProgram((prev) => ({
-                ...(prev || {}),
-                [programCode]: {
-                    ...(prev?.[programCode] || {}),
-                    startTerm: { season: normalizedSeason, year: normalizedYear },
-                    startTermLocked: true,
-                    courseTermOverrides: prev?.[programCode]?.courseTermOverrides || {},
-                },
-            }));
-        } catch (error) {
-            console.error("Failed to save start term", error);
-            setStickyViolation({
-                message: String(error?.message || "").includes("409")
-                    ? "Start semester is locked and cannot be changed anymore."
-                    : "Could not save start term settings.",
-                until: Date.now() + 4000,
-                tone: "error",
-            });
-        } finally {
-            setIsSavingProfileSettings(false);
-        }
-    }, [isStartTermLocked, programCode]);
-    const saveSignupSetup = useCallback(async () => {
-        const selectedProgramCode = String(signupSetupProgramCode || "").trim();
-        if (!selectedProgramCode) return;
-        const normalizedSeason = normalizeStartSeason(signupSetupStartSeason);
-        const normalizedYear = Number(signupSetupStartYear) || new Date().getFullYear();
-        setIsSavingSignupSetup(true);
-        try {
-            await saveStartTerm({
-                programCode: selectedProgramCode,
-                season: normalizedSeason,
-                year: normalizedYear,
-            });
-            setLockedProgramCode(selectedProgramCode);
-            setProgramCode?.(selectedProgramCode);
-            if (selectedProgramCode === BACHELOR_PROGRAM_CODE) {
-                setSelectedFocusForProgram?.(selectedProgramCode, signupSetupFocus || "");
-            } else {
-                setSelectedFocusForProgram?.(selectedProgramCode, "");
-            }
-            setProfileSettingsByProgram((prev) => ({
-                ...(prev || {}),
-                [selectedProgramCode]: {
-                    ...(prev?.[selectedProgramCode] || {}),
-                    startTerm: { season: normalizedSeason, year: normalizedYear },
-                    startTermLocked: true,
-                    courseTermOverrides: prev?.[selectedProgramCode]?.courseTermOverrides || {},
-                },
-            }));
-            const snapshot = buildPersistSnapshot();
-            const nextSnapshot = {
-                ...(snapshot || {}),
-                programCode: selectedProgramCode,
-                selectedFocusByProgram: {
-                    ...((snapshot && snapshot.selectedFocusByProgram) || {}),
-                    [selectedProgramCode]: selectedProgramCode === BACHELOR_PROGRAM_CODE ? (signupSetupFocus || "") : "",
-                },
-            };
-            await savePlannerState(nextSnapshot);
-            setIsSignupSetupOpen(false);
-        } catch (error) {
-            console.error("Failed to save signup setup", error);
-            setStickyViolation({
-                message: String(error?.message || "").includes("409")
-                    ? "Program/start are already locked and cannot be changed."
-                    : "Could not save signup setup.",
-                until: Date.now() + 4000,
-                tone: "error",
-            });
-        } finally {
-            setIsSavingSignupSetup(false);
-        }
-    }, [
-        buildPersistSnapshot,
-        setProgramCode,
-        setSelectedFocusForProgram,
-        setStickyViolation,
-        signupSetupFocus,
-        signupSetupProgramCode,
-        signupSetupStartSeason,
-        signupSetupStartYear,
-    ]);
-    const resetSignupSetupDraft = useCallback(() => {
-        const defaultProgram = String(PROGRAM_OPTIONS?.[0]?.code || "066 937").trim();
-        setSignupSetupProgramCode(defaultProgram);
-        setSignupSetupStartSeason(TERM_WINTER);
-        setSignupSetupStartYear(new Date().getFullYear());
-        setSignupSetupFocus("");
-    }, []);
-    const savePendingCourseTerms = useCallback(async () => {
-        const updates = Object.entries(pendingCourseTermUpdateByCode || {})
-            .map(([courseCode, termAvailability]) => ({
-                courseCode,
-                termAvailability: normalizeTermAvailability(termAvailability),
-            }))
-            .filter((item) => Boolean(item.courseCode));
-        if (!updates.length) return;
-        setIsSavingProfileSettings(true);
-        try {
-            await saveCourseTerms({
-                programCode,
-                updates,
-            });
-            setProfileSettingsByProgram((prev) => {
-                const current = prev?.[programCode] || {};
-                const nextOverrides = { ...(current?.courseTermOverrides || {}) };
-                for (const update of updates) {
-                    nextOverrides[update.courseCode] = update.termAvailability;
-                }
-                return {
-                    ...(prev || {}),
-                    [programCode]: {
-                        ...current,
-                        courseTermOverrides: nextOverrides,
-                    },
-                };
-            });
-            setPendingCourseTermUpdateByCode({});
-        } catch (error) {
-            console.error("Failed to save course term settings", error);
-            setStickyViolation({
-                message: "Could not save course term settings.",
-                until: Date.now() + 4000,
-                tone: "error",
-            });
-        } finally {
-            setIsSavingProfileSettings(false);
-        }
-    }, [pendingCourseTermUpdateByCode, programCode]);
-    const saveProfileChanges = useCallback(async () => {
-        if (isSavingProfileSettings) return;
-        setIsSavingProfileSettings(true);
-        try {
-            const normalizedSeason = normalizeStartSeason(profileDraftStartSeason);
-            const normalizedYear = Number(profileDraftStartYear) || new Date().getFullYear();
-            const shouldSaveStartTerm = !isStartTermLocked;
-            if (shouldSaveStartTerm) {
-                await saveStartTerm({
-                    programCode,
-                    season: normalizedSeason,
-                    year: normalizedYear,
-                });
-                setProfileSettingsByProgram((prev) => ({
-                    ...(prev || {}),
-                    [programCode]: {
-                        ...(prev?.[programCode] || {}),
-                        startTerm: { season: normalizedSeason, year: normalizedYear },
-                        startTermLocked: true,
-                        courseTermOverrides: prev?.[programCode]?.courseTermOverrides || {},
-                    },
-                }));
-            }
-
-            const updates = Object.entries(pendingCourseTermUpdateByCode || {})
-                .map(([courseCode, termAvailability]) => ({
-                    courseCode,
-                    termAvailability: normalizeTermAvailability(termAvailability),
-                }))
-                .filter((item) => Boolean(item.courseCode));
-            if (updates.length > 0) {
-                await saveCourseTerms({
-                    programCode,
-                    updates,
-                });
-                setProfileSettingsByProgram((prev) => {
-                    const current = prev?.[programCode] || {};
-                    const nextOverrides = { ...(current?.courseTermOverrides || {}) };
-                    for (const update of updates) {
-                        nextOverrides[update.courseCode] = update.termAvailability;
-                    }
-                    return {
-                        ...(prev || {}),
-                        [programCode]: {
-                            ...current,
-                            courseTermOverrides: nextOverrides,
-                        },
-                    };
-                });
-                setPendingCourseTermUpdateByCode({});
-            }
-
-            // Save Recommendation Profile (interests, career).
-            const parsedInterests = profileDraftInterests.split(",").map(i => i.trim()).filter(Boolean);
-            await saveRecommendationProfile({
-                programCode,
-                interests: parsedInterests,
-                careerDirection: profileDraftCareer,
-                recommendationToggles: profileSettingsForProgram?.recommendation_toggles || {},
-            });
-            setProfileSettingsByProgram((prev) => ({
-                ...(prev || {}),
-                [programCode]: {
-                    ...(prev?.[programCode] || {}),
-                    interests: parsedInterests,
-                    careerDirection: profileDraftCareer,
-                },
-            }));
-
-            if ((selectedFocus || "") !== (profileDraftFocus || "")) {
-                setSelectedFocus?.(profileDraftFocus || "");
-            }
-            setSemesterLoadLimits?.({
-                maxEctsPerSemester: Number(profileDraftMaxEcts) || 42,
-                recommendedEctsPerSemester: Number(profileDraftRecommendedEcts) || 30,
-                maxWeekHoursPerSemester: Number(profileDraftMaxWeekHours) || 50,
-                recommendedWeekHoursPerSemester: Number(profileDraftRecommendedWeekHours) || 40,
-            });
-            setIsProfileOpen(false);
-
-            // Refetch recommendations to reflect newly saved interests/career
-            const doneSet = new Set(doneCourseCodes || []);
-            const allCourses = Object.values(coursesBySemester || {})
-                .flat()
-                .map((course) => normalizeRulecheckCategoryForProgram(course, programCode));
-            const doneCoursesList = allCourses.filter((c) => c?.code && doneSet.has(c.code));
-            const plannedCoursesList = allCourses.filter((c) => c?.code && !doneSet.has(c.code));
-            const response = await fetchRecommendations({ 
-                programCode, 
-                plannedCourses: plannedCoursesList, 
-                doneCourses: doneCoursesList,
-                parkedCourses: parkedCourseCodes
-            });
-            if (response?.ok && response?.recommendations) {
-                setRecommendations(response.recommendations);
-            } else {
-                setRecommendations([]);
-            }
-        } catch (error) {
-            console.error("Failed to save profile settings", error);
-            setStickyViolation({
-                message: String(error?.message || "").includes("409")
-                    ? "Start semester is locked and cannot be changed anymore."
-                    : "Could not save profile settings.",
-                until: Date.now() + 4000,
-                tone: "error",
-            });
-        } finally {
-            setIsSavingProfileSettings(false);
-        }
-    }, [
-        isSavingProfileSettings,
-        isStartTermLocked,
-        startTermSeason,
-        startTermYear,
-        programCode,
-        pendingCourseTermUpdateByCode,
-        selectedFocus,
-        profileDraftFocus,
-        profileDraftStartSeason,
-        profileDraftStartYear,
-        profileDraftMaxEcts,
-        profileDraftRecommendedEcts,
-        profileDraftMaxWeekHours,
-        profileDraftRecommendedWeekHours,
-        profileDraftInterests,
-        profileDraftCareer,
-        profileSettingsForProgram,
-        doneCourseCodes,
-        coursesBySemester,
-        parkedCourseCodes,
-        setRecommendations,
-        setSemesterLoadLimits,
-        setIsProfileOpen,
-        setStickyViolation,
-        setIsSavingProfileSettings,
-        setSelectedFocus,
-    ]);
     const togglePf = useCallback((name) => {
         setExpandedPf((prev) => {
             const next = new Set(prev);
@@ -4397,576 +4034,71 @@ export default function App({ currentUser, onSignOut, openSignupSetupOnEntry = f
             </button>
         </div>
     );
-    const signupSetupModalNode = isSignupSetupOpen ? (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 45,
-                background: "rgba(15, 23, 42, 0.32)",
-                display: "grid",
-                placeItems: "center",
-                padding: 16,
-            }}
-        >
-            <div
-                style={{
-                    width: 420,
-                    maxWidth: "100%",
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 10,
-                    padding: 12,
-                    display: "grid",
-                    gap: 10,
-                    boxShadow: "0 20px 42px rgba(15, 23, 42, 0.2)",
-                }}
-            >
-                <div style={{ fontSize: 14, color: "#111827", fontWeight: 700 }}>Complete Signup Setup</div>
-                <div style={{ fontSize: 13, color: "#111827" }}>
-                    Name: <strong>{currentUser?.username || "user"}</strong>
-                </div>
-                <div style={{ display: "grid", gap: 4 }}>
-                    <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
-                    <select
-                        value={signupSetupProgramCode}
-                        onChange={(e) => setSignupSetupProgramCode(e.target.value)}
-                        disabled={isSavingSignupSetup}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontWeight: 600,
-                            width: "100%",
-                            boxSizing: "border-box",
-                        }}
-                    >
-                        {(PROGRAM_OPTIONS || []).map((opt) => (
-                            <option key={opt.code} value={opt.code}>
-                                {opt.label} ({opt.code})
-                            </option>
-                        ))}
-                    </select>
-                </div>
-                {signupSetupProgramCode === BACHELOR_PROGRAM_CODE && (
-                    <div style={{ display: "grid", gap: 4 }}>
-                        <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
-                        <select
-                            value={signupSetupFocus || ""}
-                            onChange={(e) => setSignupSetupFocus(e.target.value)}
-                            disabled={isSavingSignupSetup}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                boxSizing: "border-box",
-                            }}
-                        >
-                            <option value="">Select focus area</option>
-                            {(BACHELOR_FOCUS_OPTIONS || []).map((focus) => (
-                                <option key={focus} value={focus}>
-                                    {focus}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-                <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Start Semester</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
-                        <select
-                            value={signupSetupStartSeason}
-                            onChange={(e) => setSignupSetupStartSeason(normalizeStartSeason(e.target.value))}
-                            disabled={isSavingSignupSetup}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                boxSizing: "border-box",
-                            }}
-                        >
-                            <option value={TERM_WINTER}>Winter</option>
-                            <option value={TERM_SUMMER}>Summer</option>
-                        </select>
-                        <input
-                            type="number"
-                            min={1900}
-                            max={2600}
-                            value={signupSetupStartYear ?? ""}
-                            onChange={(e) => setSignupSetupStartYear(e.target.value)}
-                            disabled={isSavingSignupSetup}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                boxSizing: "border-box",
-                            }}
-                        />
-                        <div style={{ alignSelf: "center", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
-                            S1: {laneSeason(signupSetupStartSeason, 0)}
-                        </div>
-                    </div>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <button
-                        type="button"
-                        onClick={resetSignupSetupDraft}
-                        disabled={isSavingSignupSetup}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            background: "#ffffff",
-                            color: "#111827",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                        }}
-                    >
-                        Reset
-                    </button>
-                    <button
-                        type="button"
-                        onClick={saveSignupSetup}
-                        disabled={isSavingSignupSetup}
-                        style={{
-                            border: "1px solid #1d4ed8",
-                            background: isSavingSignupSetup ? "#93c5fd" : "#2563eb",
-                            color: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                        }}
-                    >
-                        {isSavingSignupSetup ? "Saving..." : "Save"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    ) : null;
+    const signupSetupModalNode = (
+        <SignupSetupModal
+            open={isSignupSetupOpen}
+            username={currentUser?.username}
+            programCode={signupSetupProgramCode}
+            onProgramCodeChange={setSignupSetupProgramCode}
+            focus={signupSetupFocus}
+            onFocusChange={setSignupSetupFocus}
+            startSeason={signupSetupStartSeason}
+            onStartSeasonChange={setSignupSetupStartSeason}
+            startYear={signupSetupStartYear}
+            onStartYearChange={setSignupSetupStartYear}
+            isSaving={isSavingSignupSetup}
+            onReset={resetSignupSetupDraft}
+            onSave={saveSignupSetup}
+        />
+    );
 
-    const profileModalNode = isProfileOpen ? (
-        <div
-            style={{
-                position: "fixed",
-                inset: 0,
-                zIndex: 40,
-                background: "rgba(15, 23, 42, 0.32)",
-                display: "grid",
-                placeItems: "center",
-                padding: 16,
+    const profileModalNode = (
+        <ProfileModal
+            open={isProfileOpen}
+            username={currentUser?.username}
+            onClose={() => setIsProfileOpen(false)}
+            isCurriculumSettingsOpen={isCurriculumSettingsOpen}
+            onToggleCurriculumSettings={() => setIsCurriculumSettingsOpen((v) => !v)}
+            disableGraphView={profileDisableGraphView}
+            onDisableGraphViewChange={(val) => {
+                setProfileDisableGraphView(val);
+                if (val) {
+                    localStorage.setItem("disable-graph-view-" + currentUser?.username, "true");
+                } else {
+                    localStorage.removeItem("disable-graph-view-" + currentUser?.username);
+                }
             }}
-        >
-            <div
-                id="profile-modal-container"
-                style={{
-                    width: 420,
-                    maxWidth: "100%",
-                    border: "1px solid #d1d5db",
-                    background: "#ffffff",
-                    borderRadius: 10,
-                    padding: 12,
-                    display: "grid",
-                    gap: 10,
-                    boxShadow: "0 20px 42px rgba(15, 23, 42, 0.2)",
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ fontSize: 14, color: "#111827", fontWeight: 700 }}>Profile</div>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                        <button
-                            onClick={() => setIsCurriculumSettingsOpen((v) => !v)}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "6px 10px",
-                                fontSize: 12,
-                                fontWeight: 700,
-                                cursor: "pointer",
-                            }}
-                        >
-                            Course availability
-                        </button>
-                        <button
-                            onClick={() => setIsProfileOpen(false)}
-                            title="Close"
-                            aria-label="Close"
-                            style={{
-                                border: "1px solid #fca5a5",
-                                background: "#fef2f2",
-                                color: "#b91c1c",
-                                borderRadius: 8,
-                                fontSize: 12,
-                                width: 24,
-                                height: 22,
-                                lineHeight: 1,
-                                cursor: "pointer",
-                                fontWeight: 700,
-                            }}
-                        >
-                            ×
-                        </button>
-                    </div>
-                </div>
-                {!isCurriculumSettingsOpen && (
-                    <div style={{ fontSize: 13, color: "#111827" }}>
-                        Name: <strong>{currentUser?.username || "user"}</strong>
-                    </div>
-                )}
-                {!isCurriculumSettingsOpen && (
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", userSelect: "none", marginTop: 4 }}>
-                        <input
-                            type="checkbox"
-                            checked={profileDisableGraphView}
-                            onChange={(e) => {
-                                const val = e.target.checked;
-                                setProfileDisableGraphView(val);
-                                if (val) {
-                                    localStorage.setItem("disable-graph-view-" + currentUser?.username, "true");
-                                } else {
-                                    localStorage.removeItem("disable-graph-view-" + currentUser?.username);
-                                }
-                            }}
-                            style={{ cursor: "pointer", width: 16, height: 16 }}
-                        />
-                        Disable Graph View (User Study Persona 1)
-                    </label>
-                )}
-                {!isCurriculumSettingsOpen && (
-                    <div style={{ display: "grid", gap: 4 }}>
-                    <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Study Program</label>
-                    <select
-                        value={programCode}
-                        onChange={(e) => setProgramCode?.(e.target.value)}
-                        disabled={isProgramLocked}
-                        style={{
-                            border: "1px solid #d1d5db",
-                            background: isProgramLocked ? "#f3f4f6" : "#ffffff",
-                            color: isProgramLocked ? "#6b7280" : "#111827",
-                            borderRadius: 8,
-                            padding: "8px 10px",
-                            fontWeight: 600,
-                            width: "100%",
-                            boxSizing: "border-box",
-                            cursor: isProgramLocked ? "not-allowed" : "default",
-                        }}
-                    >
-                        {(PROGRAM_OPTIONS || []).map((opt) => (
-                            <option key={opt.code} value={opt.code}>
-                                {opt.label} ({opt.code})
-                            </option>
-                        ))}
-                    </select>
-                    {isProgramLocked && (
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>
-                            Study program is locked after signup setup.
-                        </div>
-                    )}
-                    </div>
-                )}
-                {!isCurriculumSettingsOpen && programCode === BACHELOR_PROGRAM_CODE && (
-                    <div style={{ display: "grid", gap: 4 }}>
-                        <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Focus Area</label>
-                        <select
-                            value={profileDraftFocus || ""}
-                            onChange={(e) => setProfileDraftFocus(e.target.value)}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: "#ffffff",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                boxSizing: "border-box",
-                            }}
-                        >
-                            <option value="">Select focus area</option>
-                            {(BACHELOR_FOCUS_OPTIONS || []).map((focus) => (
-                                <option key={focus} value={focus}>
-                                    {focus}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-                {!isCurriculumSettingsOpen && (
-                    <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                    <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Start Semester</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8 }}>
-                        <select
-                            value={profileDraftStartSeason}
-                            onChange={(e) => setProfileDraftStartSeason(normalizeStartSeason(e.target.value))}
-                            disabled={isSavingProfileSettings || isStartTermLocked}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: (isSavingProfileSettings || isStartTermLocked) ? "#f3f4f6" : "#ffffff",
-                                color: (isSavingProfileSettings || isStartTermLocked) ? "#6b7280" : "#111827",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                boxSizing: "border-box",
-                                cursor: (isSavingProfileSettings || isStartTermLocked) ? "not-allowed" : "default",
-                            }}
-                        >
-                            <option value={TERM_WINTER}>Winter</option>
-                            <option value={TERM_SUMMER}>Summer</option>
-                        </select>
-                        <input
-                            type="number"
-                            min={1900}
-                            max={2600}
-                            value={profileDraftStartYear ?? ""}
-                            onChange={(e) => setProfileDraftStartYear(e.target.value)}
-                            disabled={isSavingProfileSettings || isStartTermLocked}
-                            style={{
-                                border: "1px solid #d1d5db",
-                                background: (isSavingProfileSettings || isStartTermLocked) ? "#f3f4f6" : "#ffffff",
-                                color: (isSavingProfileSettings || isStartTermLocked) ? "#6b7280" : "#111827",
-                                borderRadius: 8,
-                                padding: "8px 10px",
-                                fontWeight: 600,
-                                width: "100%",
-                                boxSizing: "border-box",
-                                cursor: (isSavingProfileSettings || isStartTermLocked) ? "not-allowed" : "default",
-                            }}
-                        />
-                        <div style={{ alignSelf: "center", fontSize: 12, color: "#6b7280", whiteSpace: "nowrap" }}>
-                            S1: {laneSeason(profileDraftStartSeason, 0)}
-                        </div>
-                    </div>
-                    {isStartTermLocked && (
-                        <div style={{ fontSize: 11, color: "#6b7280" }}>
-                            Start semester is locked after initial setup.
-                        </div>
-                    )}
-                    </div>
-                )}
-                {!isCurriculumSettingsOpen && (
-                    <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Recommendation Preferences</div>
-                        <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "#374151" }}>Interests (comma separated)</label>
-                            <input
-                                type="text"
-                                value={profileDraftInterests}
-                                placeholder="e.g. machine learning, react, robotics"
-                                onChange={(e) => setProfileDraftInterests(e.target.value)}
-                                disabled={isSavingProfileSettings}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: isSavingProfileSettings ? "#f3f4f6" : "#ffffff",
-                                    color: isSavingProfileSettings ? "#6b7280" : "#111827",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontSize: 12,
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "#374151" }}>Career Direction / Internship Target</label>
-                            <input
-                                type="text"
-                                value={profileDraftCareer}
-                                placeholder="e.g. Data Scientist, Security Analyst"
-                                onChange={(e) => setProfileDraftCareer(e.target.value)}
-                                disabled={isSavingProfileSettings}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: isSavingProfileSettings ? "#f3f4f6" : "#ffffff",
-                                    color: isSavingProfileSettings ? "#6b7280" : "#111827",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontSize: 12,
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
-                <div style={{ display: "grid", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                    {isCurriculumSettingsOpen && (
-                        <>
-                            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Course Semester Availability</div>
-                            <input
-                                type="text"
-                                placeholder="Search by code/title..."
-                                value={profileSearch}
-                                onChange={(e) => setProfileSearch(e.target.value)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontSize: 12,
-                                }}
-                            />
-                            <div style={{ maxHeight: 220, overflow: "auto", border: "1px solid #e5e7eb", borderRadius: 8 }}>
-                                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                                    <thead>
-                                        <tr style={{ background: "#f9fafb" }}>
-                                            <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Title</th>
-                                            <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Type</th>
-                                            <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #e5e7eb" }}>Term</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredCatalogCourseRows.map((row) => (
-                                            <tr key={`profile-course-${row.code}`}>
-                                                <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
-                                                    <div style={{ color: "#6b7280" }}>{row.title}</div>
-                                                </td>
-                                                <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6", color: "#6b7280", whiteSpace: "nowrap" }}>
-                                                    {row.type || "-"}
-                                                </td>
-                                                <td style={{ padding: "6px 8px", borderBottom: "1px solid #f3f4f6" }}>
-                                                    <select
-                                                        value={pendingTermForCode(row.code)}
-                                                        onChange={(e) => setPendingTermForCode(row.code, e.target.value)}
-                                                        style={{
-                                                            border: "1px solid #d1d5db",
-                                                            borderRadius: 6,
-                                                            padding: "4px 6px",
-                                                            background: "#ffffff",
-                                                        }}
-                                                    >
-                                                        <option value={TERM_BOTH}>Both</option>
-                                                        <option value={TERM_WINTER}>Winter</option>
-                                                        <option value={TERM_SUMMER}>Summer</option>
-                                                    </select>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {filteredCatalogCourseRows.length === 0 && (
-                                            <tr>
-                                                <td colSpan={3} style={{ padding: "8px", color: "#6b7280" }}>No courses found.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </>
-                    )}
-                </div>
-                {!isCurriculumSettingsOpen && (
-                    <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                        <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Max ECTS / semester</label>
-                            <input
-                                type="number"
-                                min={1}
-                                step={0.5}
-                                value={profileDraftMaxEcts ?? ""}
-                                onChange={(e) => setProfileDraftMaxEcts(e.target.value)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontWeight: 600,
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Max Week-Hours / semester</label>
-                            <input
-                                type="number"
-                                min={1}
-                                step={0.5}
-                                value={profileDraftMaxWeekHours ?? ""}
-                                onChange={(e) => setProfileDraftMaxWeekHours(e.target.value)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontWeight: 600,
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Recommended ECTS</label>
-                            <input
-                                type="number"
-                                min={1}
-                                step={0.5}
-                                value={profileDraftRecommendedEcts ?? ""}
-                                onChange={(e) => setProfileDraftRecommendedEcts(e.target.value)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontWeight: 600,
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                        <div style={{ display: "grid", gap: 4 }}>
-                            <label style={{ fontSize: 11, color: "#6b7280", fontWeight: 700 }}>Recommended Week-Hours</label>
-                            <input
-                                type="number"
-                                min={1}
-                                step={0.5}
-                                value={profileDraftRecommendedWeekHours ?? ""}
-                                onChange={(e) => setProfileDraftRecommendedWeekHours(e.target.value)}
-                                style={{
-                                    border: "1px solid #d1d5db",
-                                    background: "#ffffff",
-                                    borderRadius: 8,
-                                    padding: "8px 10px",
-                                    fontWeight: 600,
-                                    width: "100%",
-                                    boxSizing: "border-box",
-                                }}
-                            />
-                        </div>
-                    </div>
-                    </div>
-                )}
-                <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e5e7eb", paddingTop: 8 }}>
-                    <button
-                        onClick={saveProfileChanges}
-                        disabled={isSavingProfileSettings}
-                        style={{
-                            border: "1px solid #15803d",
-                            background: isSavingProfileSettings ? "#86efac" : "#16a34a",
-                            color: "#ffffff",
-                            borderRadius: 8,
-                            padding: "8px 12px",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            cursor: "pointer",
-                        }}
-                    >
-                        {isSavingProfileSettings ? "Saving..." : "Save"}
-                    </button>
-                </div>
-            </div>
-        </div>
-    ) : null;
+            programCode={programCode}
+            onProgramCodeChange={(code) => setProgramCode?.(code)}
+            isProgramLocked={isProgramLocked}
+            focus={profileDraftFocus}
+            onFocusChange={setProfileDraftFocus}
+            startSeason={profileDraftStartSeason}
+            onStartSeasonChange={setProfileDraftStartSeason}
+            startYear={profileDraftStartYear}
+            onStartYearChange={setProfileDraftStartYear}
+            isStartTermLocked={isStartTermLocked}
+            interests={profileDraftInterests}
+            onInterestsChange={setProfileDraftInterests}
+            career={profileDraftCareer}
+            onCareerChange={setProfileDraftCareer}
+            search={profileSearch}
+            onSearchChange={setProfileSearch}
+            courseRows={filteredCatalogCourseRows}
+            termForCode={pendingTermForCode}
+            onTermChange={setPendingTermForCode}
+            maxEcts={profileDraftMaxEcts}
+            onMaxEctsChange={setProfileDraftMaxEcts}
+            maxWeekHours={profileDraftMaxWeekHours}
+            onMaxWeekHoursChange={setProfileDraftMaxWeekHours}
+            recommendedEcts={profileDraftRecommendedEcts}
+            onRecommendedEctsChange={setProfileDraftRecommendedEcts}
+            recommendedWeekHours={profileDraftRecommendedWeekHours}
+            onRecommendedWeekHoursChange={setProfileDraftRecommendedWeekHours}
+            isSaving={isSavingProfileSettings}
+            onSave={saveProfileChanges}
+        />
+    );
 
     const ruleDashboardAside = isRuleDashboardOpen && (
         <aside
