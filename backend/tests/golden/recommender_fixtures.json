@@ -5483,127 +5483,6 @@
     "title": "Type Systems",
     "type": "VU"
    }
-  ],
-  "mock-graph": [
-   {
-    "category": "elective",
-    "code": "183.131",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "0f29e05c-7271-5a08-82c2-50381f704f7e"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 183.131",
-    "type": "VU"
-   },
-   {
-    "category": "elective",
-    "code": "184.735",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "c01dd203-9d53-5c5e-8a11-d23fd8d888b7"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 184.735",
-    "type": "VU"
-   },
-   {
-    "category": "elective",
-    "code": "184.739",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "fcc02503-eadb-52be-af5a-3aef5a804a48"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 184.739",
-    "type": "VU"
-   },
-   {
-    "category": "elective",
-    "code": "188.923",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "48f17c7c-3c14-553c-99fb-359d4baf3d2f"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 188.923",
-    "type": "VU"
-   },
-   {
-    "category": "elective",
-    "code": "188.995",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "de6f70b8-3169-5b8d-a170-5d25448f322d"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 188.995",
-    "type": "VU"
-   },
-   {
-    "category": "elective",
-    "code": "193.052",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "99328c60-a8f8-5dff-8121-06708a01e310"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 193.052",
-    "type": "VU"
-   },
-   {
-    "category": "elective",
-    "code": "193.111",
-    "content": null,
-    "ects": {
-     "__decimal__": "3.0"
-    },
-    "exam_subject": null,
-    "id": {
-     "__uuid__": "949289fd-61a8-5bdb-85ba-01e0e8203343"
-    },
-    "language": "en",
-    "similar_courses": null,
-    "term_availability": "winter",
-    "title": "Graph Course 193.111",
-    "type": "VU"
-   }
   ]
  },
  "scenarios": {
@@ -5778,6 +5657,323 @@
     "similarity": true
    }
   },
+  "bachelor-completed-co-occurrence": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "mandatory",
+     "code": "ADMUE",
+     "ects": {
+      "__decimal__": "5.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 4,
+     "title": "Algebra und Diskrete Mathematik (UE)"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMVU",
+     "ects": {
+      "__decimal__": "9.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 5,
+     "title": "Algebra und Diskrete Mathematik (VU)"
+    },
+    {
+     "category": "elective",
+     "code": "AM",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Computersysteme",
+     "laneIndex": 6,
+     "title": "Abstrakte Maschinen"
+    },
+    {
+     "category": "mandatory",
+     "code": "ANL",
+     "ects": {
+      "__decimal__": "2.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 7,
+     "title": "Analysis (VO)"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": true,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": false,
+    "similarity": false
+   }
+  },
+  "bachelor-curriculum-order-every-channel": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 1,
+     "title": "Einführung in die Programmierung 1"
+    },
+    {
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
+     "laneIndex": 1,
+     "title": "Software Engineering"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMUE",
+     "ects": {
+      "__decimal__": "5.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 4,
+     "title": "Algebra und Diskrete Mathematik (UE)"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMVU",
+     "ects": {
+      "__decimal__": "9.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 5,
+     "title": "Algebra und Diskrete Mathematik (VU)"
+    },
+    {
+     "category": "elective",
+     "code": "AM",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Computersysteme",
+     "laneIndex": 6,
+     "title": "Abstrakte Maschinen"
+    },
+    {
+     "category": "mandatory",
+     "code": "ANL",
+     "ects": {
+      "__decimal__": "2.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 7,
+     "title": "Analysis (VO)"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "elective",
+     "code": "ACC",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Human-Centered Computing",
+     "laneIndex": 0,
+     "title": "Access Computing"
+    },
+    {
+     "category": "mandatory",
+     "code": "AD",
+     "ects": {
+      "__decimal__": "8.0"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 1,
+     "title": "Algorithmen und Datenstrukturen"
+    },
+    {
+     "category": "elective",
+     "code": "ADCS",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Security",
+     "laneIndex": 2,
+     "title": "Attacks and Defenses in Computer Security"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADM",
+     "ects": {
+      "__decimal__": "4.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 3,
+     "title": "Algebra und Diskrete Mathematik (VO)"
+    }
+   ],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": true,
+    "interest": true,
+    "internship": true,
+    "peer": true,
+    "sequence": true,
+    "similarity": true
+   }
+  },
+  "bachelor-curriculum-order-every-channel-no-rule-checker": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 1,
+     "title": "Einführung in die Programmierung 1"
+    },
+    {
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
+     "laneIndex": 1,
+     "title": "Software Engineering"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMUE",
+     "ects": {
+      "__decimal__": "5.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 4,
+     "title": "Algebra und Diskrete Mathematik (UE)"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMVU",
+     "ects": {
+      "__decimal__": "9.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 5,
+     "title": "Algebra und Diskrete Mathematik (VU)"
+    },
+    {
+     "category": "elective",
+     "code": "AM",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Computersysteme",
+     "laneIndex": 6,
+     "title": "Abstrakte Maschinen"
+    },
+    {
+     "category": "mandatory",
+     "code": "ANL",
+     "ects": {
+      "__decimal__": "2.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 7,
+     "title": "Analysis (VO)"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "elective",
+     "code": "ACC",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Human-Centered Computing",
+     "laneIndex": 0,
+     "title": "Access Computing"
+    },
+    {
+     "category": "mandatory",
+     "code": "AD",
+     "ects": {
+      "__decimal__": "8.0"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 1,
+     "title": "Algorithmen und Datenstrukturen"
+    },
+    {
+     "category": "elective",
+     "code": "ADCS",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Security",
+     "laneIndex": 2,
+     "title": "Attacks and Defenses in Computer Security"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADM",
+     "ects": {
+      "__decimal__": "4.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 3,
+     "title": "Algebra und Diskrete Mathematik (VO)"
+    }
+   ],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": false,
+   "toggles": {
+    "completed": true,
+    "interest": true,
+    "internship": true,
+    "peer": true,
+    "sequence": true,
+    "similarity": true
+   }
+  },
   "bachelor-done-and-planned": {
    "careerDirection": "data science engineer",
    "doneCourses": [
@@ -5906,244 +6102,6 @@
     "peer": true,
     "sequence": true,
     "similarity": true
-   }
-  },
-  "bachelor-graph-built-in-tags": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [],
-   "interests": [
-    "cryptography",
-    "neural networks",
-    "frontend"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": false,
-    "interest": true,
-    "internship": false,
-    "peer": false,
-    "sequence": false,
-    "similarity": false
-   }
-  },
-  "bachelor-graph-co-occurrence": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "188.995",
-     "laneIndex": 0,
-     "title": "Graph Course 188.995"
-    },
-    {
-     "code": "193.052",
-     "laneIndex": 1,
-     "title": "Graph Course 193.052"
-    }
-   ],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": true,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": false,
-    "similarity": false
-   }
-  },
-  "bachelor-graph-every-channel": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "188.995",
-     "laneIndex": 1,
-     "title": "Graph Course 188.995"
-    }
-   ],
-   "interests": [
-    "cryptography",
-    "neural networks",
-    "frontend"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [
-    {
-     "code": "193.111",
-     "laneIndex": 0,
-     "title": "Graph Course 193.111"
-    }
-   ],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": true,
-    "interest": true,
-    "internship": true,
-    "peer": true,
-    "sequence": true,
-    "similarity": true
-   }
-  },
-  "bachelor-graph-every-channel-no-rule-checker": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "188.995",
-     "laneIndex": 1,
-     "title": "Graph Course 188.995"
-    }
-   ],
-   "interests": [
-    "cryptography",
-    "neural networks",
-    "frontend"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [
-    {
-     "code": "193.111",
-     "laneIndex": 0,
-     "title": "Graph Course 193.111"
-    }
-   ],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": false,
-   "toggles": {
-    "completed": true,
-    "interest": true,
-    "internship": true,
-    "peer": true,
-    "sequence": true,
-    "similarity": true
-   }
-  },
-  "bachelor-graph-prerequisite-of-planned": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [
-    {
-     "code": "193.111",
-     "laneIndex": 0,
-     "title": "Graph Course 193.111"
-    },
-    {
-     "code": "184.739",
-     "laneIndex": 1,
-     "title": "Graph Course 184.739"
-    }
-   ],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": false,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": true,
-    "similarity": false
-   }
-  },
-  "bachelor-graph-sequence-outranks-co-occurrence": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "193.052",
-     "laneIndex": 0,
-     "title": "Graph Course 193.052"
-    }
-   ],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": true,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": true,
-    "similarity": false
-   }
-  },
-  "bachelor-graph-successor-of-done": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "193.052",
-     "laneIndex": 0,
-     "title": "Graph Course 193.052"
-    },
-    {
-     "code": "184.735",
-     "laneIndex": 1,
-     "title": "Graph Course 184.735"
-    }
-   ],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "033 521",
-    "mock-graph"
-   ],
-   "programCode": "033 521",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": false,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": true,
-    "similarity": false
    }
   },
   "bachelor-large-plan": {
@@ -7208,14 +7166,24 @@
      "title": "Analysis (VO)"
     },
     {
-     "code": "193.052",
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Einführung in die Programmierung 1"
     },
     {
-     "code": "188.995",
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Software Engineering"
     }
    ],
    "interests": [
@@ -7264,16 +7232,10 @@
      "examSubject": "Strukturwissenschaften",
      "laneIndex": 3,
      "title": "Algebra und Diskrete Mathematik (VO)"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "033 521",
-    "mock-graph"
+    "033 521"
    ],
    "programCode": "033 521",
    "ruleChecker": true,
@@ -7330,14 +7292,24 @@
      "title": "Analysis (VO)"
     },
     {
-     "code": "193.052",
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Einführung in die Programmierung 1"
     },
     {
-     "code": "188.995",
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Software Engineering"
     }
    ],
    "interests": [
@@ -7386,16 +7358,10 @@
      "examSubject": "Strukturwissenschaften",
      "laneIndex": 3,
      "title": "Algebra und Diskrete Mathematik (VO)"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "033 521",
-    "mock-graph"
+    "033 521"
    ],
    "programCode": "033 521",
    "ruleChecker": true,
@@ -7452,14 +7418,24 @@
      "title": "Analysis (VO)"
     },
     {
-     "code": "193.052",
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Einführung in die Programmierung 1"
     },
     {
-     "code": "188.995",
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Software Engineering"
     }
    ],
    "interests": [
@@ -7508,16 +7484,10 @@
      "examSubject": "Strukturwissenschaften",
      "laneIndex": 3,
      "title": "Algebra und Diskrete Mathematik (VO)"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "033 521",
-    "mock-graph"
+    "033 521"
    ],
    "programCode": "033 521",
    "ruleChecker": true,
@@ -7574,14 +7544,24 @@
      "title": "Analysis (VO)"
     },
     {
-     "code": "193.052",
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Einführung in die Programmierung 1"
     },
     {
-     "code": "188.995",
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Software Engineering"
     }
    ],
    "interests": [
@@ -7630,16 +7610,10 @@
      "examSubject": "Strukturwissenschaften",
      "laneIndex": 3,
      "title": "Algebra und Diskrete Mathematik (VO)"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "033 521",
-    "mock-graph"
+    "033 521"
    ],
    "programCode": "033 521",
    "ruleChecker": true,
@@ -7696,14 +7670,24 @@
      "title": "Analysis (VO)"
     },
     {
-     "code": "193.052",
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Einführung in die Programmierung 1"
     },
     {
-     "code": "188.995",
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Software Engineering"
     }
    ],
    "interests": [
@@ -7752,16 +7736,10 @@
      "examSubject": "Strukturwissenschaften",
      "laneIndex": 3,
      "title": "Algebra und Diskrete Mathematik (VO)"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "033 521",
-    "mock-graph"
+    "033 521"
    ],
    "programCode": "033 521",
    "ruleChecker": true,
@@ -7818,14 +7796,24 @@
      "title": "Analysis (VO)"
     },
     {
-     "code": "193.052",
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Einführung in die Programmierung 1"
     },
     {
-     "code": "188.995",
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Software Engineering"
     }
    ],
    "interests": [
@@ -7874,16 +7862,10 @@
      "examSubject": "Strukturwissenschaften",
      "laneIndex": 3,
      "title": "Algebra und Diskrete Mathematik (VO)"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "033 521",
-    "mock-graph"
+    "033 521"
    ],
    "programCode": "033 521",
    "ruleChecker": true,
@@ -9945,6 +9927,226 @@
     "similarity": true
    }
   },
+  "bachelor-sequence-prerequisite-of-planned": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "mandatory",
+     "code": "EIDI2",
+     "ects": {
+      "__decimal__": "4.0"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 0,
+     "title": "Einführung in die Programmierung 2"
+    },
+    {
+     "category": "core",
+     "code": "SEP",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
+     "laneIndex": 1,
+     "title": "Software Engineering Projekt"
+    }
+   ],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": false,
+   "toggles": {
+    "completed": false,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
+  "bachelor-sequence-prerequisite-through-the-rule-filter": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "mandatory",
+     "code": "EIDI2",
+     "ects": {
+      "__decimal__": "4.0"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 0,
+     "title": "Einführung in die Programmierung 2"
+    },
+    {
+     "category": "core",
+     "code": "SEP",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
+     "laneIndex": 1,
+     "title": "Software Engineering Projekt"
+    }
+   ],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": false,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
+  "bachelor-sequence-successor-of-done": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 0,
+     "title": "Einführung in die Programmierung 1"
+    },
+    {
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
+     "laneIndex": 1,
+     "title": "Software Engineering"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": false,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
+  "bachelor-sequence-with-co-occurrence": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "mandatory",
+     "code": "EIDI1",
+     "ects": {
+      "__decimal__": "5.5"
+     },
+     "examSubject": "Algorithmen und Programmierung",
+     "laneIndex": 0,
+     "title": "Einführung in die Programmierung 1"
+    },
+    {
+     "category": "core",
+     "code": "SE",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Software Engineering",
+     "laneIndex": 0,
+     "title": "Software Engineering"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMUE",
+     "ects": {
+      "__decimal__": "5.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 4,
+     "title": "Algebra und Diskrete Mathematik (UE)"
+    },
+    {
+     "category": "mandatory",
+     "code": "ADMVU",
+     "ects": {
+      "__decimal__": "9.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 5,
+     "title": "Algebra und Diskrete Mathematik (VU)"
+    },
+    {
+     "category": "elective",
+     "code": "AM",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Computersysteme",
+     "laneIndex": 6,
+     "title": "Abstrakte Maschinen"
+    },
+    {
+     "category": "mandatory",
+     "code": "ANL",
+     "ects": {
+      "__decimal__": "2.0"
+     },
+     "examSubject": "Strukturwissenschaften",
+     "laneIndex": 7,
+     "title": "Analysis (VO)"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [],
+   "pools": [
+    "033 521"
+   ],
+   "programCode": "033 521",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": true,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
   "bachelor-without-completed": {
    "careerDirection": "data science engineer",
    "doneCourses": [
@@ -10929,6 +11131,323 @@
     "similarity": true
    }
   },
+  "master-completed-co-occurrence": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "elective",
+     "code": "ADSVU",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 4,
+     "title": "Algorithms for Data Science"
+    },
+    {
+     "category": "elective",
+     "code": "AET",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 5,
+     "title": "Algorithmic Encoding Techniques"
+    },
+    {
+     "category": "elective",
+     "code": "AGAI",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 6,
+     "title": "Applied Generative AI and LLM-based Systems"
+    },
+    {
+     "category": "elective",
+     "code": "AGEO",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 7,
+     "title": "Algorithmic Geometry"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": true,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": false,
+    "similarity": false
+   }
+  },
+  "master-curriculum-order-every-channel": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "ADSVU",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 4,
+     "title": "Algorithms for Data Science"
+    },
+    {
+     "category": "elective",
+     "code": "AET",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 5,
+     "title": "Algorithmic Encoding Techniques"
+    },
+    {
+     "category": "elective",
+     "code": "AGAI",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 6,
+     "title": "Applied Generative AI and LLM-based Systems"
+    },
+    {
+     "category": "elective",
+     "code": "AGEO",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 7,
+     "title": "Algorithmic Geometry"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "elective",
+     "code": "ABD",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Distributed and Next Generation Computing",
+     "laneIndex": 0,
+     "title": "Artifact-based Design"
+    },
+    {
+     "category": "elective",
+     "code": "ACR",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Security and Privacy",
+     "laneIndex": 1,
+     "title": "Advanced Cryptography"
+    },
+    {
+     "category": "elective",
+     "code": "ADED",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Verification and Automated Reasoning",
+     "laneIndex": 2,
+     "title": "Automated Deduction"
+    },
+    {
+     "category": "core",
+     "code": "ADS",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Data Management and Intelligent Systems",
+     "laneIndex": 3,
+     "title": "Advanced Database Systems"
+    }
+   ],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": true,
+    "interest": true,
+    "internship": true,
+    "peer": true,
+    "sequence": true,
+    "similarity": true
+   }
+  },
+  "master-curriculum-order-every-channel-no-rule-checker": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "ADSVU",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 4,
+     "title": "Algorithms for Data Science"
+    },
+    {
+     "category": "elective",
+     "code": "AET",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 5,
+     "title": "Algorithmic Encoding Techniques"
+    },
+    {
+     "category": "elective",
+     "code": "AGAI",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 6,
+     "title": "Applied Generative AI and LLM-based Systems"
+    },
+    {
+     "category": "elective",
+     "code": "AGEO",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 7,
+     "title": "Algorithmic Geometry"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "elective",
+     "code": "ABD",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Distributed and Next Generation Computing",
+     "laneIndex": 0,
+     "title": "Artifact-based Design"
+    },
+    {
+     "category": "elective",
+     "code": "ACR",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Security and Privacy",
+     "laneIndex": 1,
+     "title": "Advanced Cryptography"
+    },
+    {
+     "category": "elective",
+     "code": "ADED",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Verification and Automated Reasoning",
+     "laneIndex": 2,
+     "title": "Automated Deduction"
+    },
+    {
+     "category": "core",
+     "code": "ADS",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Data Management and Intelligent Systems",
+     "laneIndex": 3,
+     "title": "Advanced Database Systems"
+    }
+   ],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": false,
+   "toggles": {
+    "completed": true,
+    "interest": true,
+    "internship": true,
+    "peer": true,
+    "sequence": true,
+    "similarity": true
+   }
+  },
   "master-done-and-planned": {
    "careerDirection": "data science engineer",
    "doneCourses": [
@@ -11057,244 +11576,6 @@
     "peer": true,
     "sequence": true,
     "similarity": true
-   }
-  },
-  "master-graph-built-in-tags": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [],
-   "interests": [
-    "cryptography",
-    "neural networks",
-    "frontend"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": false,
-    "interest": true,
-    "internship": false,
-    "peer": false,
-    "sequence": false,
-    "similarity": false
-   }
-  },
-  "master-graph-co-occurrence": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "188.995",
-     "laneIndex": 0,
-     "title": "Graph Course 188.995"
-    },
-    {
-     "code": "193.052",
-     "laneIndex": 1,
-     "title": "Graph Course 193.052"
-    }
-   ],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": true,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": false,
-    "similarity": false
-   }
-  },
-  "master-graph-every-channel": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "188.995",
-     "laneIndex": 1,
-     "title": "Graph Course 188.995"
-    }
-   ],
-   "interests": [
-    "cryptography",
-    "neural networks",
-    "frontend"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [
-    {
-     "code": "193.111",
-     "laneIndex": 0,
-     "title": "Graph Course 193.111"
-    }
-   ],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": true,
-    "interest": true,
-    "internship": true,
-    "peer": true,
-    "sequence": true,
-    "similarity": true
-   }
-  },
-  "master-graph-every-channel-no-rule-checker": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "188.995",
-     "laneIndex": 1,
-     "title": "Graph Course 188.995"
-    }
-   ],
-   "interests": [
-    "cryptography",
-    "neural networks",
-    "frontend"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [
-    {
-     "code": "193.111",
-     "laneIndex": 0,
-     "title": "Graph Course 193.111"
-    }
-   ],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": false,
-   "toggles": {
-    "completed": true,
-    "interest": true,
-    "internship": true,
-    "peer": true,
-    "sequence": true,
-    "similarity": true
-   }
-  },
-  "master-graph-prerequisite-of-planned": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [
-    {
-     "code": "193.111",
-     "laneIndex": 0,
-     "title": "Graph Course 193.111"
-    },
-    {
-     "code": "184.739",
-     "laneIndex": 1,
-     "title": "Graph Course 184.739"
-    }
-   ],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": false,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": true,
-    "similarity": false
-   }
-  },
-  "master-graph-sequence-outranks-co-occurrence": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "193.052",
-     "laneIndex": 0,
-     "title": "Graph Course 193.052"
-    }
-   ],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": true,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": true,
-    "similarity": false
-   }
-  },
-  "master-graph-successor-of-done": {
-   "careerDirection": "data science engineer",
-   "doneCourses": [
-    {
-     "code": "193.052",
-     "laneIndex": 0,
-     "title": "Graph Course 193.052"
-    },
-    {
-     "code": "184.735",
-     "laneIndex": 1,
-     "title": "Graph Course 184.735"
-    }
-   ],
-   "interests": [
-    "machine learning",
-    "web security",
-    "software architecture"
-   ],
-   "parkedCourses": [],
-   "plannedCourses": [],
-   "pools": [
-    "066 937",
-    "mock-graph"
-   ],
-   "programCode": "066 937",
-   "ruleChecker": true,
-   "toggles": {
-    "completed": false,
-    "interest": false,
-    "internship": false,
-    "peer": false,
-    "sequence": true,
-    "similarity": false
    }
   },
   "master-large-plan": {
@@ -12357,14 +12638,24 @@
      "title": "Algorithmic Geometry"
     },
     {
-     "code": "193.052",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Diplomarbeit"
     },
     {
-     "code": "188.995",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Diplomarbeit"
     }
    ],
    "interests": [
@@ -12413,16 +12704,10 @@
      "examSubject": "Data Management and Intelligent Systems",
      "laneIndex": 3,
      "title": "Advanced Database Systems"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "066 937",
-    "mock-graph"
+    "066 937"
    ],
    "programCode": "066 937",
    "ruleChecker": true,
@@ -12479,14 +12764,24 @@
      "title": "Algorithmic Geometry"
     },
     {
-     "code": "193.052",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Diplomarbeit"
     },
     {
-     "code": "188.995",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Diplomarbeit"
     }
    ],
    "interests": [
@@ -12535,16 +12830,10 @@
      "examSubject": "Data Management and Intelligent Systems",
      "laneIndex": 3,
      "title": "Advanced Database Systems"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "066 937",
-    "mock-graph"
+    "066 937"
    ],
    "programCode": "066 937",
    "ruleChecker": true,
@@ -12601,14 +12890,24 @@
      "title": "Algorithmic Geometry"
     },
     {
-     "code": "193.052",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Diplomarbeit"
     },
     {
-     "code": "188.995",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Diplomarbeit"
     }
    ],
    "interests": [
@@ -12657,16 +12956,10 @@
      "examSubject": "Data Management and Intelligent Systems",
      "laneIndex": 3,
      "title": "Advanced Database Systems"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "066 937",
-    "mock-graph"
+    "066 937"
    ],
    "programCode": "066 937",
    "ruleChecker": true,
@@ -12723,14 +13016,24 @@
      "title": "Algorithmic Geometry"
     },
     {
-     "code": "193.052",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Diplomarbeit"
     },
     {
-     "code": "188.995",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Diplomarbeit"
     }
    ],
    "interests": [
@@ -12779,16 +13082,10 @@
      "examSubject": "Data Management and Intelligent Systems",
      "laneIndex": 3,
      "title": "Advanced Database Systems"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "066 937",
-    "mock-graph"
+    "066 937"
    ],
    "programCode": "066 937",
    "ruleChecker": true,
@@ -12845,14 +13142,24 @@
      "title": "Algorithmic Geometry"
     },
     {
-     "code": "193.052",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Diplomarbeit"
     },
     {
-     "code": "188.995",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Diplomarbeit"
     }
    ],
    "interests": [
@@ -12901,16 +13208,10 @@
      "examSubject": "Data Management and Intelligent Systems",
      "laneIndex": 3,
      "title": "Advanced Database Systems"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "066 937",
-    "mock-graph"
+    "066 937"
    ],
    "programCode": "066 937",
    "ruleChecker": true,
@@ -12967,14 +13268,24 @@
      "title": "Algorithmic Geometry"
     },
     {
-     "code": "193.052",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 193.052"
+     "title": "Diplomarbeit"
     },
     {
-     "code": "188.995",
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
      "laneIndex": 5,
-     "title": "Graph Course 188.995"
+     "title": "Diplomarbeit"
     }
    ],
    "interests": [
@@ -13023,16 +13334,10 @@
      "examSubject": "Data Management and Intelligent Systems",
      "laneIndex": 3,
      "title": "Advanced Database Systems"
-    },
-    {
-     "code": "193.111",
-     "laneIndex": 2,
-     "title": "Graph Course 193.111"
     }
    ],
    "pools": [
-    "066 937",
-    "mock-graph"
+    "066 937"
    ],
    "programCode": "066 937",
    "ruleChecker": true,
@@ -15512,6 +15817,226 @@
     "peer": true,
     "sequence": true,
     "similarity": true
+   }
+  },
+  "master-sequence-prerequisite-of-planned": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "elective",
+     "code": "FOE",
+     "ects": {
+      "__decimal__": "1.5"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 0,
+     "title": "Kommissionelle Abschlussprüfung"
+    },
+    {
+     "category": "elective",
+     "code": "SDS",
+     "ects": {
+      "__decimal__": "1.5"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Seminar für Diplomand_innen"
+    }
+   ],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": false,
+   "toggles": {
+    "completed": false,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
+  "master-sequence-prerequisite-through-the-rule-filter": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [
+    {
+     "category": "elective",
+     "code": "FOE",
+     "ects": {
+      "__decimal__": "1.5"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 0,
+     "title": "Kommissionelle Abschlussprüfung"
+    },
+    {
+     "category": "elective",
+     "code": "SDS",
+     "ects": {
+      "__decimal__": "1.5"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Seminar für Diplomand_innen"
+    }
+   ],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": false,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
+  "master-sequence-successor-of-done": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 0,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 1,
+     "title": "Diplomarbeit"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": false,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
+   }
+  },
+  "master-sequence-with-co-occurrence": {
+   "careerDirection": "data science engineer",
+   "doneCourses": [
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 0,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "MTH",
+     "ects": {
+      "__decimal__": "27.0"
+     },
+     "examSubject": "Diplomarbeit",
+     "laneIndex": 0,
+     "title": "Diplomarbeit"
+    },
+    {
+     "category": "elective",
+     "code": "ADSVU",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 4,
+     "title": "Algorithms for Data Science"
+    },
+    {
+     "category": "elective",
+     "code": "AET",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 5,
+     "title": "Algorithmic Encoding Techniques"
+    },
+    {
+     "category": "elective",
+     "code": "AGAI",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Machine Learning",
+     "laneIndex": 6,
+     "title": "Applied Generative AI and LLM-based Systems"
+    },
+    {
+     "category": "elective",
+     "code": "AGEO",
+     "ects": {
+      "__decimal__": "6.0"
+     },
+     "examSubject": "Algorithms and Complexity",
+     "laneIndex": 7,
+     "title": "Algorithmic Geometry"
+    }
+   ],
+   "interests": [
+    "machine learning",
+    "web security",
+    "software architecture"
+   ],
+   "parkedCourses": [],
+   "plannedCourses": [],
+   "pools": [
+    "066 937"
+   ],
+   "programCode": "066 937",
+   "ruleChecker": true,
+   "toggles": {
+    "completed": true,
+    "interest": false,
+    "internship": false,
+    "peer": false,
+    "sequence": true,
+    "similarity": false
    }
   },
   "master-without-completed": {
