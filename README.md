@@ -16,8 +16,9 @@ students in a within-subjects study; the version they used is tagged
 
 ## Running it
 
-You need Node 20 or newer, Python 3.11 or newer, and PostgreSQL 16. Docker is
-optional.
+You need Node 22 or newer, Python 3.11 or newer, and PostgreSQL 16. Docker is
+optional. Node 22 is a floor rather than a preference: jsdom, which the unit
+tests render into, does not run below it.
 
 ```bash
 # a database, migrated and seeded with both curricula
