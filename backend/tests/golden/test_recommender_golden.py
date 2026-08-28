@@ -112,7 +112,7 @@ def test_database_types_survive_the_fixture_file() -> None:
     arithmetic on text. This asserts the tagged form gives the types back.
     """
     for name, pool in POOLS.items():
-        assert pool or name == "mock-graph", f"pool '{name}' is empty"
+        assert pool, f"pool '{name}' is empty"
         for row in pool:
             assert isinstance(row["id"], UUID), f"{name}/{row['code']}: id is {type(row['id'])}"
             assert isinstance(row["ects"], Decimal), f"{name}/{row['code']}: ects is {type(row['ects'])}"
@@ -129,10 +129,10 @@ def test_corpus_is_not_degenerate() -> None:
     """
     A corpus whose scenarios nearly all answer the same thing pins nothing.
 
-    Four of the six channels consult a hard-coded graph keyed by course codes the
-    catalogue no longer contains, so a corpus built from real candidates alone
-    agrees with itself almost everywhere and would pass this file unchanged no
-    matter what the refactor broke.
+    The failure this guards against is real: while two of the six channels read a
+    table of course codes the catalogue does not contain, a corpus built from
+    real candidates agreed with itself almost everywhere and would have passed
+    this file unchanged no matter what the refactor broke.
     """
     distinct = {json.dumps(encode(value), sort_keys=True) for value in SNAPSHOTS.values()}
     assert len(distinct) >= len(SNAPSHOTS) * 0.5, (

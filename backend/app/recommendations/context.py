@@ -17,8 +17,6 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import Any
 
-from .knowledge import COURSE_TAGS
-
 _WORDS = re.compile(r"\b[A-Za-zÄÖÜäöüß]{2,}\b")
 _ANY_WORD = re.compile(r"\b\w+\b")
 
@@ -40,8 +38,6 @@ def course_metadata(row: dict[str, Any]) -> CourseMetadata:
     name = row.get("title") or row.get("name") or code or ""
 
     content = row.get("content") or []
-    if not content and code in COURSE_TAGS:
-        content = list(COURSE_TAGS[code])
 
     phrases = {str(item).lower().strip() for item in content if str(item).strip()}
     content_keywords: set[str] = set()

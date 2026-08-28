@@ -38,10 +38,9 @@ import os
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from uuid import UUID, uuid5, NAMESPACE_URL
+from uuid import UUID
 
 from app.recommendations import Recommender
-from app.recommendations import knowledge
 from app.recommendations.peer import forget_cohorts
 from app.rules import checker_for
 
@@ -52,19 +51,21 @@ SNAPSHOT = HERE / "recommender_snapshots.json"
 BACHELOR = "033 521"
 MASTER = "066 937"
 
-# The knowledge graph the recommender consults is keyed by course codes that no
-# longer exist in the catalogue, so the sequence and completed channels cannot
-# fire against real candidates alone. This pool supplies those codes, which is
-# the only way to record what those two channels do at all.
-MOCK_GRAPH = "mock-graph"
-
 CHANNELS = ("interest", "similarity", "sequence", "completed", "internship", "peer")
 ALL_ON = {name: True for name in CHANNELS}
 ALL_OFF = {name: False for name in CHANNELS}
 
+# The ordering each curriculum states, as the catalogue codes it resolves to:
+# `soft_prereqs` in the bachelor document, `prerequisites` in the master one. The
+# sequence channel has nothing to say about a plan that touches none of these,
+# so the scenarios that exercise it are built from them.
+ORDERED_PAIRS = {
+    BACHELOR: (("EIDI1", "EIDI2"), ("SE", "SEP")),
+    MASTER: (("MTH", "FOE"), ("MTH", "SDS")),
+}
+
 INTERESTS = ["machine learning", "web security", "software architecture"]
 OTHER_INTERESTS = ["databases", "human computer interaction"]
-GRAPH_INTERESTS = ["cryptography", "neural networks", "frontend"]
 CAREER = "data science engineer"
 OTHER_CAREER = "distributed systems architect"
 
@@ -130,41 +131,6 @@ def load_pools() -> dict[str, list[dict[str, Any]]]:
     return asyncio.run(_run())
 
 
-def mock_graph_pool() -> list[dict[str, Any]]:
-    """
-    Candidate rows for the codes the hard-coded knowledge graph refers to.
-
-    `content` is left empty on purpose: that is what makes the recommender fall
-    back to its built-in tag table, a branch no real catalogue row reaches.
-    """
-    codes = set(knowledge.COURSE_TAGS)
-    for mapping in (knowledge.SEQUENCES,
-                    knowledge.DEPENDENCIES):
-        codes.update(mapping)
-        for successors in mapping.values():
-            codes.update(successors)
-    for source, targets in knowledge.CO_OCCURRENCES.items():
-        codes.add(source)
-        codes.update(targets)
-
-    return [
-        {
-            "id": uuid5(NAMESPACE_URL, f"mock-graph/{code}"),
-            "code": code,
-            "title": f"Graph Course {code}",
-            "type": "VU",
-            "ects": Decimal("3.0"),
-            "language": "en",
-            "term_availability": "winter",
-            "content": None,
-            "similar_courses": None,
-            "category": "elective",
-            "exam_subject": None,
-        }
-        for code in sorted(codes)
-    ]
-
-
 def planned(pool: list[dict[str, Any]], start: int, stop: int, lane: int = 0) -> list[dict[str, Any]]:
     """Shape catalogue rows the way the frontend sends a plan."""
     return [
@@ -178,6 +144,19 @@ def planned(pool: list[dict[str, Any]], start: int, stop: int, lane: int = 0) ->
         }
         for index, row in enumerate(pool[start:stop])
     ]
+
+
+def course(pool: list[dict[str, Any]], code: str, lane: int = 0) -> dict[str, Any]:
+    """One named catalogue row, shaped the same way."""
+    row = next(row for row in pool if row["code"] == code)
+    return {
+        "code": code,
+        "title": row["title"],
+        "ects": row["ects"],
+        "category": row["category"],
+        "examSubject": row["exam_subject"],
+        "laneIndex": lane,
+    }
 
 
 def scenario(**over: Any) -> dict[str, Any]:
@@ -225,25 +204,24 @@ def build(pools: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
             **here, ruleChecker=False
         )
 
+        earlier = [pair[0] for pair in ORDERED_PAIRS[code]]
+        later = [pair[1] for pair in ORDERED_PAIRS[code]]
+
         # --- one channel at a time, then one channel missing at a time.
-        # The isolated cases carry the knowledge-graph pool and a plan that
-        # reaches into it, because two of the six channels consult nothing else
-        # and would otherwise be recorded answering an empty list.
-        graph_plan = plan + [{"code": "193.111", "title": "Graph Course 193.111", "laneIndex": 2}]
-        graph_done = done + [
-            {"code": "193.052", "title": "Graph Course 193.052", "laneIndex": 5},
-            {"code": "188.995", "title": "Graph Course 188.995", "laneIndex": 5},
-        ]
+        # The isolated cases finish the courses the curriculum puts first, so
+        # that the sequence channel has something to answer about; without it it
+        # would be recorded answering an empty list.
+        ordered_done = done + [course(pool, c, 5) for c in earlier]
+
         cases[f"{tag}-all-toggles-off"] = scenario(
             **here, toggles=dict(ALL_OFF), plannedCourses=plan, doneCourses=done
         )
         for channel in CHANNELS:
             cases[f"{tag}-only-{channel}"] = scenario(
-                programCode=code,
-                pools=[code, MOCK_GRAPH],
+                **here,
                 toggles={**ALL_OFF, channel: True},
-                plannedCourses=graph_plan,
-                doneCourses=graph_done,
+                plannedCourses=plan,
+                doneCourses=ordered_done,
             )
             cases[f"{tag}-without-{channel}"] = scenario(
                 **here,
@@ -305,50 +283,49 @@ def build(pools: dict[str, list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
             **here, plannedCourses=planned(pool, 0, len(pool))
         )
 
-        # --- the knowledge graph, which real catalogue codes never reach.
-        # The sequence and completed channels are recorded with the earlier
-        # channels switched off: a candidate is only ever recommended once, so
-        # with everything on the interest channel claims these courses first and
-        # the two channels under test leave no trace.
-        both = dict(programCode=code, pools=[code, MOCK_GRAPH])
-
-        def graph_course(graph_code: str, lane: int = 0) -> dict[str, Any]:
-            return {"code": graph_code, "title": f"Graph Course {graph_code}", "laneIndex": lane}
-
-        cases[f"{tag}-graph-prerequisite-of-planned"] = scenario(
-            **both,
+        # --- the two channels that read a relation rather than a course.
+        # Both are recorded with the earlier channels switched off: a candidate
+        # is only ever recommended once, so with everything on the interest
+        # channel claims these courses first and the channel under test leaves
+        # no trace.
+        cases[f"{tag}-sequence-prerequisite-of-planned"] = scenario(
+            **here,
             toggles={**ALL_OFF, "sequence": True},
-            plannedCourses=[graph_course("193.111"), graph_course("184.739", 1)],
+            plannedCourses=[course(pool, c, index) for index, c in enumerate(later)],
+            # The rule filter offers a candidate a semester past every one the
+            # student uses, so a course put forward because a planned course
+            # needs it first is judged as arriving after it. The scenario below
+            # records what the filter then does with that; with the checker off,
+            # this one records what the channel itself answered.
+            ruleChecker=False,
         )
-        cases[f"{tag}-graph-successor-of-done"] = scenario(
-            **both,
+        cases[f"{tag}-sequence-prerequisite-through-the-rule-filter"] = scenario(
+            **here,
             toggles={**ALL_OFF, "sequence": True},
-            doneCourses=[graph_course("193.052"), graph_course("184.735", 1)],
+            plannedCourses=[course(pool, c, index) for index, c in enumerate(later)],
         )
-        cases[f"{tag}-graph-co-occurrence"] = scenario(
-            **both,
-            toggles={**ALL_OFF, "completed": True},
-            doneCourses=[graph_course("188.995"), graph_course("193.052", 1)],
+        cases[f"{tag}-sequence-successor-of-done"] = scenario(
+            **here,
+            toggles={**ALL_OFF, "sequence": True},
+            doneCourses=[course(pool, c, index) for index, c in enumerate(earlier)],
         )
-        cases[f"{tag}-graph-sequence-outranks-co-occurrence"] = scenario(
-            **both,
+        cases[f"{tag}-completed-co-occurrence"] = scenario(
+            **here, toggles={**ALL_OFF, "completed": True}, doneCourses=done
+        )
+        cases[f"{tag}-sequence-with-co-occurrence"] = scenario(
+            **here,
             toggles={**ALL_OFF, "sequence": True, "completed": True},
-            doneCourses=[graph_course("193.052")],
+            doneCourses=[course(pool, c) for c in earlier] + done,
         )
-        cases[f"{tag}-graph-built-in-tags"] = scenario(
-            **both, toggles={**ALL_OFF, "interest": True}, interests=list(GRAPH_INTERESTS)
+        cases[f"{tag}-curriculum-order-every-channel"] = scenario(
+            **here,
+            plannedCourses=plan,
+            doneCourses=[course(pool, c, 1) for c in earlier] + done,
         )
-        cases[f"{tag}-graph-every-channel"] = scenario(
-            **both,
-            interests=list(GRAPH_INTERESTS),
-            plannedCourses=[graph_course("193.111")],
-            doneCourses=[graph_course("188.995", 1)],
-        )
-        cases[f"{tag}-graph-every-channel-no-rule-checker"] = scenario(
-            **both,
-            interests=list(GRAPH_INTERESTS),
-            plannedCourses=[graph_course("193.111")],
-            doneCourses=[graph_course("188.995", 1)],
+        cases[f"{tag}-curriculum-order-every-channel-no-rule-checker"] = scenario(
+            **here,
+            plannedCourses=plan,
+            doneCourses=[course(pool, c, 1) for c in earlier] + done,
             ruleChecker=False,
         )
 
@@ -407,7 +384,6 @@ def run(case: dict[str, Any], pools: dict[str, list[dict[str, Any]]]) -> Any:
 
 def main() -> None:
     pools = load_pools()
-    pools[MOCK_GRAPH] = mock_graph_pool()
     cases = build(pools)
 
     snapshots = {name: run(case, pools) for name, case in cases.items()}
@@ -428,9 +404,9 @@ def main() -> None:
     empty = sum(1 for value in snapshots.values() if value == [])
     distinct = len({json.dumps(encode(value), sort_keys=True) for value in snapshots.values()})
     # A corpus whose scenarios nearly all answer the same thing pins nothing. The
-    # failure this guards against is real: with the candidate pool alone, four of
-    # the six channels never fire, and a first draft agreed with itself almost
-    # everywhere because only the interest channel was doing any work.
+    # failure this guards against is real: an earlier draft agreed with itself
+    # almost everywhere, because two channels read a table of course codes the
+    # catalogue does not contain and only the interest channel was doing work.
     if distinct < len(snapshots) * 0.5:
         raise SystemExit(
             f"corpus is degenerate: only {distinct} distinct answers across "
