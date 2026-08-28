@@ -122,8 +122,6 @@ export interface UseProfileFormResult {
     profileDraftCareer: string;
     setProfileDraftCareer: Dispatch<SetStateAction<string>>;
     isSavingProfileSettings: boolean;
-    saveStartTermSetting: (season: unknown, year: unknown) => Promise<void>;
-    savePendingCourseTerms: () => Promise<void>;
     saveProfileChanges: () => Promise<void>;
 }
 
@@ -275,40 +273,6 @@ export function useProfileForm({
         }));
     }, []);
 
-    const saveStartTermSetting = useCallback(async (season: unknown, year: unknown) => {
-        if (isStartTermLocked) return;
-        const normalizedSeason = normalizeStartSeason(season);
-        const normalizedYear = Number(year) || new Date().getFullYear();
-        setIsSavingProfileSettings(true);
-        try {
-            await saveStartTerm({
-                programCode,
-                season: normalizedSeason,
-                year: normalizedYear,
-            });
-            setProfileSettingsByProgram((prev) => ({
-                ...(prev || {}),
-                [programCode]: {
-                    ...(prev?.[programCode] || {}),
-                    startTerm: { season: normalizedSeason, year: normalizedYear },
-                    startTermLocked: true,
-                    courseTermOverrides: prev?.[programCode]?.courseTermOverrides || {},
-                },
-            }));
-        } catch (error) {
-            console.error("Failed to save start term", error);
-            setStickyViolation({
-                message: String((error as Error)?.message || "").includes("409")
-                    ? "Start semester is locked and cannot be changed anymore."
-                    : "Could not save start term settings.",
-                until: Date.now() + 4000,
-                tone: "error",
-            });
-        } finally {
-            setIsSavingProfileSettings(false);
-        }
-    }, [isStartTermLocked, programCode]);
-
     const saveSignupSetup = useCallback(async () => {
         const selectedProgramCode = String(signupSetupProgramCode || "").trim();
         if (!selectedProgramCode) return;
@@ -380,47 +344,6 @@ export function useProfileForm({
         setSignupSetupStartYear(new Date().getFullYear());
         setSignupSetupFocus("");
     }, []);
-
-    const savePendingCourseTerms = useCallback(async () => {
-        const updates = Object.entries(pendingCourseTermUpdateByCode || {})
-            .map(([courseCode, termAvailability]) => ({
-                courseCode,
-                termAvailability: normalizeTermAvailability(termAvailability),
-            }))
-            .filter((item) => Boolean(item.courseCode));
-        if (!updates.length) return;
-        setIsSavingProfileSettings(true);
-        try {
-            await saveCourseTerms({
-                programCode,
-                updates,
-            });
-            setProfileSettingsByProgram((prev) => {
-                const current = prev?.[programCode] || {};
-                const nextOverrides = { ...(current?.courseTermOverrides || {}) };
-                for (const update of updates) {
-                    nextOverrides[update.courseCode] = update.termAvailability;
-                }
-                return {
-                    ...(prev || {}),
-                    [programCode]: {
-                        ...current,
-                        courseTermOverrides: nextOverrides,
-                    },
-                };
-            });
-            setPendingCourseTermUpdateByCode({});
-        } catch (error) {
-            console.error("Failed to save course term settings", error);
-            setStickyViolation({
-                message: "Could not save course term settings.",
-                until: Date.now() + 4000,
-                tone: "error",
-            });
-        } finally {
-            setIsSavingProfileSettings(false);
-        }
-    }, [pendingCourseTermUpdateByCode, programCode]);
 
     const saveProfileChanges = useCallback(async () => {
         if (isSavingProfileSettings) return;
@@ -599,8 +522,6 @@ export function useProfileForm({
         profileDraftCareer,
         setProfileDraftCareer,
         isSavingProfileSettings,
-        saveStartTermSetting,
-        savePendingCourseTerms,
         saveProfileChanges,
     };
 }

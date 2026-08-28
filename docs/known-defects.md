@@ -200,7 +200,7 @@ is fetched again. `frontend/src/features/recommendations/`.
   which is the same information in a second place. Found while moving the phase
   tags into the document; left alone because the entry is curriculum data that
   should be read rather than dead code that should go.
-- Two profile save functions are called from nowhere.
+- Two profile save functions are called from nowhere. Removed.
 - `rightPanelTab` is declared, never read, never persisted. Removed.
 - The onboarding tour writes an unsuffixed `localStorage` key that nothing reads.
   Removed; the tour now writes the per-student key or nothing at all.
