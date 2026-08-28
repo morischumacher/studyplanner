@@ -101,6 +101,21 @@ export interface BachelorPlannedCourse extends PlannedCourse {
 }
 
 /**
+ * What a course card carries about the module it belongs to. Only the id is
+ * certain: a card whose module panel has been collapsed away keeps the id and
+ * loses the rest.
+ */
+export interface CourseModuleMeta {
+    id: string;
+    title?: string | undefined;
+    examSubject?: string | null | undefined;
+    category?: string | undefined;
+    subjectColor?: string | null | undefined;
+    code?: string | null | undefined;
+    ects?: number | null | undefined;
+}
+
+/**
  * What the planner stores on a canvas node. A node is a course card, the panel
  * behind a module group, or a lane background, and the three kinds read
  * disjoint fields, which is why every field is optional.
@@ -110,10 +125,19 @@ export interface PlanNodeData {
     status?: string | undefined;
     code?: string | undefined;
     name?: string | undefined;
+    label?: string | undefined;
+    title?: string | undefined;
+    /** Teaching format such as "VU", not the node's kind. */
+    type?: string | undefined;
+    category?: string | undefined;
+    examSubject?: string | null | undefined;
+    subjectColor?: string | null | undefined;
     ects?: number | undefined;
     width?: number | undefined;
     height?: number | undefined;
+    moduleCode?: string | null | undefined;
     moduleEcts?: number | null | undefined;
+    moduleMeta?: CourseModuleMeta | undefined;
     moduleCourseCount?: number | undefined;
     moduleCourseCodes?: string[] | undefined;
 }
