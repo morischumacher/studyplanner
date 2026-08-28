@@ -59,23 +59,38 @@ wait_ready() {
   return 1
 }
 
-# Every file is applied inside a single transaction. 007 and 008 require it,
-# because they build temp tables declared ON COMMIT DROP and psql's default
-# autocommit would drop those before the file's closing UPDATE could read them.
-# A few files also carry their own BEGIN/COMMIT, which is harmless but makes
-# psql warn; those warnings are filtered so a clean run prints nothing, while
-# ON_ERROR_STOP still aborts on a real error.
+# Migrations are recorded in the same migration_history table the application
+# uses on boot, so the script and the app agree on what has been applied and
+# `up` is safe to re-run. Each file is applied inside a single transaction: 007
+# and 008 require it, because they build ON COMMIT DROP temp tables that psql's
+# default autocommit would destroy before the file's closing UPDATE reads them.
+# A few files carry their own BEGIN/COMMIT, which is harmless but makes psql
+# warn; those warnings are filtered while ON_ERROR_STOP still aborts on error.
 apply_migrations() {
   local psql_bin="${1:-psql}"
-  local f applied=0
+  local run=("$psql_bin" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE")
+
+  "${run[@]}" --quiet --set ON_ERROR_STOP=1 -c "
+    CREATE TABLE IF NOT EXISTS migration_history (
+      filename    text PRIMARY KEY,
+      executed_at timestamptz NOT NULL DEFAULT now()
+    );" >/dev/null
+
+  local applied=0 skipped=0 f name
   for f in "$SQL_DIR"/*.sql; do
-    "$psql_bin" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" \
-      --single-transaction --quiet --set ON_ERROR_STOP=1 -f "$f" 2> >(
-        grep -vE 'WARNING:  there is (already a|no) transaction in progress' >&2
-      )
+    name="$(basename "$f")"
+    if [ "$("${run[@]}" -tAc "SELECT 1 FROM migration_history WHERE filename = '$name'")" = "1" ]; then
+      skipped=$((skipped + 1))
+      continue
+    fi
+    "${run[@]}" --single-transaction --quiet --set ON_ERROR_STOP=1 -f "$f" 2> >(
+      grep -vE 'WARNING:  there is (already a|no) transaction in progress' >&2
+    )
+    "${run[@]}" --quiet --set ON_ERROR_STOP=1 \
+      -c "INSERT INTO migration_history (filename) VALUES ('$name') ON CONFLICT DO NOTHING" >/dev/null
     applied=$((applied + 1))
   done
-  echo "applied $applied migration(s)"
+  echo "migrations: $applied applied, $skipped already present"
 }
 
 up_docker() {
