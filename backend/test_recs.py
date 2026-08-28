@@ -57,8 +57,7 @@ async def main():
                         career = p["career_direction"] or ""
                         toggles = p["recommendation_toggles"] or {}
                         
-                        from app.services.rule_checker_master import RuleChecker as MasterRuleChecker
-                        from app.services.rule_checker_bachelor import RuleChecker as BachelorRuleChecker
+                        from app.rules import BachelorRuleChecker, MasterRuleChecker
                         
                         checker = MasterRuleChecker() if prog == "066 937" else BachelorRuleChecker()
                         rec = Recommender(interests, career, toggles, rule_checker=checker, program_code=prog)

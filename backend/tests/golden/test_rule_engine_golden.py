@@ -22,8 +22,7 @@ from typing import Any
 
 import pytest
 
-from app.services.rule_checker_bachelor import RuleChecker as BachelorRuleChecker
-from app.services.rule_checker_master import RuleChecker as MasterRuleChecker
+from app.rules import BachelorRuleChecker, MasterRuleChecker
 
 HERE = Path(__file__).resolve().parent
 MASTER_PROGRAM_CODE = "066 937"

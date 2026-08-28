@@ -1,0 +1,829 @@
+{
+  "constants": {
+    "TOTAL_ECTS": 180.0,
+    "MIN_NARROW_ELECTIVE_MODULES": 7,
+    "TRANSFERABLE_SKILLS_MIN_ECTS": 6.0,
+    "TRANSFERABLE_SKILLS_MAX_ECTS": 9.0,
+    "BACHELORARBEIT_ECTS": 13.0,
+    "MAX_ECTS_PER_SEMESTER": 42.0,
+    "RECOMMENDED_ECTS_PER_SEMESTER": 30.0
+  },
+  "data": {
+    "program_code": "033 521",
+    "exam_subject_aliases": {
+      "ap": "algorithmen und programmierung",
+      "cs": "computersysteme",
+      "cgvc": "computergraphik und visual computing",
+      "hcc": "human centered computing",
+      "ie": "information engineering",
+      "log": "logik",
+      "mi": "medizinische informatik",
+      "sec": "security",
+      "stw": "strukturwissenschaften",
+      "se": "software engineering",
+      "ti": "theoretische informatik",
+      "fwts": "freie wahlfacher und transferable skills",
+      "thesis": "bachelorarbeit"
+    },
+    "modules": {
+      "algorithmen und datenstrukturen": {
+        "title": "Algorithmen und Datenstrukturen",
+        "ects": 8.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Algorithmen und Programmierung"
+      },
+      "einfuhrung in die programmierung": {
+        "title": "Einführung in die Programmierung",
+        "ects": 9.5,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Algorithmen und Programmierung"
+      },
+      "programmierparadigmen": {
+        "title": "Programmierparadigmen",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Algorithmen und Programmierung"
+      },
+      "grundzuge digitaler systeme": {
+        "title": "Grundzüge digitaler Systeme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Computersysteme"
+      },
+      "denkweisen der informatik": {
+        "title": "Denkweisen der Informatik",
+        "ects": 6.5,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Human-Centered Computing"
+      },
+      "datenbanksysteme": {
+        "title": "Datenbanksysteme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Information Engineering"
+      },
+      "einfuhrung in security": {
+        "title": "Einführung in Security",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Security"
+      },
+      "algebra und diskrete mathematik": {
+        "title": "Algebra und Diskrete Mathematik",
+        "ects": 9.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Strukturwissenschaften"
+      },
+      "analysis": {
+        "title": "Analysis",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Strukturwissenschaften"
+      },
+      "mathematisches arbeiten": {
+        "title": "Mathematisches Arbeiten",
+        "ects": 2.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Strukturwissenschaften"
+      },
+      "statistik und wahrscheinlichkeitstheorie": {
+        "title": "Statistik und Wahrscheinlichkeitstheorie",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Strukturwissenschaften"
+      },
+      "theoretische informatik": {
+        "title": "Theoretische Informatik",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "mandatory",
+        "examSubject": "Theoretische Informatik"
+      },
+      "bachelorarbeit": {
+        "title": "Bachelorarbeit",
+        "ects": 13.0,
+        "min_ects": null,
+        "kind": "thesis",
+        "examSubject": "Bachelorarbeit"
+      },
+      "freie wahlfacher und transferable skills": {
+        "title": "Freie Wahlfächer und Transferable Skills",
+        "ects": 18.0,
+        "min_ects": null,
+        "kind": "fwts",
+        "examSubject": "Freie Wahlfächer und Transferable Skills"
+      },
+      "betriebssysteme": {
+        "title": "Betriebssysteme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Computersysteme"
+      },
+      "computersysteme": {
+        "title": "Computersysteme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Computersysteme"
+      },
+      "einfuhrung in visual computing": {
+        "title": "Einführung in Visual Computing",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Computergraphik und Visual Computing"
+      },
+      "interface und interaction design": {
+        "title": "Interface und Interaction Design",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Human-Centered Computing"
+      },
+      "einfuhrung in artificial intelligence": {
+        "title": "Einführung in Artificial Intelligence",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Logik"
+      },
+      "logic and reasoning in computer science": {
+        "title": "Logic and Reasoning in Computer Science",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Logik"
+      },
+      "daten und informatikrecht": {
+        "title": "Daten- und Informatikrecht",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Security"
+      },
+      "software engineering": {
+        "title": "Software Engineering",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Software Engineering"
+      },
+      "software engineering projekt": {
+        "title": "Software Engineering Projekt",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Software Engineering"
+      },
+      "verteilte systeme": {
+        "title": "Verteilte Systeme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "narrow_elective",
+        "examSubject": "Software Engineering"
+      },
+      "einfuhrung in machine learning": {
+        "title": "Einführung in Machine Learning",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "attacks and defenses in computer security": {
+        "title": "Attacks and Defenses in Computer Security",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "foundations of system and application security": {
+        "title": "Foundations of System and Application Security",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "privacy enhancing technologies": {
+        "title": "Privacy-Enhancing Technologies",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "programm und systemverifikation": {
+        "title": "Programm- und Systemverifikation",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "software qualitatssicherung": {
+        "title": "Software-Qualitätssicherung",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "argumentieren und beweisen": {
+        "title": "Argumentieren und Beweisen",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "deklaratives problemlosen": {
+        "title": "Deklaratives Problemlösen",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "effiziente algorithmen": {
+        "title": "Effiziente Algorithmen",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "introduction to cryptography": {
+        "title": "Introduction to Cryptography",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "einfuhrung in quantencomputing": {
+        "title": "Einführung in Quantencomputing",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "logik fur wissensreprasentation": {
+        "title": "Logik für Wissensrepräsentation",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "logik und grundlagen der mathematik": {
+        "title": "Logik und Grundlagen der Mathematik",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "multimedia": {
+        "title": "Multimedia",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "programmiertechniken fur visual computing": {
+        "title": "Programmiertechniken für Visual Computing",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "grundlagen der computergraphik": {
+        "title": "Grundlagen der Computergraphik",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "grundlagen der computer vision": {
+        "title": "Grundlagen der Computer Vision",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "grundlagen der visualisierung": {
+        "title": "Grundlagen der Visualisierung",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "semistrukturierte daten": {
+        "title": "Semistrukturierte Daten",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "ubersetzerbau": {
+        "title": "Übersetzerbau",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "usability engineering and mobile interaction": {
+        "title": "Usability Engineering and Mobile Interaction",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "web engineering": {
+        "title": "Web Engineering",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "parallel computing": {
+        "title": "Parallel Computing",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "einfuhrung in wissensbasierte systeme": {
+        "title": "Einführung in wissensbasierte Systeme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "einfuhrung in information retrieval": {
+        "title": "Einführung in Information Retrieval",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "menschzentrierte kunstliche intelligenz": {
+        "title": "Menschzentrierte Künstliche Intelligenz",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "sozio technische systeme": {
+        "title": "Sozio-technische Systeme",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "access computing": {
+        "title": "Access Computing",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "design und fertigung": {
+        "title": "Design und Fertigung",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "human augmentation": {
+        "title": "Human Augmentation",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "methods for data generation and analytics in medicine and life sciences": {
+        "title": "Methods for Data Generation and Analytics in Medicine and Life Sciences",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "bio medical visualization and visual analytics": {
+        "title": "Bio-Medical Visualization and Visual Analytics",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "design und entwicklung von anwendungen im gesundheitswesen": {
+        "title": "Design und Entwicklung von Anwendungen im Gesundheitswesen",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "informationssysteme des gesundheitswesens": {
+        "title": "Informationssysteme des Gesundheitswesens",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "datenanalyse": {
+        "title": "Datenanalyse",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "methoden der angewandten statistik": {
+        "title": "Methoden der Angewandten Statistik",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "computational statistics": {
+        "title": "Computational Statistics",
+        "ects": 6.0,
+        "min_ects": 6.0,
+        "kind": "broad_elective",
+        "examSubject": "Strukturwissenschaften"
+      },
+      "multivariate statistik": {
+        "title": "Multivariate Statistik",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "numerical computation": {
+        "title": "Numerical Computation",
+        "ects": 6.0,
+        "min_ects": null,
+        "kind": "broad_elective",
+        "examSubject": null
+      },
+      "zuverlassige echtzeitsysteme": {
+        "title": "Zuverlässige Echtzeitsysteme",
+        "ects": 5.0,
+        "min_ects": 5.0,
+        "kind": "broad_elective",
+        "examSubject": "Computersysteme"
+      }
+    },
+    "course_to_module": {
+      "einfuhrung in die programmierung 1": "Einführung in die Programmierung",
+      "einfuhrung in die programmierung 2": "Einführung in die Programmierung",
+      "eidi1": "Einführung in die Programmierung",
+      "eidi2": "Einführung in die Programmierung",
+      "eidi1 vu": "Einführung in die Programmierung",
+      "eidi2 vu": "Einführung in die Programmierung",
+      "orientierung informatik und wirtschaftsinformatik": "Denkweisen der Informatik",
+      "oiw": "Denkweisen der Informatik",
+      "di": "Denkweisen der Informatik",
+      "ori vu": "Denkweisen der Informatik",
+      "dwi vu": "Denkweisen der Informatik",
+      "algebra und diskrete mathematik": "Algebra und Diskrete Mathematik",
+      "algebra und diskrete mathematik vo": "Algebra und Diskrete Mathematik",
+      "algebra und diskrete mathematik ue": "Algebra und Diskrete Mathematik",
+      "algebra und diskrete mathematik vu": "Algebra und Diskrete Mathematik",
+      "algebra und diskrete mathematik fur informatik und wirtschaftsinformatik": "Algebra und Diskrete Mathematik",
+      "algebra und diskrete mathematik fur informatik und wirtschaftsinformatik ue": "Algebra und Diskrete Mathematik",
+      "algebra und diskrete mathematik fur informatik und wirtschaftsinformatik vu": "Algebra und Diskrete Mathematik",
+      "adm": "Algebra und Diskrete Mathematik",
+      "admue": "Algebra und Diskrete Mathematik",
+      "admvu": "Algebra und Diskrete Mathematik",
+      "adm vo": "Algebra und Diskrete Mathematik",
+      "adm ue": "Algebra und Diskrete Mathematik",
+      "adm vu": "Algebra und Diskrete Mathematik",
+      "analysis": "Analysis",
+      "analysis vo": "Analysis",
+      "analysis ue": "Analysis",
+      "analysis vu": "Analysis",
+      "analysis fur informatik und wirtschaftsinformatik": "Analysis",
+      "analysis fur informatik und wirtschaftsinformatik ue": "Analysis",
+      "analysis fur informatik und wirtschaftsinformatik vu": "Analysis",
+      "anl": "Analysis",
+      "anlue": "Analysis",
+      "anlvu": "Analysis",
+      "anl vo": "Analysis",
+      "anl ue": "Analysis",
+      "anl vu": "Analysis",
+      "swt": "Statistik und Wahrscheinlichkeitstheorie",
+      "swtue": "Statistik und Wahrscheinlichkeitstheorie",
+      "swtvu": "Statistik und Wahrscheinlichkeitstheorie",
+      "swt vo": "Statistik und Wahrscheinlichkeitstheorie",
+      "swt ue": "Statistik und Wahrscheinlichkeitstheorie",
+      "swt vu": "Statistik und Wahrscheinlichkeitstheorie",
+      "ba": "Bachelorarbeit",
+      "wa": "Bachelorarbeit",
+      "ba pr": "Bachelorarbeit",
+      "wiss se": "Bachelorarbeit",
+      "bachelorarbeit fur informatik und wirtschaftsinformatik": "Bachelorarbeit",
+      "wissenschaftliches arbeiten": "Bachelorarbeit",
+      "ea": "Effiziente Algorithmen",
+      "fp": "Funktionale Programmierung",
+      "lpc": "Logikprogrammierung und Constraints",
+      "am": "Abstrakte Maschinen",
+      "pc": "Parallel Computing",
+      "ub": "Übersetzerbau",
+      "rts": "Zuverlässige Echtzeitsysteme",
+      "dsys": "Zuverlässige Echtzeitsysteme",
+      "avp": "Audio and Video Production",
+      "cmus": "Computermusik",
+      "cmp": "Creative Media Production",
+      "gcg": "Grundlagen der Computergraphik",
+      "gcv": "Grundlagen der Computer Vision",
+      "gvis": "Grundlagen der Visualisierung",
+      "mm": "Multimedia",
+      "ptvc": "Programmiertechniken für Visual Computing",
+      "acc": "Access Computing",
+      "duf": "Design und Fertigung",
+      "mkai": "Menschzentrierte Künstliche Intelligenz",
+      "sts": "Sozio-technische Systeme",
+      "uemi": "Usability Engineering and Mobile Interaction",
+      "ews": "Einführung in wissensbasierte Systeme",
+      "ir": "Einführung in Information Retrieval",
+      "ssd": "Semistrukturierte Daten",
+      "webe": "Web Engineering",
+      "aub": "Argumentieren und Beweisen",
+      "dpr": "Deklaratives Problemlösen",
+      "eml": "Einführung in Machine Learning",
+      "lgm": "Logik und Grundlagen der Mathematik",
+      "lgmue": "Logik und Grundlagen der Mathematik",
+      "lwr": "Logik für Wissensrepräsentation",
+      "bmvva": "Bio-Medical Visualization and Visual Analytics",
+      "deag": "Design und Entwicklung von Anwendungen im Gesundheitswesen",
+      "haug": "Human Augmentation",
+      "isg": "Informationssysteme des Gesundheitswesens",
+      "mdgam": "Methods for Data Generation and Analytics in Medicine and Life Sciences",
+      "adcs": "Attacks and Defenses in Computer Security",
+      "fsas": "Foundations of System and Application Security",
+      "pet": "Privacy-Enhancing Technologies",
+      "cstat": "Computational Statistics",
+      "scomp": "Computational Statistics",
+      "sim": "Computational Statistics",
+      "da": "Datenanalyse",
+      "mas": "Methoden der Angewandten Statistik",
+      "masue": "Methoden der Angewandten Statistik",
+      "mvs": "Multivariate Statistik",
+      "mvsue": "Multivariate Statistik",
+      "numc": "Numerical Computation",
+      "psv": "Programm- und Systemverifikation",
+      "sqs": "Software-Qualitätssicherung",
+      "itc": "Introduction to Cryptography",
+      "eqc": "Einführung in Quantencomputing"
+    },
+    "steop_mandatory_lv_keys": {
+      "einfuhrung in die programmierung 1": 5.5,
+      "eidi1": 5.5,
+      "eidi1 vu": 5.5,
+      "mathematisches arbeiten fur informatik und wirtschaftsinformatik 1": 2.0,
+      "mathematisches arbeiten": 2.0,
+      "ma": 2.0,
+      "ma vu": 2.0,
+      "orientierung informatik und wirtschaftsinformatik": 1.0,
+      "oiw": 1.0,
+      "ori vu": 1.0
+    },
+    "steop_pool_keys": {
+      "__set__": [
+        "adm",
+        "adm ue",
+        "adm vo",
+        "adm vu",
+        "admue",
+        "admvu",
+        "algebra und diskrete mathematik",
+        "analysis",
+        "anl",
+        "anl ue",
+        "anl vo",
+        "anl vu",
+        "anlue",
+        "anlvu",
+        "denkweisen der informatik",
+        "di",
+        "dwi vu",
+        "gds vu",
+        "ggds",
+        "grundzuge digitaler systeme",
+        "swt",
+        "swtue",
+        "swtvu"
+      ]
+    },
+    "allowed_before_steop_extra": {
+      "__set__": [
+        "ad",
+        "ad vu",
+        "algorithmen und datenstrukturen",
+        "daten und informatikrecht",
+        "datenbanksysteme",
+        "dbs",
+        "dbs vu",
+        "dir",
+        "dir vu",
+        "ehvc",
+        "eidi2",
+        "eidi2 vu",
+        "einfuhrung in die programmierung 2",
+        "einfuhrung in visual computing",
+        "evc vu"
+      ]
+    },
+    "focuses": {
+      "artificial intelligence und machine learning": {
+        "required": [
+          "Einführung in Artificial Intelligence",
+          "Einführung in Machine Learning"
+        ],
+        "choose": {
+          "min": 4,
+          "from": [
+            "Datenanalyse",
+            "Deklaratives Problemlösen",
+            "Effiziente Algorithmen",
+            "Einführung in Information Retrieval",
+            "Einführung in wissensbasierte Systeme",
+            "Logikprogrammierung und Constraints",
+            "Menschzentrierte Künstliche Intelligenz",
+            "Methoden der Angewandten Statistik",
+            "Grundlagen der Visualisierung"
+          ]
+        }
+      },
+      "cybersecurity": {
+        "choose_groups": [
+          {
+            "min": 2,
+            "from": [
+              "Betriebssysteme",
+              "Einführung in Artificial Intelligence",
+              "Logic and Reasoning in Computer Science",
+              "Verteilte Systeme"
+            ]
+          },
+          {
+            "min": 4,
+            "from": [
+              "Attacks and Defenses in Computer Security",
+              "Foundations of System and Application Security",
+              "Introduction to Cryptography",
+              "Privacy-Enhancing Technologies",
+              "Programm- und Systemverifikation"
+            ]
+          }
+        ]
+      },
+      "digital health": {
+        "required": [
+          "Daten- und Informatikrecht",
+          "Einführung in Visual Computing",
+          "Interface und Interaction Design",
+          "Software Engineering",
+          "Methods for Data Generation and Analytics in Medicine and Life Sciences"
+        ],
+        "choose": {
+          "min": 4,
+          "from": [
+            "Bio-Medical Visualization and Visual Analytics",
+            "Datenanalyse",
+            "Design und Fertigung",
+            "Design und Entwicklung von Anwendungen im Gesundheitswesen",
+            "Einführung in Machine Learning",
+            "Grundlagen der Computer Vision",
+            "Human Augmentation",
+            "Informationssysteme des Gesundheitswesens",
+            "Privacy-Enhancing Technologies",
+            "Sozio-technische Systeme",
+            "Grundlagen der Visualisierung"
+          ]
+        }
+      },
+      "human centered computing": {
+        "required": [
+          "Einführung in Visual Computing",
+          "Interface und Interaction Design",
+          "Software Engineering"
+        ],
+        "choose": {
+          "min": 4,
+          "from": [
+            "Access Computing",
+            "Daten- und Informatikrecht",
+            "Design und Fertigung",
+            "Human Augmentation",
+            "Menschzentrierte Künstliche Intelligenz",
+            "Sozio-technische Systeme"
+          ]
+        }
+      },
+      "software engineering": {
+        "required": [
+          "Interface und Interaction Design",
+          "Software Engineering",
+          "Software Engineering Projekt",
+          "Verteilte Systeme",
+          "Software-Qualitätssicherung"
+        ],
+        "choose": {
+          "min": 4,
+          "from": [
+            "Einführung in wissensbasierte Systeme",
+            "Funktionale Programmierung",
+            "Logikprogrammierung und Constraints",
+            "Parallel Computing",
+            "Programm- und Systemverifikation",
+            "Semistrukturierte Daten",
+            "Übersetzerbau",
+            "Usability Engineering and Mobile Interaction",
+            "Web Engineering"
+          ]
+        }
+      },
+      "theoretische informatik und logik": {
+        "required": [
+          "Logic and Reasoning in Computer Science"
+        ],
+        "choose": {
+          "min": 5,
+          "from": [
+            "Argumentieren und Beweisen",
+            "Deklaratives Problemlösen",
+            "Effiziente Algorithmen",
+            "Introduction to Cryptography",
+            "Einführung in Quantencomputing",
+            "Logik für Wissensrepräsentation",
+            "Logik und Grundlagen der Mathematik",
+            "Programm- und Systemverifikation"
+          ]
+        }
+      },
+      "visual computing": {
+        "required": [
+          "Einführung in Visual Computing",
+          "Software Engineering",
+          "Grundlagen der Computergraphik",
+          "Grundlagen der Computer Vision"
+        ],
+        "choose": {
+          "min": 3,
+          "from": [
+            "Multimedia",
+            "Programmiertechniken für Visual Computing",
+            "Grundlagen der Visualisierung"
+          ]
+        }
+      }
+    },
+    "focus_aliases": {
+      "ai": "artificial intelligence und machine learning",
+      "ml": "artificial intelligence und machine learning",
+      "aiml": "artificial intelligence und machine learning",
+      "ai ml": "artificial intelligence und machine learning",
+      "artificial intelligence": "artificial intelligence und machine learning",
+      "machine learning": "artificial intelligence und machine learning",
+      "cyber": "cybersecurity",
+      "security": "cybersecurity",
+      "cybersecurity": "cybersecurity",
+      "digital health": "digital health",
+      "dh": "digital health",
+      "hcc": "human centered computing",
+      "human centered computing": "human centered computing",
+      "se": "software engineering",
+      "software engineering": "software engineering",
+      "til": "theoretische informatik und logik",
+      "theory": "theoretische informatik und logik",
+      "theoretische informatik": "theoretische informatik und logik",
+      "logik": "theoretische informatik und logik",
+      "vc": "visual computing",
+      "visual computing": "visual computing"
+    },
+    "soft_prereqs": [
+      {
+        "__tuple__": [
+          "Einführung in die Programmierung 1",
+          "Einführung in die Programmierung 2"
+        ]
+      },
+      {
+        "__tuple__": [
+          "Software Engineering",
+          "Software Engineering Projekt"
+        ]
+      }
+    ],
+    "split_variant_module_keys": {
+      "__set__": [
+        "algebra und diskrete mathematik",
+        "analysis",
+        "statistik und wahrscheinlichkeitstheorie"
+      ]
+    }
+  }
+}

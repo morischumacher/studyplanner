@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, List, Dict, Tuple, Optional
 
+from ..curriculum import MASTER, load as load_curriculum
+from .result import RuleCheckResult
 
-@dataclass
-class RuleCheckResult:
-    ok: bool = True
-    message: str = "accepted"
-    # Data for the persistent status dashboard
-    stats: Dict[str, Any] = field(default_factory=dict)
-    missing: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+_CURRICULUM = load_curriculum(MASTER)
 
 
 class RuleChecker:
@@ -27,261 +21,30 @@ class RuleChecker:
     - "Wahlmodul" gating: electives of an examSubject that has core modules require all that subject’s core modules.
     """
 
-    # ----------------------------
-    # Curriculum constants (from the provided text)
-    # ----------------------------
-    TOTAL_ECTS = 120.0
-    SUBJECT_MODULES_MIN_ECTS = 81.0  # Pflicht-, Core- und Wahlmodule excluding the free-choice module
-    TRANSFERABLE_SKILLS_MIN_ECTS = 4.5
-
-    # Practical “plan sanity” constraint (not a legal curriculum rule, but requested as a consistency check)
-    # - hard reject if exceeded
-    MAX_ECTS_PER_SEMESTER = 42.0
-    # - soft warning if exceeded
-    RECOMMENDED_ECTS_PER_SEMESTER = 30.0
+    # The thresholds the curriculum sets, and the two the application adds.
+    # MAX and RECOMMENDED_ECTS_PER_SEMESTER are not curriculum law: they are the
+    # plan-sanity limits the planner enforces, one as a rejection and one as a
+    # warning. All five are read from the curriculum document.
+    TOTAL_ECTS = _CURRICULUM.TOTAL_ECTS
+    SUBJECT_MODULES_MIN_ECTS = _CURRICULUM.SUBJECT_MODULES_MIN_ECTS
+    TRANSFERABLE_SKILLS_MIN_ECTS = _CURRICULUM.TRANSFERABLE_SKILLS_MIN_ECTS
+    MAX_ECTS_PER_SEMESTER = _CURRICULUM.MAX_ECTS_PER_SEMESTER
+    RECOMMENDED_ECTS_PER_SEMESTER = _CURRICULUM.RECOMMENDED_ECTS_PER_SEMESTER
 
     def __init__(self) -> None:
-        # Exam subjects as per curriculum
-        self.exam_subjects = {
-            "algorithms and complexity",
-            "automation systems and mobile robotics",
-            "data management and intelligent systems",
-            "distributed and next generation computing",
-            "high performance computing",
-            "machine learning",
-            "security and privacy",
-            "societal impact and critical reflections",
-            "software engineering and programming",
-            "verification and automated reasoning",
-            "methods in computer science",
-            "extension",
-            "freie wahlfächer und transferable skills",
-            "freiewahlfächer und transferable skills",
-            "free choice and transferable skills",
-            "diplomarbeit",
-            "master thesis",  # tolerated alias
-        }
-
-        # Core modules (+) per Prüfungsfach, needed only if taking *Wahlmodule* of that exam subject
-        self.core_by_exam_subject: Dict[str, List[str]] = {
-            "algorithms and complexity": ["Algorithmics"],
-            "automation systems and mobile robotics": ["Mobile Robotics"],
-            "data management and intelligent systems": ["Advanced Database Systems"],
-            "distributed and next generation computing": [
-                "Advanced Internet Computing",
-                "Distributed Systems Technologies",
-            ],
-            "machine learning": ["Machine Learning"],
-            "verification and automated reasoning": ["Formal Methods in Systems Engineering"],
-        }
-
-        # Mandatory (Pflicht) modules (unmarked in the list)
-        self.mandatory_modules: Dict[str, Dict[str, Any]] = {
-            "Advanced Software Engineering": {
-                "examSubject": "software engineering and programming",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "mandatory",
-            },
-            "Advanced Software Engineering Project": {
-                "examSubject": "software engineering and programming",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "mandatory",
-            },
-            "Seminar in Computer Science": {
-                "examSubject": "methods in computer science",
-                "ects_min": 3.0,
-                "ects_max": 30.0,  # curriculum says "min 3.0"; implementations may vary; we accept >=3
-                "kind": "mandatory",
-            },
-        }
-
-        # Core modules are not mandatory overall, but we still validate ects and examSubject when present
-        self.core_modules: Dict[str, Dict[str, Any]] = {
-            "Algorithmics": {
-                "examSubject": "algorithms and complexity",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-            "Mobile Robotics": {
-                "examSubject": "automation systems and mobile robotics",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-            "Advanced Database Systems": {
-                "examSubject": "data management and intelligent systems",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-            "Advanced Internet Computing": {
-                "examSubject": "distributed and next generation computing",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-            "Distributed Systems Technologies": {
-                "examSubject": "distributed and next generation computing",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-            "Machine Learning": {
-                "examSubject": "machine learning",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-            "Formal Methods in Systems Engineering": {
-                "examSubject": "verification and automated reasoning",
-                "ects_min": 6.0,
-                "ects_max": 6.0,
-                "kind": "core",
-            },
-        }
-
-        # Variable-ECTS named modules from the text (range validation if the code matches)
-        self.variable_modules: Dict[str, Dict[str, Any]] = {
-            "Network Security": {
-                "examSubject": "security and privacy",
-                "ects_min": 3.0,
-                "ects_max": 6.0,
-                "kind": "elective",
-            },
-            "Project in Computer Science": {
-                "examSubject": "methods in computer science",
-                "ects_min": 6.0,
-                "ects_max": 12.0,
-                "kind": "elective",
-            },
-            "Extension": {
-                "examSubject": "extension",
-                "ects_min": 0.0,
-                "ects_max": 12.0,
-                "kind": "elective",
-            },
-        }
-
-        # “Advanced Topics … (min 3.0 ECTS)” family
-        self.advanced_topics_prefixes = (
-            "Advanced Topics In Algorithms and Complexity",
-            "Advanced Topics In Automation and Mobile Robotics",
-            "Advanced Topics In Data Management and Intelligent Systems",
-            "Advanced Topics In Distributed and Next Generation Computing",
-            "Advanced Topics In High Performance Computing",
-            "Advanced Topics In Machine Learning",
-            "Advanced Topics In Security and Privacy",
-            "Advanced Topics In Societal Impact and Critical Reflections",
-            "Advanced Topics In Software Engineering and Programming",
-            "Advanced Topics In Verification and Automated Reasoning",
-        )
-
-        # Minimal prerequisite model (sequence checks)
-        self.prerequisites: Dict[str, List[str]] = {
-            # diploma parts (if represented as separate “courses”)
-            "Final Oral Exam / Defense": ["Master Thesis"],
-            "Seminar for Diploma Students": ["Master Thesis"],
-            "FOE": ["MTH"],
-            "SDS": ["MTH"],
-        }
-
-        # Category normalization map (many synonyms accepted)
-        self.category_map: Dict[str, str] = {
-            # mandatory
-            "mandatory": "mandatory",
-            "pflicht": "mandatory",
-            "pflichtmodul": "mandatory",
-            "required": "mandatory",
-            # core
-            "core": "core",
-            "core module": "core",
-            "coremodul": "core",
-            # elective
-            "elective": "elective",
-            "wahl": "elective",
-            "wahlmodul": "elective",
-            "optional": "elective",
-            "choice": "elective",
-            # extension
-            "extension": "extension",
-            # free choice & transferable
-            "free": "free",
-            "freie wahl": "free",
-            "freifach": "free",
-            "free choice": "free",
-            "freie wahlfächer": "free",
-            "freie wahlfaecher": "free",
-            # transferable skills
-            "transferable": "transferable_skills",
-            "transferable skills": "transferable_skills",
-            "soft skills": "transferable_skills",
-            "ts": "transferable_skills",
-            # diploma / thesis
-            "diploma": "diploma_other",
-            "diplom": "diploma_other",
-            "diplomarbeit": "diploma_other",
-            "thesis": "diploma_thesis",
-            "master thesis": "diploma_thesis",
-            "diploma thesis": "diploma_thesis",
-            "seminar for diplomand": "diploma_seminar",
-            "seminar for diploma students": "diploma_seminar",
-            "defense": "diploma_defense",
-            "final exam": "diploma_defense",
-            "abschlussprüfung": "diploma_defense",
-            "abschlusspruefung": "diploma_defense",
-        }
-
-        # Catalog compatibility: master SQL stores these as module category "elective",
-        # but they are semantically diploma/TS items and must be counted in those buckets.
-        self.special_category_by_code: Dict[str, str] = {
-            # Free choice + transferable skills
-            "fwts-el": "transferable_skills",
-            "fwtsel": "transferable_skills",
-            "freie wahlfächer und transferable skills": "transferable_skills",
-            "freie wahlfaecher und transferable skills": "transferable_skills",
-            "free choice and transferable skills": "transferable_skills",
-            # Diploma components
-            "master thesis": "diploma_thesis",
-            "mth": "diploma_thesis",
-            "diplomarbeit": "diploma_thesis",
-            "seminar for diploma students": "diploma_seminar",
-            "sds": "diploma_seminar",
-            "seminar für diplomand_innen": "diploma_seminar",
-            "seminar fuer diplomand_innen": "diploma_seminar",
-            "final oral exam / defense": "diploma_defense",
-            "foe": "diploma_defense",
-            "kommissionelle abschlussprüfung": "diploma_defense",
-            "kommissionelle abschlusspruefung": "diploma_defense",
-        }
-
-        # Canonical course-code aliases from the SQL catalogs.
-        # The rule engine internally uses curriculum module names for consistency checks.
-        self.course_alias_to_name: Dict[str, str] = {
-            # mandatory
-            "ASE": "Advanced Software Engineering",
-            "ASEP": "Advanced Software Engineering Project",
-            "SCS": "Seminar in Computer Science",
-            # core modules
-            "ALGO": "Algorithmics",
-            "MR": "Mobile Robotics",
-            "ADS": "Advanced Database Systems",
-            "AIC": "Advanced Internet Computing",
-            "DST": "Distributed Systems Technologies",
-            "ML": "Machine Learning",
-            "FMSE": "Formal Methods in Systems Engineering",
-            # variable-ECTS modules
-            "NS": "Network Security",
-            "PRJCS1": "Project in Computer Science",
-            "PRJCS2": "Project in Computer Science",
-            "EXTENSION": "Extension",
-            # diploma aliases
-            "MTH": "Master Thesis",
-            "SDS": "Seminar for Diploma Students",
-            "FOE": "Final Oral Exam / Defense",
-        }
+        # The curriculum itself is data, loaded from app/curriculum/master.json.
+        # What stays here is the checking, which is the part that is code.
+        curriculum = load_curriculum(MASTER)
+        self.exam_subjects: set = curriculum.exam_subjects
+        self.core_by_exam_subject: Dict[str, Any] = curriculum.core_by_exam_subject
+        self.mandatory_modules: Dict[str, Any] = curriculum.mandatory_modules
+        self.core_modules: Dict[str, Any] = curriculum.core_modules
+        self.variable_modules: Dict[str, Any] = curriculum.variable_modules
+        self.advanced_topics_prefixes: tuple = curriculum.advanced_topics_prefixes
+        self.prerequisites: Dict[str, Any] = curriculum.prerequisites
+        self.category_map: Dict[str, str] = curriculum.category_map
+        self.special_category_by_code: Dict[str, str] = curriculum.special_category_by_code
+        self.course_alias_to_name: Dict[str, str] = curriculum.course_alias_to_name
 
     # ----------------------------
     # Public API

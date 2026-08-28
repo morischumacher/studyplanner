@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Any, List, Dict, Tuple, Optional, Set
 import unicodedata
 
+from ..curriculum import BACHELOR, load as load_curriculum
+from .result import RuleCheckResult
 
-@dataclass
-class RuleCheckResult:
-    ok: bool = True
-    message: str = "accepted"
-    stats: Dict[str, Any] = field(default_factory=dict)
-    missing: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+_CURRICULUM = load_curriculum(BACHELOR)
 
 
 class RuleChecker:
@@ -26,14 +21,17 @@ class RuleChecker:
       - Pre-StEOP extra: use canonical category (not just incoming) so FWTS/TS are handled correctly.
     """
 
-    TOTAL_ECTS = 180.0
-    MIN_NARROW_ELECTIVE_MODULES = 7
-    TRANSFERABLE_SKILLS_MIN_ECTS = 6.0
-    TRANSFERABLE_SKILLS_MAX_ECTS = 9.0
-    BACHELORARBEIT_ECTS = 13.0
-
-    MAX_ECTS_PER_SEMESTER = 42.0
-    RECOMMENDED_ECTS_PER_SEMESTER = 30.0
+    # The thresholds the curriculum sets, and the two the application adds.
+    # MAX and RECOMMENDED_ECTS_PER_SEMESTER are not curriculum law: they are the
+    # plan-sanity limits the planner enforces, one as a rejection and one as a
+    # warning. All seven are read from the curriculum document.
+    TOTAL_ECTS = _CURRICULUM.TOTAL_ECTS
+    MIN_NARROW_ELECTIVE_MODULES = _CURRICULUM.MIN_NARROW_ELECTIVE_MODULES
+    TRANSFERABLE_SKILLS_MIN_ECTS = _CURRICULUM.TRANSFERABLE_SKILLS_MIN_ECTS
+    TRANSFERABLE_SKILLS_MAX_ECTS = _CURRICULUM.TRANSFERABLE_SKILLS_MAX_ECTS
+    BACHELORARBEIT_ECTS = _CURRICULUM.BACHELORARBEIT_ECTS
+    MAX_ECTS_PER_SEMESTER = _CURRICULUM.MAX_ECTS_PER_SEMESTER
+    RECOMMENDED_ECTS_PER_SEMESTER = _CURRICULUM.RECOMMENDED_ECTS_PER_SEMESTER
 
     # ----------------------------
     # Helpers: normalization/parsing
@@ -100,392 +98,20 @@ class RuleChecker:
     # Init curriculum model
     # ----------------------------
     def __init__(self) -> None:
-        self.program_code = "033 521"
-
-        self.exam_subject_aliases: Dict[str, str] = {
-            "ap": "algorithmen und programmierung",
-            "cs": "computersysteme",
-            "cgvc": "computergraphik und visual computing",
-            "hcc": "human centered computing",
-            "ie": "information engineering",
-            "log": "logik",
-            "mi": "medizinische informatik",
-            "sec": "security",
-            "stw": "strukturwissenschaften",
-            "se": "software engineering",
-            "ti": "theoretische informatik",
-            "fwts": "freie wahlfacher und transferable skills",
-            "thesis": "bachelorarbeit",
-        }
-
-        self.modules: Dict[str, Dict[str, Any]] = {}
-
-        def add_module(
-            title: str,
-            ects: float,
-            kind: str,
-            exam_subject: Optional[str] = None,
-            min_ects: Optional[float] = None,
-        ) -> None:
-            key = self._norm(title)
-            self.modules[key] = {
-                "title": title,
-                "ects": float(ects),
-                "min_ects": float(min_ects) if min_ects is not None else None,
-                "kind": kind,
-                "examSubject": exam_subject,
-            }
-
-        # Pflichtmodule
-        add_module("Algorithmen und Datenstrukturen", 8.0, "mandatory", "Algorithmen und Programmierung")
-        add_module("Einführung in die Programmierung", 9.5, "mandatory", "Algorithmen und Programmierung")
-        add_module("Programmierparadigmen", 6.0, "mandatory", "Algorithmen und Programmierung")
-        add_module("Grundzüge digitaler Systeme", 6.0, "mandatory", "Computersysteme")
-        add_module("Denkweisen der Informatik", 6.5, "mandatory", "Human-Centered Computing")
-        add_module("Datenbanksysteme", 6.0, "mandatory", "Information Engineering")
-        add_module("Einführung in Security", 6.0, "mandatory", "Security")
-        add_module("Algebra und Diskrete Mathematik", 9.0, "mandatory", "Strukturwissenschaften")
-        add_module("Analysis", 6.0, "mandatory", "Strukturwissenschaften")
-        add_module("Mathematisches Arbeiten", 2.0, "mandatory", "Strukturwissenschaften")
-        add_module("Statistik und Wahrscheinlichkeitstheorie", 6.0, "mandatory", "Strukturwissenschaften")
-        add_module("Theoretische Informatik", 6.0, "mandatory", "Theoretische Informatik")
-
-        add_module("Bachelorarbeit", 13.0, "thesis", "Bachelorarbeit")
-        add_module("Freie Wahlfächer und Transferable Skills", 18.0, "fwts", "Freie Wahlfächer und Transferable Skills")
-
-        # Wahlmodule der engen Wahl (+)
-        narrow = [
-            ("Betriebssysteme", 6.0, "Computersysteme"),
-            ("Computersysteme", 6.0, "Computersysteme"),
-            ("Einführung in Visual Computing", 6.0, "Computergraphik und Visual Computing"),
-            ("Interface und Interaction Design", 6.0, "Human-Centered Computing"),
-            ("Einführung in Artificial Intelligence", 6.0, "Logik"),
-            ("Logic and Reasoning in Computer Science", 6.0, "Logik"),
-            ("Daten- und Informatikrecht", 6.0, "Security"),
-            ("Software Engineering", 6.0, "Software Engineering"),
-            ("Software Engineering Projekt", 6.0, "Software Engineering"),
-            ("Verteilte Systeme", 6.0, "Software Engineering"),
-        ]
-        for t, e, es in narrow:
-            add_module(t, e, "narrow_elective", es)
-
-        # Broad electives needed for focus rules (default 6 unless specified)
-        broad_for_focus = [
-            "Einführung in Machine Learning",
-            "Attacks and Defenses in Computer Security",
-            "Foundations of System and Application Security",
-            "Privacy-Enhancing Technologies",
-            "Programm- und Systemverifikation",
-            "Software-Qualitätssicherung",
-            "Argumentieren und Beweisen",
-            "Deklaratives Problemlösen",
-            "Eﬀiziente Algorithmen",
-            "Effiziente Algorithmen",  # accept spelled-out ligature variant
-            "Introduction to Cryptography",
-            "Einführung in Quantencomputing",
-            "Logik für Wissensrepräsentation",
-            "Logik und Grundlagen der Mathematik",
-            "Multimedia",
-            "Programmiertechniken für Visual Computing",
-            "Grundlagen der Computergraphik",
-            "Grundlagen der Computer Vision",
-            "Grundlagen der Visualisierung",
-            "Semistrukturierte Daten",
-            "Übersetzerbau",
-            "Usability Engineering and Mobile Interaction",
-            "Web Engineering",
-            "Parallel Computing",
-            "Einführung in wissensbasierte Systeme",
-            "Einführung in Information Retrieval",
-            "Menschzentrierte Künstliche Intelligenz",
-            "Sozio-technische Systeme",
-            "Access Computing",
-            "Design und Fertigung",
-            "Human Augmentation",
-            "Methods for Data Generation and Analytics in Medicine and Life Sciences",
-            "Bio-Medical Visualization and Visual Analytics",
-            "Design und Entwicklung von Anwendungen im Gesundheitswesen",
-            "Informationssysteme des Gesundheitswesens",
-            "Datenanalyse",
-            "Methoden der Angewandten Statistik",
-            "Computational Statistics",
-            "Multivariate Statistik",
-            "Numerical Computation",
-        ]
-        for t in broad_for_focus:
-            if self._norm(t) == self._norm("Computational Statistics"):
-                add_module("Computational Statistics", 6.0, "broad_elective", "Strukturwissenschaften", min_ects=6.0)
-            else:
-                add_module(t, 6.0, "broad_elective", None)
-
-        # Special ECTS cases
-        add_module("Zuverlässige Echtzeitsysteme", 5.0, "broad_elective", "Computersysteme", min_ects=5.0)
-
-        # ----------------------------
-        # Course-to-module mapping
-        # ----------------------------
-        self.course_to_module: Dict[str, str] = {}
-
-        def map_course_to_module(course_title_or_code: str, module_title: str) -> None:
-            self.course_to_module[self._norm(course_title_or_code)] = module_title
-        def map_codes(module_title: str, *codes: str) -> None:
-            for code in codes:
-                map_course_to_module(code, module_title)
-
-        # EIDI split
-        map_course_to_module("Einführung in die Programmierung 1", "Einführung in die Programmierung")
-        map_course_to_module("Einführung in die Programmierung 2", "Einführung in die Programmierung")
-        map_course_to_module("EIDI1", "Einführung in die Programmierung")
-        map_course_to_module("EIDI2", "Einführung in die Programmierung")
-        map_course_to_module("EIDI1-VU", "Einführung in die Programmierung")  # legacy alias
-        map_course_to_module("EIDI2-VU", "Einführung in die Programmierung")  # legacy alias
-
-        # Orientation: keep module mapping for ECTS, BUT StEOP checks it by course code/title.
-        map_course_to_module("Orientierung Informatik und Wirtschaftsinformatik", "Denkweisen der Informatik")
-        map_course_to_module("OIW", "Denkweisen der Informatik")
-        map_course_to_module("DI", "Denkweisen der Informatik")
-        map_course_to_module("ORI-VU", "Denkweisen der Informatik")  # legacy alias
-        map_course_to_module("DWI-VU", "Denkweisen der Informatik")  # legacy alias
-
-        # Algebra/Analysis variants
-        for c in [
-            "Algebra und Diskrete Mathematik",
-            "Algebra und Diskrete Mathematik (VO)",
-            "Algebra und Diskrete Mathematik (UE)",
-            "Algebra und Diskrete Mathematik (VU)",
-            "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik",
-            "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (UE)",
-            "Algebra und Diskrete Mathematik für Informatik und Wirtschaftsinformatik (VU)",
-        ]:
-            map_course_to_module(c, "Algebra und Diskrete Mathematik")
-        for c in ["ADM", "ADMUE", "ADMVU", "ADM-VO", "ADM-UE", "ADM-VU"]:
-            map_course_to_module(c, "Algebra und Diskrete Mathematik")
-        for c in [
-            "Analysis",
-            "Analysis (VO)",
-            "Analysis (UE)",
-            "Analysis (VU)",
-            "Analysis für Informatik und Wirtschaftsinformatik",
-            "Analysis für Informatik und Wirtschaftsinformatik (UE)",
-            "Analysis für Informatik und Wirtschaftsinformatik (VU)",
-        ]:
-            map_course_to_module(c, "Analysis")
-        for c in ["ANL", "ANLUE", "ANLVU", "ANL-VO", "ANL-UE", "ANL-VU"]:
-            map_course_to_module(c, "Analysis")
-        for c in ["SWT", "SWTUE", "SWTVU", "SWT-VO", "SWT-UE", "SWT-VU"]:
-            map_course_to_module(c, "Statistik und Wahrscheinlichkeitstheorie")
-
-        # Thesis split
-        map_course_to_module("BA", "Bachelorarbeit")
-        map_course_to_module("WA", "Bachelorarbeit")
-        map_course_to_module("BA-PR", "Bachelorarbeit")  # legacy alias
-        map_course_to_module("WISS-SE", "Bachelorarbeit")  # legacy alias
-        map_course_to_module("Bachelorarbeit für Informatik und Wirtschaftsinformatik", "Bachelorarbeit")
-        map_course_to_module("Wissenschaftliches Arbeiten", "Bachelorarbeit")
-
-        # DB course-code mapping (from 003_bachelorcatalog.sql) to keep code usage consistent
-        map_codes("Effiziente Algorithmen", "EA")
-        map_codes("Funktionale Programmierung", "FP")
-        map_codes("Logikprogrammierung und Constraints", "LPC")
-        map_codes("Abstrakte Maschinen", "AM")
-        map_codes("Parallel Computing", "PC")
-        map_codes("Übersetzerbau", "UB")
-        map_codes("Zuverlässige Echtzeitsysteme", "RTS", "DSYS")
-        map_codes("Audio and Video Production", "AVP")
-        map_codes("Computermusik", "CMUS")
-        map_codes("Creative Media Production", "CMP")
-        map_codes("Grundlagen der Computergraphik", "GCG")
-        map_codes("Grundlagen der Computer Vision", "GCV")
-        map_codes("Grundlagen der Visualisierung", "GVIS")
-        map_codes("Multimedia", "MM")
-        map_codes("Programmiertechniken für Visual Computing", "PTVC")
-        map_codes("Access Computing", "ACC")
-        map_codes("Design und Fertigung", "DUF")
-        map_codes("Menschzentrierte Künstliche Intelligenz", "MKAI")
-        map_codes("Sozio-technische Systeme", "STS")
-        map_codes("Usability Engineering and Mobile Interaction", "UEMI")
-        map_codes("Einführung in wissensbasierte Systeme", "EWS")
-        map_codes("Einführung in Information Retrieval", "IR")
-        map_codes("Semistrukturierte Daten", "SSD")
-        map_codes("Web Engineering", "WEBE")
-        map_codes("Argumentieren und Beweisen", "AUB")
-        map_codes("Deklaratives Problemlösen", "DPR")
-        map_codes("Einführung in Machine Learning", "EML")
-        map_codes("Logik und Grundlagen der Mathematik", "LGM", "LGMUE")
-        map_codes("Logik für Wissensrepräsentation", "LWR")
-        map_codes("Bio-Medical Visualization and Visual Analytics", "BMVVA")
-        map_codes("Design und Entwicklung von Anwendungen im Gesundheitswesen", "DEAG")
-        map_codes("Human Augmentation", "HAUG")
-        map_codes("Informationssysteme des Gesundheitswesens", "ISG")
-        map_codes("Methods for Data Generation and Analytics in Medicine and Life Sciences", "MDGAM")
-        map_codes("Attacks and Defenses in Computer Security", "ADCS")
-        map_codes("Foundations of System and Application Security", "FSAS")
-        map_codes("Privacy-Enhancing Technologies", "PET")
-        map_codes("Computational Statistics", "CSTAT", "SCOMP", "SIM")
-        map_codes("Datenanalyse", "DA")
-        map_codes("Methoden der Angewandten Statistik", "MAS", "MASUE")
-        map_codes("Multivariate Statistik", "MVS", "MVSUE")
-        map_codes("Numerical Computation", "NUMC")
-        map_codes("Programm- und Systemverifikation", "PSV")
-        map_codes("Software-Qualitätssicherung", "SQS")
-        map_codes("Introduction to Cryptography", "ITC")
-        map_codes("Einführung in Quantencomputing", "EQC")
-
-        # ----------------------------
-        # StEOP definition (LV-level!)
-        # ----------------------------
-        # Mandatory StEOP LVs:
-        self.steop_mandatory_lv_keys: Dict[str, float] = {
-            self._norm("Einführung in die Programmierung 1"): 5.5,
-            self._norm("EIDI1"): 5.5,
-            self._norm("EIDI1-VU"): 5.5,
-            self._norm("Mathematisches Arbeiten für Informatik und Wirtschaftsinformatik 1"): 2.0,
-            self._norm("Mathematisches Arbeiten"): 2.0,
-            self._norm("MA"): 2.0,
-            self._norm("MA-VU"): 2.0,
-            self._norm("Orientierung Informatik und Wirtschaftsinformatik"): 1.0,
-            self._norm("OIW"): 1.0,
-            self._norm("ORI-VU"): 1.0,
-        }
-
-        # Pool LVs / modules (>= 8 ECTS)
-        self.steop_pool_keys: Set[str] = {
-            self._norm("Algebra und Diskrete Mathematik"),
-            self._norm("Analysis"),
-            self._norm("Denkweisen der Informatik"),
-            self._norm("Grundzüge digitaler Systeme"),
-            # allow LV codes
-            self._norm("ADM"), self._norm("ADMUE"), self._norm("ADMVU"),
-            self._norm("ANL"), self._norm("ANLUE"), self._norm("ANLVU"),
-            self._norm("SWT"), self._norm("SWTUE"), self._norm("SWTVU"),
-            self._norm("DI"), self._norm("GGDS"),
-            self._norm("ADM-VO"), self._norm("ADM-UE"), self._norm("ADM-VU"),
-            self._norm("ANL-VO"), self._norm("ANL-UE"), self._norm("ANL-VU"),
-            self._norm("DWI-VU"),
-            self._norm("GDS-VU"),
-        }
-
-        # Allowed extra BEFORE StEOP completion (§7) – besides FWTS
-        self.allowed_before_steop_extra: Set[str] = {
-            self._norm("Algorithmen und Datenstrukturen"),
-            self._norm("Datenbanksysteme"),
-            self._norm("Daten- und Informatikrecht"),
-            self._norm("Einführung in die Programmierung 2"),
-            self._norm("Einführung in Visual Computing"),
-            # DB-ish codes
-            self._norm("AD"),
-            self._norm("DBS"),
-            self._norm("DIR"),
-            self._norm("EIDI2"),
-            self._norm("EHVC"),
-            self._norm("AD-VU"),
-            self._norm("DBS-VU"),
-            self._norm("DIR-VU"),
-            self._norm("EIDI2-VU"),
-            self._norm("EVC-VU"),
-        }
-
-        # ----------------------------
-        # Focus (Vertiefung) definitions
-        # ----------------------------
-        self.focuses: Dict[str, Dict[str, Any]] = {
-            self._norm("Artificial Intelligence und Machine Learning"): {
-                "required": ["Einführung in Artificial Intelligence", "Einführung in Machine Learning"],
-                "choose": {"min": 4, "from": [
-                    "Datenanalyse", "Deklaratives Problemlösen", "Effiziente Algorithmen",
-                    "Einführung in Information Retrieval", "Einführung in wissensbasierte Systeme",
-                    "Logikprogrammierung und Constraints", "Menschzentrierte Künstliche Intelligenz",
-                    "Methoden der Angewandten Statistik", "Grundlagen der Visualisierung",
-                ]},
-            },
-            self._norm("Cybersecurity"): {
-                "choose_groups": [
-                    {"min": 2, "from": ["Betriebssysteme", "Einführung in Artificial Intelligence", "Logic and Reasoning in Computer Science", "Verteilte Systeme"]},
-                    {"min": 4, "from": ["Attacks and Defenses in Computer Security", "Foundations of System and Application Security",
-                                        "Introduction to Cryptography", "Privacy-Enhancing Technologies", "Programm- und Systemverifikation"]},
-                ]
-            },
-            self._norm("Digital Health"): {
-                "required": ["Daten- und Informatikrecht", "Einführung in Visual Computing", "Interface und Interaction Design", "Software Engineering",
-                             "Methods for Data Generation and Analytics in Medicine and Life Sciences"],
-                "choose": {"min": 4, "from": [
-                    "Bio-Medical Visualization and Visual Analytics", "Datenanalyse", "Design und Fertigung",
-                    "Design und Entwicklung von Anwendungen im Gesundheitswesen", "Einführung in Machine Learning",
-                    "Grundlagen der Computer Vision", "Human Augmentation", "Informationssysteme des Gesundheitswesens",
-                    "Privacy-Enhancing Technologies", "Sozio-technische Systeme", "Grundlagen der Visualisierung",
-                ]},
-            },
-            self._norm("Human-Centered Computing"): {
-                "required": ["Einführung in Visual Computing", "Interface und Interaction Design", "Software Engineering"],
-                "choose": {"min": 4, "from": [
-                    "Access Computing", "Daten- und Informatikrecht", "Design und Fertigung",
-                    "Human Augmentation", "Menschzentrierte Künstliche Intelligenz", "Sozio-technische Systeme",
-                ]},
-            },
-            self._norm("Software Engineering"): {
-                "required": ["Interface und Interaction Design", "Software Engineering", "Software Engineering Projekt", "Verteilte Systeme", "Software-Qualitätssicherung"],
-                "choose": {"min": 4, "from": [
-                    "Einführung in wissensbasierte Systeme", "Funktionale Programmierung", "Logikprogrammierung und Constraints",
-                    "Parallel Computing", "Programm- und Systemverifikation", "Semistrukturierte Daten", "Übersetzerbau",
-                    "Usability Engineering and Mobile Interaction", "Web Engineering",
-                ]},
-            },
-            self._norm("Theoretische Informatik und Logik"): {
-                "required": ["Logic and Reasoning in Computer Science"],
-                "choose": {"min": 5, "from": [
-                    "Argumentieren und Beweisen", "Deklaratives Problemlösen", "Effiziente Algorithmen",
-                    "Introduction to Cryptography", "Einführung in Quantencomputing", "Logik für Wissensrepräsentation",
-                    "Logik und Grundlagen der Mathematik", "Programm- und Systemverifikation",
-                ]},
-            },
-            self._norm("Visual Computing"): {
-                "required": ["Einführung in Visual Computing", "Software Engineering", "Grundlagen der Computergraphik", "Grundlagen der Computer Vision"],
-                "choose": {"min": 3, "from": ["Multimedia", "Programmiertechniken für Visual Computing", "Grundlagen der Visualisierung"]},
-            },
-        }
-
-        # Focus aliases (robust UI input)
-        self.focus_aliases: Dict[str, str] = {
-            self._norm("ai"): self._norm("Artificial Intelligence und Machine Learning"),
-            self._norm("ml"): self._norm("Artificial Intelligence und Machine Learning"),
-            self._norm("aiml"): self._norm("Artificial Intelligence und Machine Learning"),
-            self._norm("ai ml"): self._norm("Artificial Intelligence und Machine Learning"),
-            self._norm("artificial intelligence"): self._norm("Artificial Intelligence und Machine Learning"),
-            self._norm("machine learning"): self._norm("Artificial Intelligence und Machine Learning"),
-
-            self._norm("cyber"): self._norm("Cybersecurity"),
-            self._norm("security"): self._norm("Cybersecurity"),
-            self._norm("cybersecurity"): self._norm("Cybersecurity"),
-
-            self._norm("digital health"): self._norm("Digital Health"),
-            self._norm("dh"): self._norm("Digital Health"),
-
-            self._norm("hcc"): self._norm("Human-Centered Computing"),
-            self._norm("human centered computing"): self._norm("Human-Centered Computing"),
-            self._norm("human-centered computing"): self._norm("Human-Centered Computing"),
-
-            self._norm("se"): self._norm("Software Engineering"),
-            self._norm("software engineering"): self._norm("Software Engineering"),
-
-            self._norm("til"): self._norm("Theoretische Informatik und Logik"),
-            self._norm("theory"): self._norm("Theoretische Informatik und Logik"),
-            self._norm("theoretische informatik"): self._norm("Theoretische Informatik und Logik"),
-            self._norm("logik"): self._norm("Theoretische Informatik und Logik"),
-
-            self._norm("vc"): self._norm("Visual Computing"),
-            self._norm("visual computing"): self._norm("Visual Computing"),
-        }
-
-        # Soft prerequisite suggestions (warnings only)
-        self.soft_prereqs: List[Tuple[str, str]] = [
-            ("Einführung in die Programmierung 1", "Einführung in die Programmierung 2"),
-            ("Software Engineering", "Software Engineering Projekt"),
-        ]
-        self.split_variant_module_keys: Set[str] = {
-            self._norm("Algebra und Diskrete Mathematik"),
-            self._norm("Analysis"),
-            self._norm("Statistik und Wahrscheinlichkeitstheorie"),
-        }
+        # The curriculum itself is data, loaded from app/curriculum/bachelor.json.
+        # What stays here is the checking, which is the part that is code.
+        curriculum = load_curriculum(BACHELOR)
+        self.program_code: str = curriculum.program_code
+        self.exam_subject_aliases: Dict[str, str] = curriculum.exam_subject_aliases
+        self.modules: Dict[str, Dict[str, Any]] = curriculum.modules
+        self.course_to_module: Dict[str, str] = curriculum.course_to_module
+        self.steop_mandatory_lv_keys: Dict[str, str] = curriculum.steop_mandatory_lv_keys
+        self.steop_pool_keys: set = curriculum.steop_pool_keys
+        self.allowed_before_steop_extra: set = curriculum.allowed_before_steop_extra
+        self.focuses: Dict[str, Any] = curriculum.focuses
+        self.focus_aliases: Dict[str, str] = curriculum.focus_aliases
+        self.soft_prereqs: List[Any] = curriculum.soft_prereqs
+        self.split_variant_module_keys: set = curriculum.split_variant_module_keys
 
     # ----------------------------
     # Internal: canonicalization

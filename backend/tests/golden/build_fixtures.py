@@ -192,8 +192,8 @@ def main() -> None:
     catalogue = load_catalogue()
     cases = build(catalogue)
 
-    from app.services.rule_checker_bachelor import RuleChecker as Bachelor
-    from app.services.rule_checker_master import RuleChecker as Master
+    from app.rules import BachelorRuleChecker as Bachelor
+    from app.rules import MasterRuleChecker as Master
     from dataclasses import asdict
 
     snapshots: dict[str, Any] = {}

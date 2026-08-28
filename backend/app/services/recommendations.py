@@ -12,9 +12,9 @@ from __future__ import annotations
 from typing import Any
 
 from ..repositories import UnitOfWorkFactory
+from ..rules import checker_for
 from .profile import ProfileService
 from .recommender import Recommender
-from .rulecheck import rule_checker_for
 
 
 class RecommendationService:
@@ -43,7 +43,7 @@ class RecommendationService:
             interests,
             career_direction,
             toggles,
-            rule_checker=rule_checker_for(program_code, strict=False),
+            rule_checker=checker_for(program_code, strict=False),
             program_code=program_code,
         )
         return recommender.evaluate(

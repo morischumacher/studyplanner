@@ -1,50 +1,22 @@
 """
-Choosing a rule set and running it.
+Checking a plan against its curriculum.
 
-Programme codes reach the API in whichever spacing the caller happens to use, so
-the code is normalised before it is matched but passed on untouched: the rule
-sets compare against the spaced form printed in the curriculum regulations.
+The rule sets live in `app/rules`; this is the use case around them. It exists
+so that the HTTP layer never touches a checker directly, and so that the one
+place a rule set can raise is wrapped in something the API knows how to answer.
 """
 from __future__ import annotations
 
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
-from ..domain.errors import RuleEvaluationFailed, UnsupportedProgramme
-from .rule_checker_bachelor import RuleChecker as BachelorRuleChecker
-from .rule_checker_master import RuleChecker as MasterRuleChecker
-
-MASTER = "066937"
-BACHELOR = "033521"
-
-
-def normalise_programme_code(value: str | None) -> str:
-    return (value or "").strip().replace(" ", "")
-
-
-def rule_checker_for(program_code: str | None, *, strict: bool = True):
-    """
-    The checker a programme code selects.
-
-    A missing code selects the master checker, which is what the frontend
-    relied on before it sent one. `strict=False` extends that tolerance to
-    unrecognised codes, which is what the recommender does: a recommendation
-    filtered by the wrong rule set is a worse answer, not a failed request.
-    """
-    normalised = normalise_programme_code(program_code)
-    if normalised == BACHELOR:
-        return BachelorRuleChecker()
-    if normalised == MASTER or not normalised or not strict:
-        return MasterRuleChecker()
-    raise UnsupportedProgramme(
-        f"Unsupported programCode '{program_code}'. "
-        f"Expected '066 937' (master) or '033 521' (bachelor)."
-    )
+from ..domain.errors import RuleEvaluationFailed
+from ..rules import checker_for
 
 
 class RuleCheckService:
     def evaluate(self, payload: dict[str, Any]) -> dict[str, Any]:
-        checker = rule_checker_for(payload.get("programCode"))
+        checker = checker_for(payload.get("programCode"))
         try:
             result = checker.evaluate(payload)
         except Exception as error:  # noqa: BLE001 - reported to the caller
