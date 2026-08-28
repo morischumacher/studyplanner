@@ -3,8 +3,8 @@
 ## What has to stay green
 
 ```bash
-cd backend  && pytest                 # 183
-cd frontend && npm test               # 107
+cd backend  && pytest                 # 235
+cd frontend && npm test               # 112
 cd frontend && npm run typecheck
 cd frontend && npm run test:e2e       #  17
 ```
@@ -19,7 +19,7 @@ system was evaluated with eleven students, and the thesis reports what they
 experienced. A restructuring that quietly alters an answer makes the thesis
 wrong, which is a worse failure than a bug.
 
-That is what the golden masters are for. `backend/tests/golden/` holds 36
+That is what the golden masters are for. `backend/tests/golden/` holds 38
 recorded rule-engine scenarios and 85 recorded recommender scenarios, compared
 field by field. If one fails, the change is wrong until proven otherwise. Do not
 regenerate a snapshot to make a test pass. Regenerating is a deliberate act with
