@@ -4,9 +4,9 @@
 
 ```bash
 cd backend  && pytest                 # 183
-cd frontend && npm test               #  97
+cd frontend && npm test               # 105
 cd frontend && npm run typecheck
-cd frontend && npm run test:e2e       #  16
+cd frontend && npm run test:e2e       #  17
 ```
 
 CI runs all four on every push. The end-to-end suite starts its own database and
