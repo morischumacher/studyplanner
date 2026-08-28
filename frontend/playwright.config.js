@@ -68,10 +68,16 @@ export default defineConfig({
             },
         },
         {
-            command: `npx vite --port ${WEB_PORT} --strictPort`,
+            // In CI the built bundle is served rather than the dev server: it is
+            // what a student actually gets, and the dev server was dying partway
+            // through a run. The API base is baked in at build time, which is why
+            // the build happens here rather than in a separate step.
+            command: process.env.CI
+                ? `npx vite build && npx vite preview --port ${WEB_PORT} --strictPort`
+                : `npx vite --port ${WEB_PORT} --strictPort`,
             port: Number(WEB_PORT),
             reuseExistingServer: !process.env.CI,
-            timeout: 120_000,
+            timeout: 180_000,
             env: { VITE_API_BASE: `http://127.0.0.1:${API_PORT}` },
         },
     ],
