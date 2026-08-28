@@ -1,4 +1,120 @@
-export function useDashboardMetrics({
+/**
+ * Everything the planner dashboard displays, derived in one pass.
+ *
+ * This is a plain function and not a hook: it calls nothing from React and
+ * memoises nothing, so each render recomputes all of it. That is deliberate.
+ * The figures are read from a rule-check reply that is replaced wholesale on
+ * every change, so a memo keyed on it would never hit.
+ *
+ * The rule checker's reply is the backend's to shape and arrives unvalidated,
+ * which is why the types below describe only the fields read here and treat
+ * every one of them as optional.
+ */
+
+import { getExamSubjectForCode, resolveDashboardCategoryForProgram } from "../../domain/catalogue.ts";
+import type { RuleCheckState } from "../../domain/programmes.ts";
+import type { SemesterLoadLimits } from "../../domain/plan/state.ts";
+import type { Catalogue } from "../../domain/types.ts";
+
+/** One line of the focus-area checklist the rule checker sends. */
+export interface FocusChecklistItem {
+    label?: string | null;
+    kind?: string | null;
+    group?: string | null;
+    done?: boolean;
+}
+
+/** How many of a group of optional modules the focus area asks for. */
+export interface FocusChooseSummary {
+    label?: string | null;
+    min?: number;
+    done?: number;
+}
+
+interface FocusStats {
+    selected?: string | null;
+    recognized?: boolean;
+    checklist?: FocusChecklistItem[];
+    choose?: FocusChooseSummary | null;
+    chooseGroups?: FocusChooseSummary[];
+}
+
+/** A module and the ECTS counted towards it, as the rule checker reports it. */
+export interface ModuleProgressRow {
+    title?: string | null;
+    requiredEcts?: number;
+    haveEcts?: number;
+    complete?: boolean;
+}
+
+interface RuleCheckStats {
+    ects?: { target_total?: number };
+    buckets?: Record<string, number>;
+    ectsPerSemester?: Record<string, number>;
+    per_semester?: Record<string, number>;
+    ectsByCategory?: Record<string, number>;
+    by_category?: Record<string, number>;
+    ectsByExamSubject?: Record<string, number>;
+    by_exam_subject?: Record<string, number>;
+    totalEcts?: number;
+    ectsMissingTo180?: number;
+    narrowElectives?: { completedCount?: number; requiredCount?: number };
+    focus?: FocusStats;
+    maxEctsPerSemester?: number;
+    recommendedEctsPerSemester?: number;
+    violations?: unknown[];
+    warnings?: string[];
+    moduleProgress?: ModuleProgressRow[];
+}
+
+interface RuleCheckResponse {
+    ok?: boolean;
+    message?: string;
+    missing?: string[];
+    stats?: RuleCheckStats;
+}
+
+/**
+ * A planned course as the dashboard reads it. Wider than the plan's own course
+ * type: the same figures are computed for courses that came back from the rule
+ * checker, and those carry their module under a different name.
+ */
+export interface DashboardCourse {
+    code?: string | null;
+    name?: string | null;
+    title?: string | null;
+    category?: string | null;
+    ects?: number | null;
+    examSubject?: string | null;
+    laneIndex?: number | null;
+    module?: { title?: string | null; examSubject?: string | null } | null;
+    moduleMeta?: { name?: string | null; title?: string | null } | null;
+}
+
+/** The banner a refused save leaves behind, which outranks the rule feedback. */
+export interface DashboardStickyViolation {
+    message?: string;
+    until?: number;
+    tone?: string;
+}
+
+export interface DashboardMetricsInput {
+    ruleCheckState: RuleCheckState;
+    programCode: string;
+    bachelorProgramCode: string;
+    masterProgramCode: string;
+    coursesBySemester: Record<number, DashboardCourse[]> | null | undefined;
+    doneCourseCodes: readonly string[] | null | undefined;
+    plannerHydrated: boolean;
+    dismissedInitialPrefillPrompt: boolean;
+    selectedFocus: string;
+    catalog: Catalogue | null | undefined;
+    dashboardViewMode: string;
+    stickyViolation: DashboardStickyViolation;
+    semesterLoadLimits: SemesterLoadLimits | null | undefined;
+}
+
+export function computeDashboardMetrics({
     ruleCheckState,
     programCode,
     bachelorProgramCode,
@@ -7,17 +123,15 @@ export function useDashboardMetrics({
     doneCourseCodes,
     plannerHydrated,
     dismissedInitialPrefillPrompt,
-    minSemesterCount,
     selectedFocus,
     catalog,
     dashboardViewMode,
     stickyViolation,
     semesterLoadLimits,
-    resolveDashboardCategoryForProgram,
-    getExamSubjectForCode,
-}) {
-    const ruleOk = Boolean(ruleCheckState.response?.ok);
-    const ruleStats = ruleCheckState.response?.stats ?? {};
+}: DashboardMetricsInput) {
+    const response = ruleCheckState.response as RuleCheckResponse | null | undefined;
+    const ruleOk = Boolean(response?.ok);
+    const ruleStats: RuleCheckStats = response?.stats ?? {};
     const isBachelorDashboard = programCode === bachelorProgramCode;
     const ectsStats = ruleStats?.ects ?? {};
     const allPlannedCourses = Object.values(coursesBySemester || {}).flat();
@@ -56,13 +170,7 @@ export function useDashboardMetrics({
     const bachelorNarrowRequired = Number(bachelorNarrow?.requiredCount ?? 7);
     const donePctKpi = targetEctsKpi > 0 ? Math.max(0, Math.min(100, (doneEctsKpi / targetEctsKpi) * 100)) : 0;
     const totalPctKpi = targetEctsKpi > 0 ? Math.max(0, Math.min(100, (totalEctsKpi / targetEctsKpi) * 100)) : 0;
-    const renderKpiProgress = (pct, color) => (
-        <div style={{ marginTop: 6, height: 6, borderRadius: 999, background: "#e5e7eb", overflow: "hidden" }}>
-            <div style={{ width: `${Math.max(0, Math.min(100, Number(pct) || 0))}%`, height: "100%", background: color }} />
-        </div>
-    );
-
-    const normalizeSteopKey = (value) =>
+    const normalizeSteopKey = (value: unknown) =>
         String(value || "")
             .normalize("NFKD")
             .replace(/[\u0300-\u036f]/g, "")
@@ -101,13 +209,13 @@ export function useDashboardMetrics({
         "GDS-VU",
     ].map(normalizeSteopKey));
 
-    const steopMandatoryEctsByTag = { eidi1: 5.5, ma: 2.0, ori: 1.0 };
+    const steopMandatoryEctsByTag: Record<string, number> = { eidi1: 5.5, ma: 2.0, ori: 1.0 };
     const steopMandatoryRequiredEcts = 8.5;
     const steopPoolRequiredEcts = 8.0;
     const steopRequiredEcts = steopMandatoryRequiredEcts + steopPoolRequiredEcts;
 
-    const steopCourseKeys = (course) => {
-        const keys = new Set();
+    const steopCourseKeys = (course: DashboardCourse | null | undefined) => {
+        const keys = new Set<string>();
         const codeKey = normalizeSteopKey(course?.code);
         const nameKey = normalizeSteopKey(course?.name || course?.title);
         if (codeKey) keys.add(codeKey);
@@ -115,7 +223,7 @@ export function useDashboardMetrics({
         return keys;
     };
 
-    const steopTagOfCourse = (course) => {
+    const steopTagOfCourse = (course: DashboardCourse | null | undefined) => {
         for (const key of steopCourseKeys(course)) {
             const tag = steopMandatoryTagByKey[key];
             if (tag) return tag;
@@ -123,15 +231,15 @@ export function useDashboardMetrics({
         return null;
     };
 
-    const isSteopPoolCourse = (course) => {
+    const isSteopPoolCourse = (course: DashboardCourse | null | undefined) => {
         for (const key of steopCourseKeys(course)) {
             if (steopPoolKeys.has(key)) return true;
         }
         return false;
     };
 
-    const computeSteopProgress = (courses) => {
-        const tags = new Set();
+    const computeSteopProgress = (courses: readonly DashboardCourse[] | null | undefined) => {
+        const tags = new Set<string>();
         let pool = 0;
         for (const c of courses || []) {
             const tag = steopTagOfCourse(c);
@@ -170,7 +278,7 @@ export function useDashboardMetrics({
         steopPoolPlannedEcts >= steopPoolRequiredEcts - 1e-6;
 
     const doneSteopKeySet = (() => {
-        const out = new Set();
+        const out = new Set<string>();
         for (const c of doneCoursesLocal) {
             for (const key of steopCourseKeys(c)) out.add(key);
         }
@@ -220,7 +328,7 @@ export function useDashboardMetrics({
         done: row.keys.some((k) => doneSteopKeySet.has(normalizeSteopKey(k))),
     }));
     const plannedSteopKeySet = (() => {
-        const out = new Set();
+        const out = new Set<string>();
         for (const c of allPlannedCourses) {
             for (const key of steopCourseKeys(c)) out.add(key);
         }
@@ -266,7 +374,7 @@ export function useDashboardMetrics({
             if (!doneByLane.has(li)) doneByLane.set(li, []);
             doneByLane.get(li).push(c);
         }
-        const cumTags = new Set();
+        const cumTags = new Set<string>();
         let cumPool = 0;
         for (const li of [...doneByLane.keys()].sort((a, b) => a - b)) {
             for (const c of doneByLane.get(li)) {
@@ -288,7 +396,7 @@ export function useDashboardMetrics({
             if (!plannedByLane.has(li)) plannedByLane.set(li, []);
             plannedByLane.get(li).push(c);
         }
-        const cumTags = new Set();
+        const cumTags = new Set<string>();
         let cumPool = 0;
         for (const li of [...plannedByLane.keys()].sort((a, b) => a - b)) {
             for (const c of plannedByLane.get(li)) {
@@ -338,7 +446,7 @@ export function useDashboardMetrics({
         : 0;
 
     const perSemesterRows = (() => {
-        const bySemester = new Map();
+        const bySemester = new Map<number, number>();
         const bySem = coursesBySemester && typeof coursesBySemester === "object" ? coursesBySemester : {};
         for (const [semesterKey, list] of Object.entries(bySem)) {
             const sem = Number(semesterKey);
@@ -354,7 +462,7 @@ export function useDashboardMetrics({
     })();
 
     const donePerSemesterRows = (() => {
-        const bySemester = new Map();
+        const bySemester = new Map<number, number>();
         const bySem = coursesBySemester && typeof coursesBySemester === "object" ? coursesBySemester : {};
         for (const [semesterKey, list] of Object.entries(bySem)) {
             const sem = Number(semesterKey);
@@ -400,7 +508,7 @@ export function useDashboardMetrics({
     const maxDoneSemesterWorkloadForScale = Math.max(maxSemesterEcts, 1);
 
     const byCategoryRows = (() => {
-        const byCategoryMap = new Map();
+        const byCategoryMap = new Map<string, number>();
         for (const c of allPlannedCourses || []) {
             const category = resolveDashboardCategoryForProgram(c, programCode);
             const prev = Number(byCategoryMap.get(category) || 0);
@@ -415,13 +523,13 @@ export function useDashboardMetrics({
     const topByCategoryRow = byCategoryRows.length > 0 ? byCategoryRows[0] : null;
 
     const donePerCategoryProgressRows = (() => {
-        const plannedMap = new Map();
+        const plannedMap = new Map<string, number>();
         for (const c of allPlannedCourses || []) {
             const category = resolveDashboardCategoryForProgram(c, programCode);
             const prev = Number(plannedMap.get(category) || 0);
             plannedMap.set(category, prev + Number(c?.ects || 0));
         }
-        const doneMap = new Map();
+        const doneMap = new Map<string, number>();
         for (const c of doneCoursesLocal || []) {
             const category = resolveDashboardCategoryForProgram(c, programCode);
             const prev = Number(doneMap.get(category) || 0);
@@ -452,7 +560,7 @@ export function useDashboardMetrics({
     ).length;
 
     const warnings = Array.isArray(ruleStats?.warnings) ? ruleStats.warnings : [];
-    const normalizeFocusKey = (value) =>
+    const normalizeFocusKey = (value: unknown) =>
         String(value || "")
             .normalize("NFKD")
             .replace(/[\u0300-\u036f]/g, "")
@@ -476,7 +584,7 @@ export function useDashboardMetrics({
     })();
 
     const doneModuleTitleSetForFocus = (() => {
-        const out = new Set();
+        const out = new Set<string>();
         for (const course of doneCoursesLocal || []) {
             const moduleTitle =
                 course?.module?.title ||
@@ -490,7 +598,7 @@ export function useDashboardMetrics({
         return out;
     })();
     const plannedModuleTitleSetForFocus = (() => {
-        const out = new Set();
+        const out = new Set<string>();
         for (const course of allPlannedCourses || []) {
             const moduleTitle =
                 course?.module?.title ||
@@ -554,12 +662,13 @@ export function useDashboardMetrics({
     });
 
     const focusChooseGroupRows = (() => {
-        const byGroup = new Map();
+        const byGroup = new Map<string, FocusChecklistItem[]>();
         for (const item of focusChecklist) {
             if (item?.kind !== "choose_group") continue;
             const label = String(item?.group || "Option group");
-            if (!byGroup.has(label)) byGroup.set(label, []);
-            byGroup.get(label).push(item);
+            const group = byGroup.get(label);
+            if (group) group.push(item);
+            else byGroup.set(label, [item]);
         }
         return [...byGroup.entries()].map(([groupLabel, items]) => {
             const summary = focusChooseGroupsSummary.find((row) => String(row?.label || "") === groupLabel) || null;
@@ -584,12 +693,13 @@ export function useDashboardMetrics({
     const focusRequiredItemsPlanned = focusChecklistPlanned.filter((item) => item?.kind === "required");
     const focusChooseItemsPlanned = focusChecklistPlanned.filter((item) => item?.kind === "choose");
     const focusChooseGroupRowsPlanned = (() => {
-        const byGroup = new Map();
+        const byGroup = new Map<string, FocusChecklistItem[]>();
         for (const item of focusChecklistPlanned) {
             if (item?.kind !== "choose_group") continue;
             const label = String(item?.group || "Option group");
-            if (!byGroup.has(label)) byGroup.set(label, []);
-            byGroup.get(label).push(item);
+            const group = byGroup.get(label);
+            if (group) group.push(item);
+            else byGroup.set(label, [item]);
         }
         return [...byGroup.entries()].map(([groupLabel, items]) => {
             const summary = focusChooseGroupsSummaryPlanned.find((row) => String(row?.label || "") === groupLabel) || null;
@@ -634,7 +744,7 @@ export function useDashboardMetrics({
     const masterModuleProgress = (() => {
         if (isBachelorDashboard) return [];
         const moduleTitleByCourseCode = new Map();
-        const requiredEctsByModuleTitle = new Map();
+        const requiredEctsByModuleTitle = new Map<string, number>();
         for (const pf of catalog || []) {
             for (const mod of pf?.modules || []) {
                 const title = mod?.name || mod?.code;
@@ -648,7 +758,7 @@ export function useDashboardMetrics({
                 }
             }
         }
-        const haveByModuleTitle = new Map();
+        const haveByModuleTitle = new Map<string, number>();
         for (const c of allPlannedCourses || []) {
             const title = c?.module?.title || moduleTitleByCourseCode.get(c?.code) || null;
             if (!title) continue;
@@ -747,7 +857,7 @@ export function useDashboardMetrics({
         : 0;
 
     const plannedEctsByExamSubjectRows = (() => {
-        const bySubject = new Map();
+        const bySubject = new Map<string, number>();
         for (const c of allPlannedCourses || []) {
             if (!c?.code) continue;
             const subject =
@@ -765,13 +875,13 @@ export function useDashboardMetrics({
 
     const plannedEctsByExamSubjectTotal = plannedEctsByExamSubjectRows.reduce((sum, row) => sum + Number(row?.ects || 0), 0);
     const violations = Array.isArray(ruleStats?.violations) ? ruleStats.violations : [];
-    const missingItems = Array.isArray(ruleCheckState.response?.missing) ? ruleCheckState.response.missing : [];
+    const missingItems = Array.isArray(response?.missing) ? response.missing : [];
     const hasMissingRequirements = missingItems.length > 0;
     const hasWarnings = warnings.length > 0;
     const plannedChecklistComplete = missingItems.length === 0;
     const doneChecklistComplete = plannedChecklistComplete && remainingPlannedEctsKpi <= 0.0001 && donePctKpi >= 100 - 1e-6;
 
-    const getDashboardModeButtonStyle = (mode) => {
+    const getDashboardModeButtonStyle = (mode: string) => {
         const isActive = dashboardViewMode === mode;
         const isComplete = mode === "planning" ? plannedChecklistComplete : doneChecklistComplete;
         const borderColor = isComplete ? "#16a34a" : "#dc2626";
@@ -800,8 +910,8 @@ export function useDashboardMetrics({
         ? "Checking rules..."
         : (ruleCheckState.error
             ? `Rule check error: ${ruleCheckState.error}`
-            : (ruleCheckState.response
-                ? (ruleCheckState.response?.message ?? "Rule check updated")
+            : (response
+                ? (response?.message ?? "Rule check updated")
                 : "No rule check response yet")));
     const feedbackBg = stickyActive
         ? (stickyViolation?.tone === "success" ? "#dcfce7" : "#fee2e2")
@@ -840,7 +950,6 @@ export function useDashboardMetrics({
         bachelorNarrowRequired,
         donePctKpi,
         totalPctKpi,
-        renderKpiProgress,
         steopMandatoryRequiredEcts,
         steopPoolRequiredEcts,
         steopRequiredEcts,
@@ -946,3 +1055,6 @@ export function useDashboardMetrics({
         feedbackColor,
     };
 }
+
+/** What the dashboard reads. Inferred, because the figures are the contract. */
+export type DashboardMetrics = ReturnType<typeof computeDashboardMetrics>;
