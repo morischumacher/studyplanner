@@ -9,12 +9,20 @@ everything, so only violations the candidate itself introduces count.
 
 A course can appear in the catalogue more than once, under different modules. It
 survives if any one of those placements is acceptable.
+
+A checker that raises has said nothing, and silence is not consent: a candidate
+whose trial the checker could not answer is dropped, because the premise above
+only holds for candidates that were actually checked. A checker that cannot
+answer for the plan itself is a different case, and is handled where it arises.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from .context import PlanContext
+
+logger = logging.getLogger(__name__)
 
 RESULT_LIMIT = 15
 
@@ -48,16 +56,18 @@ def filter_by_rules(
     plan: PlanContext, recommendations: list[dict[str, Any]], rule_checker: Any
 ) -> list[dict[str, Any]]:
     """Keep the recommendations that introduce no new complaint, best first."""
-    base_errors: list[str] = []
-    base_warnings: list[str] = []
     try:
         base = rule_checker.evaluate(_payload(plan))
-        base_errors = base.errors or []
-        base_warnings = base.stats.get("warnings", [])
-    except BaseException:
-        # The checker is advisory here. When it cannot answer, nothing is known
-        # to be wrong with the plan, and every candidate is judged against that.
-        pass
+    except Exception:
+        # Without a baseline there is nothing to measure a candidate against, and
+        # an empty one would count every complaint the plan already has as one the
+        # candidate introduced. The filter stands down instead, leaving the list
+        # the engine shows when no checker is configured at all.
+        logger.exception("rule checker could not evaluate the plan; recommendations are unfiltered")
+        return recommendations[:RESULT_LIMIT]
+
+    base_errors = base.errors or []
+    base_warnings = base.stats.get("warnings", [])
 
     variants: dict[str, list[dict[str, Any]]] = {}
     for candidate in plan.candidates:
@@ -90,8 +100,9 @@ def _is_acceptable(
 ) -> bool:
     try:
         result = rule_checker.evaluate(_payload(plan, _trial_course(row)))
-    except BaseException:
-        return True
+    except Exception:
+        logger.exception("rule checker could not judge candidate %r", row.get("code"))
+        return False
 
     if result.ok:
         return True

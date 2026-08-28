@@ -112,9 +112,14 @@ was not fixed. Resolved for `sequence.py`, which now iterates the curriculum's
 ordering rather than the plan's sets, and settled in `completed.py` by ranking on
 the share. Latent elsewhere in the same class.
 
-**A rule-check failure is read as "this recommendation is fine".** Bare
-`except BaseException` around the filter, which also swallows `KeyboardInterrupt`
-and `SystemExit`. `backend/app/recommendations/rules.py`.
+**A rule-check failure is read as "this recommendation is fine".** Fixed. A
+candidate whose trial the checker could not answer is now dropped rather than
+kept, because the filter's premise only holds for candidates that were actually
+checked. A checker that cannot answer for the plan itself is treated separately:
+there is then no baseline to compare anything against, so the filter stands down
+and the list is shown unfiltered, which is what the engine already does when no
+checker is configured. Both failures are logged, and the catch is `Exception`, so
+`KeyboardInterrupt` and `SystemExit` travel on.
 
 **The synthetic peer cohort is unbounded module-level mutable state**, keyed by
 programme code, never evicted, shared across requests.
