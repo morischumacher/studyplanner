@@ -35,6 +35,15 @@ export interface LaneLayoutOptions {
     verticalSemantics?: VerticalSemantics | undefined;
 }
 
+/**
+ * The lane geometry a whole-canvas compaction needs. Compaction settles cards
+ * against each other and against the module headers above them, which is a
+ * question about pixels rather than about how many semesters the plan has.
+ */
+export interface PrefillLayoutOptions {
+    minModuleGroupTopY: number;
+}
+
 /** The rectangle a node occupies, plus its height. */
 interface BoundingBox {
     x1: number;
@@ -248,7 +257,7 @@ function resizeAllGroups(nodes: PlanNode[]): PlanNode[] {
  */
 export function compactPrefillLayout(
     allNodes: PlanNode[],
-    { minModuleGroupTopY }: LaneLayoutOptions
+    { minModuleGroupTopY }: PrefillLayoutOptions
 ): PlanNode[] {
     let nodes = enforceModuleHeaderClearance(allNodes, minModuleGroupTopY);
     const candidates = nodes

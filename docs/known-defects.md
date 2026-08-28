@@ -208,6 +208,7 @@ is fetched again. `frontend/src/features/recommendations/`.
   skills cap, and then discarded; `per_course_module_title` is written and never
   read. `backend/app/rules/bachelor.py`.
 - `compactPrefillLayout` takes a maximum semester count and has never used it.
+  Removed from its parameter type, which is now the one field it reads.
 - Several dependency arrays are incomplete: the placement and module-placement
   callbacks, the canvas rebuild, and the planner-state load. All are harmless
   today only because of what happens to be stable.
