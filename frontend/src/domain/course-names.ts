@@ -120,7 +120,8 @@ export function displayModuleHeader(
     if (cleanedPrefix) return cleanedPrefix;
     if (prefix) return prefix;
 
-    // The module name is not consulted here, so a module with no course codes
-    // falls back to its raw code even when it has a perfectly good name.
-    return displayShortCode(moduleCode);
+    // A name too short or too common to yield an acronym is still a name, and
+    // every other header on the canvas reads as one. Only a module with no name
+    // at all is headed with its code.
+    return String(moduleName || "").trim() || displayShortCode(moduleCode);
 }

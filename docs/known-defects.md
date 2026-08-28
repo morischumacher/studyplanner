@@ -156,8 +156,9 @@ observable in a missing-requirement message.
 ### Display
 
 **`displayModuleHeader`'s last fallback returns a module code where it means to
-return a module name.** It passed a second argument to a one-parameter function,
-so the name was silently discarded. `frontend/src/domain/course-names.ts`.
+return a module name.** Fixed. The name is now the fallback and the code is the
+fallback behind it, so a module is headed with its raw code only when it has no
+name at all.
 
 **An explicit teaching format on a drag payload is ignored.** The drop handler
 writes `type`; the placement function reads `courseType`. The format is always
