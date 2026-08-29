@@ -47,7 +47,22 @@ unprivileged_user() {
   echo studyplanner-pg
 }
 
-url() { echo "postgresql://$PGUSER@/$PGDATABASE?host=$PGSOCKET&port=$PGPORT"; }
+# The two paths are reachable at different addresses, and `url` runs as its own
+# process, so it works out which one is up rather than assuming. Docker publishes
+# a TCP port and wants the password it was created with; the native server
+# listens on a Unix socket and trusts local connections.
+container_running() {
+  command -v docker >/dev/null 2>&1 &&
+    docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$CONTAINER"
+}
+
+url() {
+  if container_running; then
+    echo "postgresql://$PGUSER:$PGUSER@127.0.0.1:$PGPORT/$PGDATABASE"
+  else
+    echo "postgresql://$PGUSER@/$PGDATABASE?host=$PGSOCKET&port=$PGPORT"
+  fi
+}
 
 wait_ready() {
   local bin="${1:-}" i
