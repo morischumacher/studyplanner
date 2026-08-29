@@ -2,6 +2,8 @@
 
 ## What has to stay green
 
+The unit tests need Node 22 or newer; the application runs on Node 20.
+
 ```bash
 cd backend  && pytest                 # 235
 cd frontend && npm test               # 112

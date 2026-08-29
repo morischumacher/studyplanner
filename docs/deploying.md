@@ -46,8 +46,8 @@ and in a second terminal:
 cd frontend && npm install && npm run dev    # :5173
 ```
 
-Node 22 or newer is required; `node --version` before you start, because the
-failure if it is older happens inside a dependency and does not say so.
+Node 20 or newer runs the application. Node 22 is needed only to run the unit
+tests, and the test command says so rather than failing inside a dependency.
 
 `scripts/dev-db.sh` starts a container if Docker is running and a native cluster
 otherwise, applies whatever is outstanding, and does nothing else. It is safe to

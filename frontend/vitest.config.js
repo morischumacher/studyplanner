@@ -1,5 +1,17 @@
 import { defineConfig } from "vitest/config";
 
+// The application runs on Node 20. These tests do not: the ones that render a
+// hook need jsdom, and jsdom 30 throws out of its own import below Node 22,
+// with a message about undici that names neither jsdom nor Node. Saying so here
+// costs one line and saves the half hour it otherwise takes to work out.
+const [major] = process.versions.node.split(".").map(Number);
+if (major < 22) {
+    throw new Error(
+        `The unit tests need Node 22 or newer (jsdom requires it); this is Node ${process.versions.node}. ` +
+        "The application itself runs on Node 20."
+    );
+}
+
 export default defineConfig({
     test: {
         environment: "node",

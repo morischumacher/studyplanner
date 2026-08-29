@@ -16,9 +16,12 @@ students in a within-subjects study; the version they used is tagged
 
 ## Running it
 
-You need Node 22 or newer, Python 3.11 or newer, and PostgreSQL 16. Docker is
-optional. Node 22 is a floor rather than a preference: jsdom, which the unit
-tests render into, does not run below it.
+You need Node 20 or newer, Python 3.11 or newer, and PostgreSQL 16. Docker is
+optional.
+
+Running the unit tests needs Node 22, which the application itself does not:
+jsdom, which the tests that render a hook use, does not run below it. The test
+command says so if you are on an older Node.
 
 ```bash
 # a database, migrated and seeded with both curricula
@@ -87,18 +90,18 @@ Five documents explain the parts that are not obvious from the tree:
 Three layers, because they catch different things.
 
 ```bash
-cd backend  && pytest                 # 183
-cd frontend && npm test               # 107
+cd backend  && pytest                 # 235
+cd frontend && npm test               # 112
 cd frontend && npm run test:e2e       #  17
 cd frontend && npm run typecheck
 ```
 
-The backend suite includes a **golden master** for the rule engine: 36 recorded
+The backend suite includes a **golden master** for the rule engine: 38 recorded
 scenarios whose verdicts are compared field by field, and 85 more for the
-recommender. They exist because the compliance rules were restructured after the
-evaluation study, and the results of that study only mean anything if the
-answers did not change. The **contract tests** pin every endpoint's status code
-and response shape for the same reason.
+recommender. A change that alters an answer fails against the recording rather
+than being noticed later, and regenerating a recording is a deliberate act with
+its own commit. The **contract tests** pin every endpoint's status code and
+response shape on the same principle.
 
 The end-to-end suite drives a real browser against a real API and database, and
 covers the loop the study actually watched students perform: read the catalogue,
