@@ -36,7 +36,9 @@ git checkout fix/evaluation-defects
 ./scripts/dev-db.sh up                       # starts Postgres, applies migrations
 export DATABASE_URL="$(./scripts/dev-db.sh url)"
 
-cd backend && pip install -r requirements-dev.txt
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
 uvicorn app.main:app --reload                # :8000
 ```
 

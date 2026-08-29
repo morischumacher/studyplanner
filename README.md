@@ -29,11 +29,19 @@ command says so if you are on an older Node.
 export DATABASE_URL="$(./scripts/dev-db.sh url)"
 
 # the API, on :8000
-cd backend && pip install -r requirements-dev.txt && uvicorn app.main:app --reload
+cd backend
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload
 
 # the interface, on :5173
 cd frontend && npm install && npm run dev
 ```
+
+The virtual environment is worth the two extra lines. Installing into the
+system Python works, but pip will report conflicts with whatever else is
+installed there, and those reports are about the other packages rather than
+about this one.
 
 `scripts/dev-db.sh` is idempotent: it starts a cluster if one is not already
 running, applies whatever migrations are outstanding, and does nothing else. It
