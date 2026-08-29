@@ -64,10 +64,30 @@ url() {
   fi
 }
 
+# How the client is reached, set by whichever path starts the server. The Docker
+# path runs psql inside the container, so a machine carrying only Docker needs no
+# PostgreSQL client of its own; requiring one was how this used to fail, and it
+# failed by exiting before the migrations ran rather than by saying so.
+PSQL=()
+PG_ISREADY=()
+
+use_docker_client() {
+  PSQL=(docker exec -i "$CONTAINER" psql -U "$PGUSER" -d "$PGDATABASE")
+  PG_ISREADY=(docker exec "$CONTAINER" pg_isready -U "$PGUSER" -d "$PGDATABASE")
+}
+
+use_native_client() {
+  local bin="${1:-}"
+  PSQL=("${bin}psql" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE")
+  PG_ISREADY=("${bin}pg_isready" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER")
+}
+
+# A first `docker run` pulls the image and initialises the cluster, which takes
+# appreciably longer than starting one that already exists.
 wait_ready() {
-  local bin="${1:-}" i
-  for i in $(seq 1 30); do
-    if "${bin}pg_isready" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" >/dev/null 2>&1; then return 0; fi
+  local i
+  for i in $(seq 1 90); do
+    if "${PG_ISREADY[@]}" >/dev/null 2>&1; then return 0; fi
     sleep 1
   done
   echo "database did not become ready on port $PGPORT" >&2
@@ -83,12 +103,13 @@ wait_ready() {
 # A few files carry their own BEGIN/COMMIT, which is harmless but makes psql
 # warn; those warnings are filtered while ON_ERROR_STOP still aborts on error.
 apply_migrations() {
-  local psql_bin="${1:-psql}"
-  local run=("$psql_bin" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE")
+  local run=("${PSQL[@]}")
 
   # The ledger and the one-time rename of the old sequential filenames. The
   # application runs the same file at startup, so both agree on what has run.
-  "${run[@]}" --quiet --set ON_ERROR_STOP=1 -f "$SQL_DIR/_ledger.psql" >/dev/null
+  # Files are fed on standard input rather than by path, because the client may
+  # be running inside the container, where the path does not exist.
+  "${run[@]}" --quiet --set ON_ERROR_STOP=1 < "$SQL_DIR/_ledger.psql" >/dev/null
 
   local applied=0 skipped=0 f name
   for f in "$SQL_DIR"/*.sql; do
@@ -97,7 +118,7 @@ apply_migrations() {
       skipped=$((skipped + 1))
       continue
     fi
-    "${run[@]}" --single-transaction --quiet --set ON_ERROR_STOP=1 -f "$f" 2> >(
+    "${run[@]}" --single-transaction --quiet --set ON_ERROR_STOP=1 < "$f" 2> >(
       grep -vE 'WARNING:  there is (already a|no) transaction in progress' >&2
     )
     "${run[@]}" --quiet --set ON_ERROR_STOP=1 \
@@ -117,8 +138,9 @@ up_docker() {
     docker start "$CONTAINER" >/dev/null
   fi
   PGSOCKET=127.0.0.1
+  use_docker_client
   wait_ready
-  PGPASSWORD="$PGUSER" apply_migrations psql
+  apply_migrations
 }
 
 up_native() {
@@ -134,11 +156,12 @@ up_native() {
     chown -R "$owner" "$PGDATA"
     run_as "$owner" "${bin}pg_ctl -D '$PGDATA' -l '$PGDATA/server.log' -o '-p $PGPORT -k $PGSOCKET' -w start" >/dev/null
   fi
-  wait_ready "$bin"
+  use_native_client "$bin"
+  wait_ready
   "${bin}psql" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d postgres -tAc \
     "select 1 from pg_database where datname='$PGDATABASE'" | grep -q 1 \
     || "${bin}createdb" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE"
-  apply_migrations "${bin}psql"
+  apply_migrations
 }
 
 run_as() {
@@ -168,8 +191,8 @@ case "${1:-up}" in
     ;;
   psql)
     shift || true
-    bin=""; have_docker || bin="$(native_bin)/"
-    exec "${bin}psql" -h "$PGSOCKET" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE" "$@"
+    if container_running; then use_docker_client; else use_native_client "$(native_bin)/"; fi
+    exec "${PSQL[@]}" "$@"
     ;;
   url) url ;;
   *) echo "usage: $0 {up|down|reset|psql|url}" >&2; exit 2 ;;
