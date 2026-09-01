@@ -235,6 +235,136 @@
       "SDS": "Seminar for Diploma Students",
       "FOE": "Final Oral Exam / Defense"
     },
-    "recommended_prereqs": []
+    "recommended_prereqs": [
+      {
+        "target": "AI Programming",
+        "sources": [
+          "Machine Learning"
+        ]
+      },
+      {
+        "target": "Advanced Model Engineering",
+        "sources": [
+          "Model Engineering"
+        ]
+      },
+      {
+        "target": "Advanced Reinforcement Learning",
+        "sources": [
+          "Reinforcement Learning"
+        ]
+      },
+      {
+        "target": "Advanced Research in Algorithmics",
+        "sources": [
+          "Algorithmics",
+          "Complexity Theory"
+        ]
+      },
+      {
+        "target": "Algorithmic Encoding Techniques",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Algorithmic Geometry",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Algorithmic Social Choice",
+        "sources": [
+          "Algorithmics",
+          "Complexity Theory"
+        ]
+      },
+      {
+        "target": "Algorithms for Data Science",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Algorithms in Graph Theory",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Beyond Exact Algorithms",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Database Theory",
+        "sources": [
+          "Formal Methods in Systems Engineering"
+        ]
+      },
+      {
+        "target": "Deep Learning for Natural Language Processing",
+        "sources": [
+          "Machine Learning"
+        ]
+      },
+      {
+        "target": "Fixed-Parameter Algorithms and Complexity",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Generative AI",
+        "sources": [
+          "Machine Learning"
+        ]
+      },
+      {
+        "target": "Graph Drawing Algorithms",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Logic and Computability",
+        "sources": [
+          "Formal Methods in Systems Engineering"
+        ]
+      },
+      {
+        "target": "Machine Learning for Optimization",
+        "sources": [
+          "Machine Learning"
+        ]
+      },
+      {
+        "target": "Mathematical Programming and Optimization in Transport Logistics",
+        "sources": [
+          "Algorithmics",
+          "Heuristic Optimization Techniques"
+        ]
+      },
+      {
+        "target": "SAT Algorithms, Applications and Extensions",
+        "sources": [
+          "Formal Methods in Systems Engineering"
+        ]
+      },
+      {
+        "target": "Structural Decompositions and Meta Theorems",
+        "sources": [
+          "Algorithmics"
+        ]
+      },
+      {
+        "target": "Theoretical Foundations of Deep Learning",
+        "sources": [
+          "Machine Learning"
+        ]
+      }
+    ]
   }
 }

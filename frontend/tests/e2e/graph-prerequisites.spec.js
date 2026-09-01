@@ -13,6 +13,11 @@ import { startPlanning, BACHELOR } from "./support/planner.js";
 
 const prerequisiteEdges = (page) => page.locator('.react-flow__edge[data-testid^="rf__edge-prereq-"]');
 
+/** The expected-knowledge control on the node card carrying a given title. */
+const toggleOn = (page, title) =>
+    page.locator(".react-flow__node", { hasText: title }).first()
+        .locator('[data-testid="recommended-prereq-toggle"]');
+
 async function openGraph(page) {
     await page.getByRole("button", { name: /Graph View/i }).click();
     await expect(page.locator(".react-flow__node").first()).toBeVisible({ timeout: 20000 });
@@ -43,12 +48,16 @@ test.describe("prerequisite relations in the graph", () => {
         await openGraph(page);
         await expandEverything(page);
 
-        // Exactly the nodes the curriculum names carry the control: the module
-        // that states expected knowledge, and the three modules that teach it.
+        // The curriculum states expected knowledge for a large minority of its
+        // modules, which is why the graph reveals it per node rather than at once.
         const toggles = page.locator('[data-testid="recommended-prereq-toggle"]');
-        await expect(toggles).toHaveCount(4);
+        await expect.poll(async () => toggles.count()).toBeGreaterThan(20);
 
-        const target = toggles.filter({ hasText: "⇠3" }).first();
+        // Abstrakte Maschinen: "Diese Voraussetzungen werden in folgenden Modulen
+        // vermittelt: Einführung in die Programmierung, Programmierparadigmen,
+        // Übersetzerbau."
+        const target = toggleOn(page, "Abstrakte Maschinen");
+        await expect(target).toHaveText("⇠3");
         await target.click();
         await expect(prerequisiteEdges(page)).toHaveCount(3);
         await expect(target).toHaveAttribute("aria-pressed", "true");
@@ -67,15 +76,16 @@ test.describe("prerequisite relations in the graph", () => {
         await openGraph(page);
         await expandEverything(page);
 
-        const toggles = page.locator('[data-testid="recommended-prereq-toggle"]');
-        const target = toggles.filter({ hasText: "⇠3" }).first();
-        const source = toggles.filter({ hasText: "⇠1" }).first();
+        const target = toggleOn(page, "Abstrakte Maschinen");
+        const source = toggleOn(page, "Übersetzerbau");
 
         await target.click();
         await expect(prerequisiteEdges(page)).toHaveCount(3);
 
+        // Übersetzerbau is one of the three, and states three of its own, so the
+        // picture changes rather than staying put.
         await source.click();
-        await expect(prerequisiteEdges(page)).toHaveCount(1);
+        await expect(prerequisiteEdges(page)).toHaveCount(4);
         await expect(target).toHaveAttribute("aria-pressed", "false");
 
         await source.click();
@@ -87,8 +97,8 @@ test.describe("prerequisite relations in the graph", () => {
         await openGraph(page);
         await expandEverything(page);
 
-        await page.locator('[data-testid="recommended-prereq-toggle"]').filter({ hasText: "⇠3" }).first().click();
-        await expect(page.getByText("Abstrakte Maschinen", { exact: false }).first()).toBeVisible();
+        await toggleOn(page, "Abstrakte Maschinen").click();
+        await expect(page.getByText("expects to be known already")).toBeVisible();
         await page.getByRole("button", { name: "Hide", exact: true }).click();
         await expect(prerequisiteEdges(page)).toHaveCount(0);
     });

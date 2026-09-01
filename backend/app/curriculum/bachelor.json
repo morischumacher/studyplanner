@@ -840,6 +840,277 @@
           "Programmierparadigmen",
           "Übersetzerbau"
         ]
+      },
+      {
+        "target": "Argumentieren und Beweisen",
+        "sources": [
+          "Algebra und Diskrete Mathematik"
+        ]
+      },
+      {
+        "target": "Attacks and Defenses in Computer Security",
+        "sources": [
+          "Betriebssysteme",
+          "Einführung in Security"
+        ]
+      },
+      {
+        "target": "Betriebssysteme",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Grundzüge digitaler Systeme"
+        ]
+      },
+      {
+        "target": "Bio-Medical Visualization and Visual Analytics",
+        "sources": [
+          "Einführung in Visual Computing",
+          "Grundlagen der Visualisierung",
+          "Methods for Data Generation and Analytics in Medicine and Life Sciences"
+        ]
+      },
+      {
+        "target": "Computational Statistics",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Analysis",
+          "Statistik und Wahrscheinlichkeitstheorie"
+        ]
+      },
+      {
+        "target": "Computersysteme",
+        "sources": [
+          "Betriebssysteme",
+          "Einführung in die Programmierung",
+          "Grundzüge digitaler Systeme"
+        ]
+      },
+      {
+        "target": "Datenanalyse",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Analysis",
+          "Statistik und Wahrscheinlichkeitstheorie"
+        ]
+      },
+      {
+        "target": "Datenbanksysteme",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Grundzüge digitaler Systeme",
+          "Mathematisches Arbeiten"
+        ]
+      },
+      {
+        "target": "Deklaratives Problemlösen",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Algorithmen und Datenstrukturen",
+          "Einführung in Artificial Intelligence",
+          "Grundzüge digitaler Systeme",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Einführung in Artificial Intelligence",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Algorithmen und Datenstrukturen",
+          "Grundzüge digitaler Systeme",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Einführung in Information Retrieval",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Programmierparadigmen"
+        ]
+      },
+      {
+        "target": "Einführung in Security",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Grundzüge digitaler Systeme"
+        ]
+      },
+      {
+        "target": "Einführung in Visual Computing",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Einführung in die Programmierung"
+        ]
+      },
+      {
+        "target": "Einführung in wissensbasierte Systeme",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Algorithmen und Datenstrukturen",
+          "Grundzüge digitaler Systeme",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Foundations of System and Application Security",
+        "sources": [
+          "Einführung in Security"
+        ]
+      },
+      {
+        "target": "Funktionale Programmierung",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Programmierparadigmen"
+        ]
+      },
+      {
+        "target": "Grundlagen der Visualisierung",
+        "sources": [
+          "Algorithmen und Datenstrukturen",
+          "Einführung in Visual Computing",
+          "Einführung in die Programmierung",
+          "Grundlagen der Computergraphik"
+        ]
+      },
+      {
+        "target": "Interface und Interaction Design",
+        "sources": [
+          "Einführung in die Programmierung"
+        ]
+      },
+      {
+        "target": "Logic and Reasoning in Computer Science",
+        "sources": [
+          "Grundzüge digitaler Systeme",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Logik für Wissensrepräsentation",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Einführung in Artificial Intelligence",
+          "Grundzüge digitaler Systeme",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Methoden der Angewandten Statistik",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Analysis",
+          "Statistik und Wahrscheinlichkeitstheorie"
+        ]
+      },
+      {
+        "target": "Multimedia",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Algorithmen und Datenstrukturen",
+          "Analysis",
+          "Einführung in die Programmierung"
+        ]
+      },
+      {
+        "target": "Multivariate Statistik",
+        "sources": [
+          "Statistik und Wahrscheinlichkeitstheorie"
+        ]
+      },
+      {
+        "target": "Numerical Computation",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Analysis",
+          "Einführung in die Programmierung",
+          "Grundzüge digitaler Systeme"
+        ]
+      },
+      {
+        "target": "Parallel Computing",
+        "sources": [
+          "Algorithmen und Datenstrukturen",
+          "Betriebssysteme",
+          "Einführung in die Programmierung",
+          "Grundzüge digitaler Systeme",
+          "Programmierparadigmen"
+        ]
+      },
+      {
+        "target": "Privacy-Enhancing Technologies",
+        "sources": [
+          "Einführung in Security",
+          "Einführung in die Programmierung"
+        ]
+      },
+      {
+        "target": "Programm- und Systemverifikation",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Einführung in die Programmierung",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Software Engineering",
+        "sources": [
+          "Einführung in die Programmierung"
+        ]
+      },
+      {
+        "target": "Software Engineering Projekt",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Software Engineering"
+        ]
+      },
+      {
+        "target": "Software-Qualitätssicherung",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Programmierparadigmen",
+          "Software Engineering",
+          "Software Engineering Projekt"
+        ]
+      },
+      {
+        "target": "Statistik und Wahrscheinlichkeitstheorie",
+        "sources": [
+          "Algebra und Diskrete Mathematik",
+          "Analysis"
+        ]
+      },
+      {
+        "target": "Theoretische Informatik",
+        "sources": [
+          "Algorithmen und Datenstrukturen",
+          "Grundzüge digitaler Systeme",
+          "Mathematisches Arbeiten"
+        ]
+      },
+      {
+        "target": "Verteilte Systeme",
+        "sources": [
+          "Algorithmen und Datenstrukturen",
+          "Einführung in die Programmierung"
+        ]
+      },
+      {
+        "target": "Zuverlässige Echtzeitsysteme",
+        "sources": [
+          "Betriebssysteme",
+          "Grundzüge digitaler Systeme",
+          "Statistik und Wahrscheinlichkeitstheorie",
+          "Theoretische Informatik"
+        ]
+      },
+      {
+        "target": "Übersetzerbau",
+        "sources": [
+          "Algorithmen und Datenstrukturen",
+          "Einführung in die Programmierung",
+          "Programmierparadigmen"
+        ]
       }
     ]
   }
