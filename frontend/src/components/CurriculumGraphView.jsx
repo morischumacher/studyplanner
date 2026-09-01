@@ -11,6 +11,8 @@ import {
 import VisualLegend from "./VisualLegend.jsx";
 import RecommendationPanel from "./RecommendationPanel.jsx";
 import GraphFilterEngine from "../domain/filters.ts";
+import { buildPrerequisiteEdges, PREREQUISITE_EDGE_COLOURS } from "../utils/prerequisiteEdges.js";
+import { fetchPrerequisites } from "../lib/api.js";
 
 const X_BY_LEVEL = {
     root: 40,
@@ -702,6 +704,11 @@ export default function CurriculumGraphView({
     const collapsedBeforeForceHierarchyRef = useRef(null);
     const [isProgramSwitching, setIsProgramSwitching] = useState(false);
     const [isFiltersOpen, setIsFiltersOpen] = useState(true);
+    // Prerequisite relations are fetched once per programme and drawn only on
+    // request: they are a second edge type over the containment tree, and the
+    // curricula in scope encode few of them (Section: prerequisite edges).
+    const [prerequisiteRelations, setPrerequisiteRelations] = useState([]);
+    const [showPrerequisiteEdges, setShowPrerequisiteEdges] = useState(false);
     const [interactionMode, setInteractionMode] = useState("pan");
     const [graphHorizontalSemantics, setGraphHorizontalSemantics] = useState("hierarchy");
     const [graphHorizontalCustomText, setGraphHorizontalCustomText] = useState("");
@@ -957,6 +964,26 @@ export default function CurriculumGraphView({
         [hierarchyMode, collapsedIds, allCollapsibleIds, isFilteringActive, root, graphFilters, programCode, getCourseStatus]
     );
 
+    useEffect(() => {
+        let cancelled = false;
+        if (!programCode) {
+            setPrerequisiteRelations([]);
+            return () => { cancelled = true; };
+        }
+        fetchPrerequisites(programCode)
+            .then((payload) => {
+                if (cancelled) return;
+                const relations = Array.isArray(payload?.relations) ? payload.relations : [];
+                setPrerequisiteRelations(relations);
+            })
+            .catch(() => {
+                // The graph is usable without them; an unavailable list simply
+                // draws no prerequisite edges rather than blocking the view.
+                if (!cancelled) setPrerequisiteRelations([]);
+            });
+        return () => { cancelled = true; };
+    }, [programCode]);
+
     const { nodes, edges: autoEdges } = useMemo(() => {
         return layoutTree(root, effectiveCollapsedIds, {
             getCourseStatus,
@@ -1008,9 +1035,19 @@ export default function CurriculumGraphView({
         () => GraphFilterEngine.computeVisibleNodeIds(nodes, autoEdges, graphFilters, programCode),
         [nodes, autoEdges, graphFilters, programCode]
     );
+    const prerequisiteEdges = useMemo(
+        () =>
+            showPrerequisiteEdges
+                ? buildPrerequisiteEdges(prerequisiteRelations, nodes, visibleNodeIds)
+                : [],
+        [showPrerequisiteEdges, prerequisiteRelations, nodes, visibleNodeIds]
+    );
     const edges = useMemo(
-        () => autoEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)),
-        [autoEdges, visibleNodeIds]
+        () => [
+            ...autoEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)),
+            ...prerequisiteEdges,
+        ],
+        [autoEdges, visibleNodeIds, prerequisiteEdges]
     );
     const filteredDisplayNodes = useMemo(
         () =>
@@ -1454,6 +1491,37 @@ export default function CurriculumGraphView({
                             ▸ Collapse
                         </button>
                     </div>
+                </div>
+                <div style={{ display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Course relations</div>
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            fontSize: 11,
+                            color: prerequisiteRelations.length === 0 ? "#9ca3af" : "#374151",
+                            cursor: prerequisiteRelations.length === 0 ? "default" : "pointer",
+                        }}
+                        title={
+                            prerequisiteRelations.length === 0
+                                ? "This curriculum encodes no course-to-course prerequisites."
+                                : "Draw the curriculum's prerequisite relations between courses."
+                        }
+                    >
+                        <input
+                            type="checkbox"
+                            checked={showPrerequisiteEdges}
+                            disabled={prerequisiteRelations.length === 0}
+                            onChange={(e) => setShowPrerequisiteEdges(e.target.checked)}
+                        />
+                        <span>
+                            Show prerequisites
+                            {prerequisiteRelations.length > 0
+                                ? ` (${prerequisiteRelations.length})`
+                                : " (none in this curriculum)"}
+                        </span>
+                    </label>
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Obligation type</div>
