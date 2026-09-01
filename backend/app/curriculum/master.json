@@ -234,6 +234,7 @@
       "MTH": "Master Thesis",
       "SDS": "Seminar for Diploma Students",
       "FOE": "Final Oral Exam / Defense"
-    }
+    },
+    "recommended_prereqs": []
   }
 }

@@ -169,8 +169,16 @@ export default function VisualLegend({ programCode, onClose }) {
                             </svg>
                             <span>Required before</span>
                         </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <svg width="34" height="8" aria-hidden="true">
+                                <line x1="0" y1="4" x2="34" y2="4" stroke={PREREQUISITE_EDGE_COLOURS.recommended} strokeWidth="1.5" strokeDasharray="2 4" />
+                            </svg>
+                            <span>Expected knowledge</span>
+                        </div>
                         <div style={{ color: "#9ca3af" }}>
-                            Prerequisite edges are drawn only while “Show prerequisites” is on in the filter panel.
+                            The first two are switched on together, under “Show prerequisites” in the filter panel.
+                            Expected knowledge is stated per module in the curriculum, so it is revealed one node at a
+                            time with the ⇠ button on the node itself.
                         </div>
                     </div>
                 </div>
