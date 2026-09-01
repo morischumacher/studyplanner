@@ -40,16 +40,42 @@ def test_abbreviated_aliases_do_not_produce_duplicate_relations():
 
 
 def test_recommended_relations_come_from_the_curriculum_and_carry_no_consequence():
-    # "Erwartete Vorkenntnisse" in the published curriculum: a module naming the
+    # "Erwartete Vorkenntnisse" in the published curricula: a module naming the
     # modules that teach what it expects. Read-only, so the rule engine must not
     # see them; the guard is that the checker's own lists are unchanged.
     recommended = _of_kind(prerequisite_relations(BACHELOR), "recommended")
-    assert {(r["source"], r["target"]) for r in recommended} == {
+    assert len(recommended) == 99
+    assert {(r["source"], r["target"]) for r in recommended} >= {
         ("Einführung in die Programmierung", "Abstrakte Maschinen"),
         ("Programmierparadigmen", "Abstrakte Maschinen"),
         ("Übersetzerbau", "Abstrakte Maschinen"),
+        ("Software Engineering", "Software Engineering Projekt"),
     }
+    assert len(_of_kind(prerequisite_relations(MASTER), "recommended")) == 24
+
+    # The engine still holds two advisory pairs and two enforced ones, whatever
+    # the curriculum says about expected knowledge.
     assert len(load(BACHELOR).soft_prereqs) == 2
+    assert len(_of_kind(prerequisite_relations(BACHELOR), "soft")) == 2
+    assert len(_of_kind(prerequisite_relations(MASTER), "hard")) == 2
+
+
+def test_no_module_is_its_own_prerequisite():
+    for code in (BACHELOR, MASTER):
+        for relation in prerequisite_relations(code):
+            assert relation["source"] != relation["target"]
+
+
+def test_every_recommended_endpoint_is_a_name_the_curriculum_uses():
+    # A relation naming something the catalogue does not hold can never be drawn,
+    # and would be invisible rather than wrong, so it is checked here instead.
+    for code, document in ((BACHELOR, "bachelor"), (MASTER, "master")):
+        entries = load(code).recommended_prereqs
+        assert entries, f"{document} carries no expected-knowledge entries"
+        for entry in entries:
+            assert entry["target"], document
+            assert entry["sources"], f"{entry['target']} names no source"
+            assert entry["target"] not in entry["sources"]
 
 
 def test_unknown_or_missing_programme_yields_no_relations():
