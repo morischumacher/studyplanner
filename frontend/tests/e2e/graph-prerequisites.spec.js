@@ -38,7 +38,7 @@ test.describe("prerequisite relations in the graph", () => {
         await expect(prerequisiteEdges(page)).toHaveCount(2);
     });
 
-    test("a node reveals its own expected knowledge, and only its own", async ({ page }) => {
+    test("a node reveals its own expected knowledge, and hides it again", async ({ page }) => {
         await startPlanning(page, { program: BACHELOR });
         await openGraph(page);
         await expandEverything(page);
@@ -48,17 +48,48 @@ test.describe("prerequisite relations in the graph", () => {
         const toggles = page.locator('[data-testid="recommended-prereq-toggle"]');
         await expect(toggles).toHaveCount(4);
 
-        await toggles.first().click();
-        const revealed = await prerequisiteEdges(page).count();
-        expect(revealed).toBeGreaterThan(0);
+        const target = toggles.filter({ hasText: "⇠3" }).first();
+        await target.click();
+        await expect(prerequisiteEdges(page)).toHaveCount(3);
+        await expect(target).toHaveAttribute("aria-pressed", "true");
 
-        // A second node adds its own relations rather than replacing the first's.
-        await toggles.nth(1).click();
-        await expect
-            .poll(async () => prerequisiteEdges(page).count())
-            .toBeGreaterThanOrEqual(revealed);
+        await target.click();
+        await expect(prerequisiteEdges(page)).toHaveCount(0);
+        await expect(target).toHaveAttribute("aria-pressed", "false");
+    });
 
-        await page.getByRole("button", { name: /Hide all/ }).click();
+    test("every press changes the picture, including on a relation already drawn", async ({ page }) => {
+        // The regression: with a set of revealed nodes, an edge was drawn if
+        // either of its endpoints was revealed, so switching on the node at one
+        // end of an already-drawn edge, and switching it off again, left the
+        // canvas untouched and the control looked dead. One node at a time.
+        await startPlanning(page, { program: BACHELOR });
+        await openGraph(page);
+        await expandEverything(page);
+
+        const toggles = page.locator('[data-testid="recommended-prereq-toggle"]');
+        const target = toggles.filter({ hasText: "⇠3" }).first();
+        const source = toggles.filter({ hasText: "⇠1" }).first();
+
+        await target.click();
+        await expect(prerequisiteEdges(page)).toHaveCount(3);
+
+        await source.click();
+        await expect(prerequisiteEdges(page)).toHaveCount(1);
+        await expect(target).toHaveAttribute("aria-pressed", "false");
+
+        await source.click();
+        await expect(prerequisiteEdges(page)).toHaveCount(0);
+    });
+
+    test("the filter panel names what is revealed and can hide it", async ({ page }) => {
+        await startPlanning(page, { program: BACHELOR });
+        await openGraph(page);
+        await expandEverything(page);
+
+        await page.locator('[data-testid="recommended-prereq-toggle"]').filter({ hasText: "⇠3" }).first().click();
+        await expect(page.getByText("Abstrakte Maschinen", { exact: false }).first()).toBeVisible();
+        await page.getByRole("button", { name: "Hide", exact: true }).click();
         await expect(prerequisiteEdges(page)).toHaveCount(0);
     });
 });

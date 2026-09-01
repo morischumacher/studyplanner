@@ -715,9 +715,15 @@ export default function CurriculumGraphView({
     const [prerequisiteRelations, setPrerequisiteRelations] = useState([]);
     const [showPrerequisiteEdges, setShowPrerequisiteEdges] = useState(false);
     // The curriculum's expected prior knowledge is stated per module, so it is
-    // revealed per node rather than all at once: this holds the nodes a student
-    // has asked to see it for.
-    const [revealedPrereqNodeIds, setRevealedPrereqNodeIds] = useState(() => new Set());
+    // revealed per node rather than all at once: this holds the one node a
+    // student has asked to see it for.
+    //
+    // One at a time, rather than a set. An edge has two endpoints, so a set of
+    // revealed nodes draws the union of their relations, and a node whose only
+    // relation is already drawn by the node at the other end can be switched on
+    // and off without the picture changing at all. A control that sometimes does
+    // nothing visible reads as broken, which is exactly how it was reported.
+    const [revealedPrereqNodeId, setRevealedPrereqNodeId] = useState(null);
     const [interactionMode, setInteractionMode] = useState("pan");
     const [graphHorizontalSemantics, setGraphHorizontalSemantics] = useState("hierarchy");
     const [graphHorizontalCustomText, setGraphHorizontalCustomText] = useState("");
@@ -1054,14 +1060,14 @@ export default function CurriculumGraphView({
                       kinds: GLOBAL_PREREQUISITE_KINDS,
                   })
                 : []),
-            ...(revealedPrereqNodeIds.size > 0
+            ...(revealedPrereqNodeId
                 ? buildPrerequisiteEdges(prerequisiteRelations, nodes, visibleNodeIds, {
                       kinds: ["recommended"],
-                      anchorIds: revealedPrereqNodeIds,
+                      anchorIds: [revealedPrereqNodeId],
                   })
                 : []),
         ],
-        [showPrerequisiteEdges, revealedPrereqNodeIds, prerequisiteRelations, nodes, visibleNodeIds]
+        [showPrerequisiteEdges, revealedPrereqNodeId, prerequisiteRelations, nodes, visibleNodeIds]
     );
     const recommendedCountByNodeId = useMemo(
         () => countRecommendedByNode(prerequisiteRelations, nodes),
@@ -1075,13 +1081,13 @@ export default function CurriculumGraphView({
         () => prerequisiteRelations.filter((r) => r?.kind === "recommended").length,
         [prerequisiteRelations]
     );
+    const revealedPrereqNodeLabel = useMemo(() => {
+        if (!revealedPrereqNodeId) return null;
+        const node = (displayNodes || []).find((n) => n.id === revealedPrereqNodeId);
+        return String(node?.data?.label ?? "").replace(/^[▶▼]\s*/, "") || null;
+    }, [revealedPrereqNodeId, displayNodes]);
     const toggleRecommendedPrereqs = useCallback((nodeId) => {
-        setRevealedPrereqNodeIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(nodeId)) next.delete(nodeId);
-            else next.add(nodeId);
-            return next;
-        });
+        setRevealedPrereqNodeId((prev) => (prev === nodeId ? null : nodeId));
     }, []);
     const edges = useMemo(
         () => [
@@ -1103,7 +1109,7 @@ export default function CurriculumGraphView({
                     data: {
                         ...(n?.data || {}),
                         recommendedPrereqCount,
-                        showsRecommendedPrereqs: revealedPrereqNodeIds.has(n.id),
+                        showsRecommendedPrereqs: revealedPrereqNodeId === n.id,
                         onToggleRecommendedPrereqs:
                             recommendedPrereqCount > 0 ? toggleRecommendedPrereqs : null,
                     },
@@ -1113,7 +1119,7 @@ export default function CurriculumGraphView({
                     },
                 };
             }),
-        [displayNodes, visibleNodeIds, recommendedCountByNodeId, revealedPrereqNodeIds, toggleRecommendedPrereqs]
+        [displayNodes, visibleNodeIds, recommendedCountByNodeId, revealedPrereqNodeId, toggleRecommendedPrereqs]
     );
 
     const onNodesChange = useCallback((changes) => {
@@ -1576,13 +1582,12 @@ export default function CurriculumGraphView({
                     </label>
                     {recommendedRelationCount > 0 && (
                         <div style={{ fontSize: 10, color: "#6b7280", lineHeight: 1.45 }}>
-                            The curriculum also states expected prior knowledge per module. Reveal a node&apos;s
-                            own with the ⇠ button on the node.
-                            {revealedPrereqNodeIds.size > 0 && (
+                            {revealedPrereqNodeLabel ? (
                                 <>
-                                    {" "}
+                                    Showing what <strong style={{ color: "#4338ca" }}>{revealedPrereqNodeLabel}</strong>{" "}
+                                    expects to be known already.{" "}
                                     <button
-                                        onClick={() => setRevealedPrereqNodeIds(new Set())}
+                                        onClick={() => setRevealedPrereqNodeId(null)}
                                         style={{
                                             border: "none",
                                             background: "none",
@@ -1594,8 +1599,13 @@ export default function CurriculumGraphView({
                                             textDecoration: "underline",
                                         }}
                                     >
-                                        Hide all ({revealedPrereqNodeIds.size})
+                                        Hide
                                     </button>
+                                </>
+                            ) : (
+                                <>
+                                    The curriculum also states expected prior knowledge per module. Reveal one
+                                    node&apos;s with the ⇠ button on the node.
                                 </>
                             )}
                         </div>
