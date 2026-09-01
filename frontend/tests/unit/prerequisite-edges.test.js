@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import {
     buildPrerequisiteEdges,
     indexCourseNodes,
+    countRecommendedByNode,
     isPrerequisiteEdge,
     normaliseCourseKey,
 } from "../../src/utils/prerequisiteEdges.js";
@@ -43,7 +44,7 @@ test("accents and case do not prevent a match", () => {
     assert.equal(normaliseCourseKey("Einführung  in DIE Programmierung 1"), "einfuhrung in die programmierung 1");
 });
 
-test("only course-bearing nodes are indexed", () => {
+test("course and module nodes are indexed, the root is not", () => {
     const index = indexCourseNodes(NODES);
     assert.equal(index.get("einfuhrung in die programmierung 1"), "c-eidi1");
     assert.equal(index.get("eidi1"), "c-eidi1");
@@ -110,4 +111,87 @@ test("edge ids are stable across rebuilds, so the canvas does not remount them",
     const first = buildPrerequisiteEdges(BACHELOR_RELATIONS, NODES).map((e) => e.id);
     const second = buildPrerequisiteEdges(BACHELOR_RELATIONS, NODES).map((e) => e.id);
     assert.deepEqual(first, second);
+});
+
+// --- Expected knowledge: module-level relations, revealed one node at a time ---
+
+const moduleNode = (id, label) => ({ id, data: { level: "module", label, moduleCode: null } });
+
+const MODULE_NODES = [
+    { id: "root", data: { level: "root", label: "Curriculum" } },
+    moduleNode("m-am", "▶ Abstrakte Maschinen"),
+    moduleNode("m-eidi", "▼ Einführung in die Programmierung"),
+    moduleNode("m-ppar", "Programmierparadigmen"),
+    moduleNode("m-ub", "Übersetzerbau"),
+    moduleNode("m-other", "Datenbanksysteme"),
+];
+
+const EXPECTED = [
+    { source: "Einführung in die Programmierung", target: "Abstrakte Maschinen", kind: "recommended" },
+    { source: "Programmierparadigmen", target: "Abstrakte Maschinen", kind: "recommended" },
+    { source: "Übersetzerbau", target: "Abstrakte Maschinen", kind: "recommended" },
+];
+
+test("a relation naming modules resolves to module nodes, disclosure marker and all", () => {
+    const edges = buildPrerequisiteEdges(EXPECTED, MODULE_NODES, null, { kinds: ["recommended"] });
+    assert.equal(edges.length, 3);
+    assert.deepEqual(
+        edges.map((e) => [e.source, e.target]).sort(),
+        [["m-eidi", "m-am"], ["m-ppar", "m-am"], ["m-ub", "m-am"]].sort()
+    );
+});
+
+test("the sidebar's kinds and the per-node kind do not draw each other", () => {
+    const mixed = [...EXPECTED, ...BACHELOR_RELATIONS];
+    const global = buildPrerequisiteEdges(mixed, [...MODULE_NODES, ...NODES], null, {
+        kinds: ["soft", "hard"],
+    });
+    assert.equal(global.every((e) => e.data.kind !== "recommended"), true);
+    const perNode = buildPrerequisiteEdges(mixed, [...MODULE_NODES, ...NODES], null, {
+        kinds: ["recommended"],
+    });
+    assert.equal(perNode.every((e) => e.data.kind === "recommended"), true);
+});
+
+test("an anchor draws only the relations that touch it", () => {
+    const edges = buildPrerequisiteEdges(EXPECTED, MODULE_NODES, null, {
+        kinds: ["recommended"],
+        anchorIds: ["m-ub"],
+    });
+    assert.equal(edges.length, 1);
+    assert.deepEqual([edges[0].source, edges[0].target], ["m-ub", "m-am"]);
+});
+
+test("an anchor with nothing to reveal draws nothing", () => {
+    const edges = buildPrerequisiteEdges(EXPECTED, MODULE_NODES, null, {
+        kinds: ["recommended"],
+        anchorIds: ["m-other"],
+    });
+    assert.deepEqual(edges, []);
+});
+
+test("the per-node count is over relations whose other end is on the canvas", () => {
+    const counts = countRecommendedByNode(EXPECTED, MODULE_NODES);
+    assert.equal(counts.get("m-am"), 3);
+    assert.equal(counts.get("m-ub"), 1);
+    assert.equal(counts.has("m-other"), false);
+
+    const withoutTarget = MODULE_NODES.filter((n) => n.id !== "m-am");
+    assert.equal(countRecommendedByNode(EXPECTED, withoutTarget).size, 0);
+});
+
+test("a course and a module of the same name resolve to the course", () => {
+    const nodes = [
+        { id: "c-se", data: { level: "course", courseCode: "SE", courseName: "Software Engineering" } },
+        moduleNode("m-se", "Software Engineering"),
+        moduleNode("m-sep", "Software Engineering Projekt"),
+    ];
+    const edges = buildPrerequisiteEdges(
+        [{ source: "Software Engineering", target: "Software Engineering Projekt", kind: "recommended" }],
+        nodes,
+        null,
+        { kinds: ["recommended"] }
+    );
+    assert.equal(edges.length, 1);
+    assert.equal(edges[0].source, "c-se");
 });

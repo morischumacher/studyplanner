@@ -11,7 +11,12 @@ import {
 import VisualLegend from "./VisualLegend.jsx";
 import RecommendationPanel from "./RecommendationPanel.jsx";
 import GraphFilterEngine from "../domain/filters.ts";
-import { buildPrerequisiteEdges, PREREQUISITE_EDGE_COLOURS } from "../utils/prerequisiteEdges.js";
+import {
+    buildPrerequisiteEdges,
+    countRecommendedByNode,
+    GLOBAL_PREREQUISITE_KINDS,
+    PREREQUISITE_EDGE_COLOURS,
+} from "../utils/prerequisiteEdges.js";
 import { fetchPrerequisites } from "../lib/api.js";
 
 const X_BY_LEVEL = {
@@ -709,6 +714,10 @@ export default function CurriculumGraphView({
     // curricula in scope encode few of them (Section: prerequisite edges).
     const [prerequisiteRelations, setPrerequisiteRelations] = useState([]);
     const [showPrerequisiteEdges, setShowPrerequisiteEdges] = useState(false);
+    // The curriculum's expected prior knowledge is stated per module, so it is
+    // revealed per node rather than all at once: this holds the nodes a student
+    // has asked to see it for.
+    const [revealedPrereqNodeIds, setRevealedPrereqNodeIds] = useState(() => new Set());
     const [interactionMode, setInteractionMode] = useState("pan");
     const [graphHorizontalSemantics, setGraphHorizontalSemantics] = useState("hierarchy");
     const [graphHorizontalCustomText, setGraphHorizontalCustomText] = useState("");
@@ -1035,13 +1044,45 @@ export default function CurriculumGraphView({
         () => GraphFilterEngine.computeVisibleNodeIds(nodes, autoEdges, graphFilters, programCode),
         [nodes, autoEdges, graphFilters, programCode]
     );
+    // The sidebar's switch owns the enforced and advisory relations, which belong
+    // to the whole graph. The expected-knowledge relations are drawn only around
+    // the nodes a student has opened them on.
     const prerequisiteEdges = useMemo(
-        () =>
-            showPrerequisiteEdges
-                ? buildPrerequisiteEdges(prerequisiteRelations, nodes, visibleNodeIds)
-                : [],
-        [showPrerequisiteEdges, prerequisiteRelations, nodes, visibleNodeIds]
+        () => [
+            ...(showPrerequisiteEdges
+                ? buildPrerequisiteEdges(prerequisiteRelations, nodes, visibleNodeIds, {
+                      kinds: GLOBAL_PREREQUISITE_KINDS,
+                  })
+                : []),
+            ...(revealedPrereqNodeIds.size > 0
+                ? buildPrerequisiteEdges(prerequisiteRelations, nodes, visibleNodeIds, {
+                      kinds: ["recommended"],
+                      anchorIds: revealedPrereqNodeIds,
+                  })
+                : []),
+        ],
+        [showPrerequisiteEdges, revealedPrereqNodeIds, prerequisiteRelations, nodes, visibleNodeIds]
     );
+    const recommendedCountByNodeId = useMemo(
+        () => countRecommendedByNode(prerequisiteRelations, nodes),
+        [prerequisiteRelations, nodes]
+    );
+    const globalPrerequisiteCount = useMemo(
+        () => prerequisiteRelations.filter((r) => GLOBAL_PREREQUISITE_KINDS.includes(r?.kind)).length,
+        [prerequisiteRelations]
+    );
+    const recommendedRelationCount = useMemo(
+        () => prerequisiteRelations.filter((r) => r?.kind === "recommended").length,
+        [prerequisiteRelations]
+    );
+    const toggleRecommendedPrereqs = useCallback((nodeId) => {
+        setRevealedPrereqNodeIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(nodeId)) next.delete(nodeId);
+            else next.add(nodeId);
+            return next;
+        });
+    }, []);
     const edges = useMemo(
         () => [
             ...autoEdges.filter((e) => visibleNodeIds.has(e.source) && visibleNodeIds.has(e.target)),
@@ -1049,19 +1090,30 @@ export default function CurriculumGraphView({
         ],
         [autoEdges, visibleNodeIds, prerequisiteEdges]
     );
+    // The expected-knowledge control is attached here rather than in the layout,
+    // because whether a node has anything to reveal depends on which other nodes
+    // are currently laid out, and the layout does not know about the relations.
     const filteredDisplayNodes = useMemo(
         () =>
             (displayNodes || []).map((n) => {
+                const recommendedPrereqCount = recommendedCountByNodeId.get(n.id) ?? 0;
                 return {
                     ...n,
                     hidden: !visibleNodeIds.has(n.id),
+                    data: {
+                        ...(n?.data || {}),
+                        recommendedPrereqCount,
+                        showsRecommendedPrereqs: revealedPrereqNodeIds.has(n.id),
+                        onToggleRecommendedPrereqs:
+                            recommendedPrereqCount > 0 ? toggleRecommendedPrereqs : null,
+                    },
                     style: {
                         ...(n?.style || {}),
                         opacity: 1,
                     },
                 };
             }),
-        [displayNodes, visibleNodeIds]
+        [displayNodes, visibleNodeIds, recommendedCountByNodeId, revealedPrereqNodeIds, toggleRecommendedPrereqs]
     );
 
     const onNodesChange = useCallback((changes) => {
@@ -1500,11 +1552,11 @@ export default function CurriculumGraphView({
                             alignItems: "center",
                             gap: 6,
                             fontSize: 11,
-                            color: prerequisiteRelations.length === 0 ? "#9ca3af" : "#374151",
-                            cursor: prerequisiteRelations.length === 0 ? "default" : "pointer",
+                            color: globalPrerequisiteCount === 0 ? "#9ca3af" : "#374151",
+                            cursor: globalPrerequisiteCount === 0 ? "default" : "pointer",
                         }}
                         title={
-                            prerequisiteRelations.length === 0
+                            globalPrerequisiteCount === 0
                                 ? "This curriculum encodes no course-to-course prerequisites."
                                 : "Draw the curriculum's prerequisite relations between courses."
                         }
@@ -1512,16 +1564,42 @@ export default function CurriculumGraphView({
                         <input
                             type="checkbox"
                             checked={showPrerequisiteEdges}
-                            disabled={prerequisiteRelations.length === 0}
+                            disabled={globalPrerequisiteCount === 0}
                             onChange={(e) => setShowPrerequisiteEdges(e.target.checked)}
                         />
                         <span>
                             Show prerequisites
-                            {prerequisiteRelations.length > 0
-                                ? ` (${prerequisiteRelations.length})`
+                            {globalPrerequisiteCount > 0
+                                ? ` (${globalPrerequisiteCount})`
                                 : " (none in this curriculum)"}
                         </span>
                     </label>
+                    {recommendedRelationCount > 0 && (
+                        <div style={{ fontSize: 10, color: "#6b7280", lineHeight: 1.45 }}>
+                            The curriculum also states expected prior knowledge per module. Reveal a node&apos;s
+                            own with the ⇠ button on the node.
+                            {revealedPrereqNodeIds.size > 0 && (
+                                <>
+                                    {" "}
+                                    <button
+                                        onClick={() => setRevealedPrereqNodeIds(new Set())}
+                                        style={{
+                                            border: "none",
+                                            background: "none",
+                                            padding: 0,
+                                            color: "#4338ca",
+                                            fontSize: 10,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                            textDecoration: "underline",
+                                        }}
+                                    >
+                                        Hide all ({revealedPrereqNodeIds.size})
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#374151" }}>Obligation type</div>

@@ -8,10 +8,13 @@ from app.curriculum import BACHELOR, MASTER, load
 from app.services.prerequisites import prerequisite_relations
 
 
+def _of_kind(relations, kind):
+    return [r for r in relations if r["kind"] == kind]
+
+
 def test_bachelor_relations_are_the_two_soft_pairs():
-    relations = prerequisite_relations("033 521")
+    relations = _of_kind(prerequisite_relations("033 521"), "soft")
     assert len(relations) == 2
-    assert all(r["kind"] == "soft" for r in relations)
     assert {(r["source"], r["target"]) for r in relations} == {
         ("Einführung in die Programmierung 1", "Einführung in die Programmierung 2"),
         ("Software Engineering", "Software Engineering Projekt"),
@@ -19,9 +22,8 @@ def test_bachelor_relations_are_the_two_soft_pairs():
 
 
 def test_master_relations_are_the_thesis_before_its_two_dependants():
-    relations = prerequisite_relations("066937")
+    relations = _of_kind(prerequisite_relations("066937"), "hard")
     assert len(relations) == 2
-    assert all(r["kind"] == "hard" for r in relations)
     assert all(r["source"] == "Master Thesis" for r in relations)
     assert {r["target"] for r in relations} == {
         "Final Oral Exam / Defense",
@@ -35,6 +37,19 @@ def test_abbreviated_aliases_do_not_produce_duplicate_relations():
     targets = [r["target"] for r in prerequisite_relations("066937")]
     assert "FOE" not in targets
     assert "SDS" not in targets
+
+
+def test_recommended_relations_come_from_the_curriculum_and_carry_no_consequence():
+    # "Erwartete Vorkenntnisse" in the published curriculum: a module naming the
+    # modules that teach what it expects. Read-only, so the rule engine must not
+    # see them; the guard is that the checker's own lists are unchanged.
+    recommended = _of_kind(prerequisite_relations(BACHELOR), "recommended")
+    assert {(r["source"], r["target"]) for r in recommended} == {
+        ("Einführung in die Programmierung", "Abstrakte Maschinen"),
+        ("Programmierparadigmen", "Abstrakte Maschinen"),
+        ("Übersetzerbau", "Abstrakte Maschinen"),
+    }
+    assert len(load(BACHELOR).soft_prereqs) == 2
 
 
 def test_unknown_or_missing_programme_yields_no_relations():

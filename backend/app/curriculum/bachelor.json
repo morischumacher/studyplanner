@@ -831,6 +831,16 @@
         "analysis",
         "statistik und wahrscheinlichkeitstheorie"
       ]
-    }
+    },
+    "recommended_prereqs": [
+      {
+        "target": "Abstrakte Maschinen",
+        "sources": [
+          "Einführung in die Programmierung",
+          "Programmierparadigmen",
+          "Übersetzerbau"
+        ]
+      }
+    ]
   }
 }
