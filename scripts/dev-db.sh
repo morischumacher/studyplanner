@@ -2,6 +2,8 @@
 #
 # Start a local PostgreSQL for development and tests, and load the schema.
 #
+#   eval "$(./scripts/dev-db.sh up)"   start it and export DATABASE_URL here
+#
 #   ./scripts/dev-db.sh up      start the server and apply every migration
 #   ./scripts/dev-db.sh down    stop the server
 #   ./scripts/dev-db.sh reset   drop everything and rebuild from the SQL files
@@ -126,7 +128,7 @@ apply_migrations() {
           VALUES ('$name', '$(sha256sum "$f" | cut -d" " -f1)') ON CONFLICT DO NOTHING" >/dev/null
     applied=$((applied + 1))
   done
-  echo "migrations: $applied applied, $skipped already present"
+  echo "migrations: $applied applied, $skipped already present" >&2
 }
 
 up_docker() {
@@ -172,16 +174,19 @@ run_as() {
 case "${1:-up}" in
   up)
     if have_docker; then up_docker; else up_native; fi
-    echo "database ready"
+    echo "database ready" >&2
+    # The only thing on stdout is the line meant to be eval'd, so
+    # `eval "$(./scripts/dev-db.sh up)"` sets DATABASE_URL and nothing else.
+    # Progress goes to stderr, where the reader still sees it.
     echo "export DATABASE_URL=\"$(url)\""
     ;;
   down)
     if have_docker && docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
-      docker stop "$CONTAINER" >/dev/null && echo "stopped container"
+      docker stop "$CONTAINER" >/dev/null && echo "stopped container" >&2
     else
       bin="$(native_bin)/"
       run_as "$(unprivileged_user)" "${bin}pg_ctl -D '$PGDATA' -m fast stop" >/dev/null 2>&1 \
-        && echo "stopped server" || echo "server was not running"
+        && echo "stopped server" >&2 || echo "server was not running" >&2
     fi
     ;;
   reset)
