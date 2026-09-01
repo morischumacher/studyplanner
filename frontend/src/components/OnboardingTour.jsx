@@ -260,8 +260,10 @@ export default function OnboardingTour({ activeStep, setActiveStep, viewMode, se
     };
 
     const handleComplete = () => {
-        const completedKey = username ? "study-planner-tour-completed-" + username : "study-planner-tour-completed";
-        localStorage.setItem(completedKey, "true");
+        // The flag belongs to the student, and is read back under their name.
+        if (username) {
+            localStorage.setItem("study-planner-tour-completed-" + username, "true");
+        }
         onClose();
     };
 

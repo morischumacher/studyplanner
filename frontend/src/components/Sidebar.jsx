@@ -10,8 +10,8 @@ import {
     stateVisualByStatus,
     renderRecommendationPatch,
 } from "../utils/courseVisuals.js";
-import { resolveModuleVariantCourses } from "../utils/bachelorCourseVariants.js";
-import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
+import { resolveModuleVariantCourses } from "../domain/prefill/index.ts";
+import { displayCourseHeader, displayCourseTitle } from "../domain/course-names.ts";
 
 /** Sidebar — catalog + drag sources */
 export default function Sidebar({
@@ -526,6 +526,8 @@ export default function Sidebar({
                                                 <div
                                                     key={menuKey}
                                                     data-sidebar-menu-key={menuKey}
+                                                    // Lets the end-to-end suite pick a named course out of the catalogue.
+                                                    data-course-code={course.code ?? mod.code ?? ""}
                                                     draggable={isAddableStatus(courseStatus)}
                                                     onDragStart={(e) => {
                                                         if (!isAddableStatus(courseStatus)) return;
@@ -931,6 +933,7 @@ export default function Sidebar({
                                                             <div
                                                                 key={`pf${pfIdx}-${mod.code}-${idx}`}
                                                                 data-sidebar-menu-key={menuKey}
+                                                                data-course-code={course?.code ?? mod.code ?? ""}
                                                                 title="Course in module"
                                                                 style={{
                                                                     textAlign: "left",

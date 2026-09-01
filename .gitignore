@@ -21,3 +21,9 @@ build/
 .idea/
 .vscode/
 .DS_Store
+
+# ---- Test output ----
+frontend/playwright-report/
+frontend/test-results/
+frontend/coverage/
+.pytest_cache/

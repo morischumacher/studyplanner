@@ -1,6 +1,6 @@
 import React from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, NODE_HEIGHT } from "../../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../../domain/layout.ts";
 
 const baseTextStyles = {
     width: CARD_WIDTH,

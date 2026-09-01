@@ -3,11 +3,11 @@ import { Handle, Position } from "reactflow";
 import {
     GROUP_PADDING_Y,
     MODULE_HEADER_HEIGHT,
-} from "../utils/constants.js";
-import { colorForType } from "../utils/constants.js";
+} from "../domain/layout.ts";
+import { colorForType } from "./typeColors.js";
 import { hexToRgba, MODULE_GROUP_COLOR_ALPHA } from "../utils/examSubjectColors.js";
 import { mapTypeForProgram, stateVisualByStatus } from "../utils/courseVisuals.js";
-import { displayCourseTitle } from "../utils/courseCodeDisplay.js";
+import { displayCourseTitle } from "../domain/course-names.ts";
 
 /** ModuleGroupBackground — soft panel wrapping a set of course nodes. */
 export default function ModuleGroupBackground({ data }) {

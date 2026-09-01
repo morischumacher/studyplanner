@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, NODE_HEIGHT, colorForType } from "../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../domain/layout.ts";
+import { colorForType } from "./typeColors.js";
 import { hexToRgba } from "../utils/examSubjectColors.js";
 import {
     mapTypeForProgram,
@@ -9,8 +10,8 @@ import {
     layeredTypeShadow,
     combinedCardShadow,
 } from "../utils/courseVisuals.js";
-import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
-import { BACHELOR_PROGRAM_CODE } from "../utils/semesters.js";
+import { displayCourseHeader, displayCourseTitle } from "../domain/course-names.ts";
+import { BACHELOR_PROGRAM_CODE } from "../domain/terms.ts";
 
 /** CourseCard — React Flow node renderer */
 export default function CourseCard({ data }) {
@@ -157,6 +158,11 @@ export default function CourseCard({ data }) {
     return (
         <div
             className="card study-planner-course-card"
+            // Test hooks. The end-to-end suite has to identify a card and read its
+            // state without depending on colours or on where the code is printed.
+            data-testid="course-card"
+            data-course-code={data?.code ?? ""}
+            data-course-status={data?.status ?? ""}
             ref={rootRef}
             onMouseEnter={() => {
                 if (data?.groupId) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Handle, Position } from "reactflow";
-import { CARD_WIDTH, NODE_HEIGHT } from "../../utils/constants.js";
+import { CARD_WIDTH, NODE_HEIGHT } from "../../domain/layout.ts";
 import { hexToRgba } from "../../utils/examSubjectColors.js";
 import {
     combinedCardShadow,
@@ -8,11 +8,12 @@ import {
     mapTypeForProgram,
     stateVisualByStatus,
 } from "../../utils/courseVisuals.js";
-import { displayCourseHeader, displayCourseTitle } from "../../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle } from "../../domain/course-names.ts";
+import RecommendedPrereqButton from "./RecommendedPrereqButton.jsx";
 
 
 
-export default function GraphCourseNode({ data }) {
+export default function GraphCourseNode({ id, data }) {
     const color = data?.color || "#4b5563";
     const status = data?.status || "todo";
     const visualStatus = status;
@@ -111,6 +112,7 @@ export default function GraphCourseNode({ data }) {
                     )}
                 </div>
                 <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <RecommendedPrereqButton nodeId={id} data={data} />
                     <div style={{ position: "relative" }}>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <button

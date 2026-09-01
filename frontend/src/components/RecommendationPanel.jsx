@@ -6,7 +6,7 @@ import {
     REC_TYPE_META,
     renderRecommendationPatch,
 } from "../utils/courseVisuals.js";
-import { displayCourseHeader, displayCourseTitle } from "../utils/courseCodeDisplay.js";
+import { displayCourseHeader, displayCourseTitle } from "../domain/course-names.ts";
 import { mapTypeForProgram } from "../utils/courseVisuals.js";
 
 // ── RecommendationPanel ───────────────────────────────────────────────────────

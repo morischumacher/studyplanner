@@ -1,4 +1,5 @@
 import React from "react";
+import { PREREQUISITE_EDGE_COLOURS } from "../utils/prerequisiteEdges.js";
 import {
     mapTypeForProgram,
     layeredTypeShadow,
@@ -144,6 +145,41 @@ export default function VisualLegend({ programCode, onClose }) {
                         {typeCard(mandatory.label, 3, subjectColor)}
                         {typeCard(core.label, 2, subjectColor)}
                         {typeCard(elective.label, 1, subjectColor)}
+                    </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 8, display: "grid", gap: 6 }}>
+                    <div style={{ fontSize: 11, color: "#4b5563", fontWeight: 700 }}>Edges</div>
+                    <div style={{ display: "grid", gap: 4, fontSize: 11, color: "#4b5563" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <svg width="34" height="8" aria-hidden="true">
+                                <line x1="0" y1="4" x2="34" y2="4" stroke="#9ca3af" strokeWidth="1.6" />
+                            </svg>
+                            <span>Contains (subject → module → course)</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <svg width="34" height="8" aria-hidden="true">
+                                <line x1="0" y1="4" x2="34" y2="4" stroke={PREREQUISITE_EDGE_COLOURS.soft} strokeWidth="2" strokeDasharray="6 4" />
+                            </svg>
+                            <span>Recommended before</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <svg width="34" height="8" aria-hidden="true">
+                                <line x1="0" y1="4" x2="34" y2="4" stroke={PREREQUISITE_EDGE_COLOURS.hard} strokeWidth="2" />
+                            </svg>
+                            <span>Required before</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <svg width="34" height="8" aria-hidden="true">
+                                <line x1="0" y1="4" x2="34" y2="4" stroke={PREREQUISITE_EDGE_COLOURS.recommended} strokeWidth="1.5" strokeDasharray="2 4" />
+                            </svg>
+                            <span>Expected knowledge</span>
+                        </div>
+                        <div style={{ color: "#9ca3af" }}>
+                            The first two are switched on together, under “Show prerequisites” in the filter panel.
+                            Expected knowledge is stated per module in the curriculum, so it is revealed one node at a
+                            time with the ⇠ button on the node itself.
+                        </div>
                     </div>
                 </div>
 

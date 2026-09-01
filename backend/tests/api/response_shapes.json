@@ -1,0 +1,311 @@
+{
+ "GET /": {
+  "shape": {
+   "message": "<str>",
+   "status": "<str>"
+  },
+  "status": 200
+ },
+ "GET /auth/me": {
+  "shape": {
+   "user": {
+    "id": "<uuid>",
+    "username": "<str>"
+   }
+  },
+  "status": 200
+ },
+ "GET /catalog": {
+  "shape": [
+   {
+    "catalog": [
+     {
+      "exam_subject": "<str>",
+      "exam_subject_code": "<str>",
+      "exam_subject_id": "<uuid>",
+      "modules": [
+       {
+        "category": "<str>",
+        "courses": [
+         {
+          "code": "<str>",
+          "course_id": "<uuid>",
+          "ects": "<number>",
+          "is_core_to_module": "<bool>",
+          "language": "<str>",
+          "tags": [
+           "<str>"
+          ],
+          "term_availability": "<str>",
+          "title": "<str>",
+          "type": "<str>"
+         }
+        ],
+        "ects": "<number>",
+        "is_mandatory": "<bool>",
+        "module_exam_subject": "<str>",
+        "module_exam_subject_code": "<str>",
+        "module_id": "<uuid>",
+        "name": "<str>"
+       }
+      ]
+     }
+    ],
+    "program_code": "<str>",
+    "program_id": "<uuid>"
+   }
+  ],
+  "status": 200
+ },
+ "GET /health": {
+  "shape": {
+   "ok": "<bool>"
+  },
+  "status": 200
+ },
+ "GET /planner-state": {
+  "shape": {
+   "state": {}
+  },
+  "status": 200
+ },
+ "GET /planner-state (anon)": {
+  "shape": {
+   "detail": "<str>"
+  },
+  "status": 401
+ },
+ "GET /profile-settings": {
+  "shape": {
+   "career_direction": null,
+   "course_term_overrides": {},
+   "interests": [],
+   "locked_program_code": null,
+   "program_code": "<str>",
+   "recommendation_toggles": {
+    "completed": "<bool>",
+    "interest": "<bool>",
+    "internship": "<bool>",
+    "sequence": "<bool>",
+    "similarity": "<bool>"
+   },
+   "start_term": null,
+   "start_term_locked": "<bool>"
+  },
+  "status": 200
+ },
+ "GET /profile-settings (anon)": {
+  "shape": {
+   "detail": "<str>"
+  },
+  "status": 401
+ },
+ "GET /profile-settings (no program)": {
+  "shape": {
+   "detail": [
+    {
+     "input": null,
+     "loc": [
+      "<str>"
+     ],
+     "msg": "<str>",
+     "type": "<str>"
+    }
+   ]
+  },
+  "status": 422
+ },
+ "POST /auth/signin": {
+  "shape": {
+   "token": "<str>",
+   "user": {
+    "id": "<uuid>",
+    "username": "<str>"
+   }
+  },
+  "status": 200
+ },
+ "POST /auth/signin (bad)": {
+  "shape": {
+   "detail": "<str>"
+  },
+  "status": 401
+ },
+ "POST /auth/signout": {
+  "shape": {
+   "ok": "<bool>"
+  },
+  "status": 200
+ },
+ "POST /auth/signup": {
+  "shape": {
+   "token": "<str>",
+   "user": {
+    "id": "<uuid>",
+    "username": "<str>"
+   }
+  },
+  "status": 200
+ },
+ "POST /recommendations": {
+  "shape": {
+   "ok": "<bool>",
+   "recommendations": [
+    {
+     "category": "<str>",
+     "courseCode": "<str>",
+     "courseName": "<str>",
+     "courseType": "<str>",
+     "ects": "<number>",
+     "evidence": "<str>",
+     "examSubject": "<str>",
+     "id": "<str>",
+     "score": "<number>",
+     "type": "<str>"
+    }
+   ]
+  },
+  "status": 200
+ },
+ "POST /rulecheck (bachelor)": {
+  "shape": {
+   "errors": [],
+   "message": "<str>",
+   "missing": [
+    "<str>"
+   ],
+   "ok": "<bool>",
+   "stats": {
+    "ectsByCategory": {},
+    "ectsByExamSubject": {},
+    "ectsMissingTo180": "<number>",
+    "ectsPerSemester": {},
+    "errors": [],
+    "focus": {
+     "recognized": "<bool>",
+     "selected": null
+    },
+    "maxEctsPerSemester": "<number>",
+    "moduleProgress": [
+     {
+      "complete": "<bool>",
+      "haveEcts": "<number>",
+      "kind": "<str>",
+      "requiredEcts": "<number>",
+      "title": "<str>"
+     }
+    ],
+    "narrowElectives": {
+     "allOptionsCount": "<number>",
+     "completed": [],
+     "completedCount": "<number>",
+     "requiredCount": "<number>"
+    },
+    "programCode": "<str>",
+    "recommendedEctsPerSemester": "<number>",
+    "steop": {
+     "done": {
+      "completeLaneIndex": null,
+      "isComplete": "<bool>",
+      "mandatoryOk": "<bool>",
+      "mandatoryPresent": [],
+      "maxNonSteopBeforeCompletion": "<number>",
+      "nonSteopEctsBeforeCompletion": "<number>",
+      "poolEcts": "<number>",
+      "poolOk": "<bool>"
+     },
+     "planned": {
+      "isComplete": "<bool>",
+      "mandatoryOk": "<bool>",
+      "mandatoryPresent": [],
+      "poolEcts": "<number>",
+      "poolOk": "<bool>"
+     }
+    },
+    "totalEcts": "<number>",
+    "warnings": [
+     "<str>"
+    ]
+   }
+  },
+  "status": 200
+ },
+ "POST /rulecheck (master)": {
+  "shape": {
+   "errors": [],
+   "message": "<str>",
+   "missing": [
+    "<str>"
+   ],
+   "ok": "<bool>",
+   "stats": {
+    "buckets": {
+     "diploma_defense_allocated": "<number>",
+     "diploma_seminar_allocated": "<number>",
+     "diploma_thesis_allocated": "<number>",
+     "diploma_total": "<number>",
+     "free_choice_and_ts": "<number>",
+     "needed_free_to_hit_120": "<number>",
+     "subject_modules_excl_free": "<number>",
+     "transferable_skills": "<number>"
+    },
+    "by_category": {},
+    "by_exam_subject": {},
+    "ects": {
+     "done": "<number>",
+     "planned": "<number>",
+     "target_total": "<number>",
+     "total": "<number>"
+    },
+    "last_change": {
+     "added": [],
+     "moved": [],
+     "removed": [],
+     "type": "<str>"
+    },
+    "maxEctsPerSemester": "<number>",
+    "per_semester": {},
+    "recommendedEctsPerSemester": "<number>"
+   }
+  },
+  "status": 200
+ },
+ "POST /rulecheck (unknown program)": {
+  "shape": {
+   "detail": "<str>"
+  },
+  "status": 400
+ },
+ "PUT /planner-state": {
+  "shape": {
+   "ok": "<bool>"
+  },
+  "status": 200
+ },
+ "PUT /profile-settings/course-terms": {
+  "shape": {
+   "ok": "<bool>",
+   "updated": "<number>"
+  },
+  "status": 200
+ },
+ "PUT /profile-settings/recommendation-profile": {
+  "shape": {
+   "ok": "<bool>"
+  },
+  "status": 200
+ },
+ "PUT /profile-settings/recommendation-profile (before setup)": {
+  "shape": {
+   "detail": "<str>"
+  },
+  "status": 400
+ },
+ "PUT /profile-settings/start-term": {
+  "shape": {
+   "locked": "<bool>",
+   "ok": "<bool>"
+  },
+  "status": 200
+ }
+}
