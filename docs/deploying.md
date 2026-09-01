@@ -31,10 +31,9 @@ rehearsal for a deployment.
 ### Against an empty database, to see that it runs
 
 ```bash
-git checkout fix/evaluation-defects
+git checkout refactor/architecture
 
-./scripts/dev-db.sh up                       # starts Postgres, applies migrations
-export DATABASE_URL="$(./scripts/dev-db.sh url)"
+eval "$(./scripts/dev-db.sh up)"             # Postgres, migrations, and DATABASE_URL
 
 cd backend
 python3 -m venv .venv && source .venv/bin/activate

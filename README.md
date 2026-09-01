@@ -24,9 +24,9 @@ jsdom, which the tests that render a hook use, does not run below it. The test
 command says so if you are on an older Node.
 
 ```bash
-# a database, migrated and seeded with both curricula
-./scripts/dev-db.sh up
-export DATABASE_URL="$(./scripts/dev-db.sh url)"
+# a database, migrated and seeded with both curricula, with DATABASE_URL
+# exported into this shell
+eval "$(./scripts/dev-db.sh up)"
 
 # the API, on :8000
 cd backend
