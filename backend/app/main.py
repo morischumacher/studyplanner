@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .settings import settings
 from .db import migrate_on_boot, get_pool
 from .routes.catalog import router as catalog_router
+from .routes.curriculum import router as curriculum_router
 from .routes.rulecheck import router as rulecheck_router
 from .routes.auth import router as auth_router
 from .routes.planner_state import router as planner_state_router
@@ -55,6 +56,7 @@ async def health():
     return {"ok": True}
 
 app.include_router(catalog_router)
+app.include_router(curriculum_router)
 app.include_router(rulecheck_router)
 app.include_router(auth_router)
 app.include_router(planner_state_router)

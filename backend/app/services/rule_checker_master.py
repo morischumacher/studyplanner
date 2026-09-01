@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, List, Dict, Tuple, Optional
+from .prerequisites import MASTER_PREREQUISITES
 
 
 @dataclass
@@ -179,13 +180,11 @@ class RuleChecker:
             "Advanced Topics In Verification and Automated Reasoning",
         )
 
-        # Minimal prerequisite model (sequence checks)
+        # Minimal prerequisite model (sequence checks). Held in
+        # services/prerequisites.py so the graph view draws the same relations
+        # this checker enforces.
         self.prerequisites: Dict[str, List[str]] = {
-            # diploma parts (if represented as separate “courses”)
-            "Final Oral Exam / Defense": ["Master Thesis"],
-            "Seminar for Diploma Students": ["Master Thesis"],
-            "FOE": ["MTH"],
-            "SDS": ["MTH"],
+            target: list(sources) for target, sources in MASTER_PREREQUISITES.items()
         }
 
         # Category normalization map (many synonyms accepted)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, List, Dict, Tuple, Optional, Set
 import unicodedata
+from .prerequisites import BACHELOR_SOFT_PREREQS
 
 
 @dataclass
@@ -476,11 +477,10 @@ class RuleChecker:
             self._norm("visual computing"): self._norm("Visual Computing"),
         }
 
-        # Soft prerequisite suggestions (warnings only)
-        self.soft_prereqs: List[Tuple[str, str]] = [
-            ("Einführung in die Programmierung 1", "Einführung in die Programmierung 2"),
-            ("Software Engineering", "Software Engineering Projekt"),
-        ]
+        # Soft prerequisite suggestions (warnings only). Held in
+        # services/prerequisites.py so the graph view draws the same relations
+        # this checker enforces.
+        self.soft_prereqs: List[Tuple[str, str]] = list(BACHELOR_SOFT_PREREQS)
         self.split_variant_module_keys: Set[str] = {
             self._norm("Algebra und Diskrete Mathematik"),
             self._norm("Analysis"),

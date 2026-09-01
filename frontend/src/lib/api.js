@@ -217,3 +217,21 @@ export async function fetchRecommendations(payload) {
     });
     return parseJsonOrError(res, "Fetch recommendations failed");
 }
+
+/**
+ * Fetch the prerequisite relations of one programme.
+ *
+ * The compliance engine enforces these relations; the graph view draws them, so
+ * both read the same list from the service rather than holding their own copy.
+ * A programme that encodes no prerequisites returns an empty list, which is an
+ * answer rather than a failure.
+ */
+export async function fetchPrerequisites(programCode) {
+    const url = new URL("/curriculum/prerequisites", BASE);
+    if (programCode) url.searchParams.set("program_code", programCode);
+    const res = await fetch(url.toString(), {
+        credentials: "include",
+        headers: getAuthHeaders({ Accept: "application/json" }),
+    });
+    return parseJsonOrError(res, "Fetch prerequisites failed");
+}
